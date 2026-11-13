@@ -158,6 +158,8 @@ def test_cli_eval_gate_exit_code_and_other_commands(tmp_path, capsys, monkeypatc
     assert cli.main(["learn", "retrieval", "gate"]) == 0 and "Why it exists" in capsys.readouterr().out
     assert cli.main(["doctor"]) == 0 and "scripted" in capsys.readouterr().out
     assert cli.main(["runs"]) == 0 and cli.main(["memory"]) == 0
+    capsys.readouterr()
+    assert cli.main(["selftest", "--provider", "scripted"]) == 0 and "8/8 passed on scripted" in capsys.readouterr().out
 
 
 # ------------------------------------------------------------------ the handbook and the board cannot drift from the code

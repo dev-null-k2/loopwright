@@ -114,7 +114,9 @@ Things to try, in order: *"Remember that Alex prefers morning meetings"*, then *
 | **Claude Code subscription** | install Claude Code and sign in | No API key. See [below](#runs-on-your-claude-code-subscription). |
 | **API key** | `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for Ollama, LM Studio, OpenRouter...) | Native tool calling; prompt caching on Anthropic. |
 
-`loopwright doctor --ping <provider>` sends one real message to check a provider end to end.
+`loopwright doctor --ping <provider>` sends one real message to check a provider. `loopwright selftest --provider
+<provider>` asks eight questions end to end (memory across sessions, tools, RAG, web search, an injection, a denied
+approval) and checks what the agent actually did.
 
 ## Learn agent design while you use it
 
@@ -235,6 +237,7 @@ starts a process, and usage counts against your subscription.
 
 ```bash
 loopwright doctor --ping claude-code        # one real message, to check it works on your machine
+loopwright selftest --provider claude-code  # eight questions end to end, checked on behaviour
 loopwright ask "Plan a three-day trip to Lisbon and save the plan as a note" --provider claude-code --steps
 ```
 
@@ -254,7 +257,7 @@ trifecta"*. More in [docs/claude-code.md](docs/claude-code.md).
 |---|---|
 | Harness, loop, tool gate, memory, guardrails, evals, CLI, web server, MCP server and client | 48 automated tests and the 50-case eval suite, on every push |
 | The cockpit | Driven in headless Chrome for every flow in the screenshots; scripts are syntax-checked in CI |
-| Claude Code provider | The adapter and a full turn through the harness are tested against a stubbed `claude` that returns the CLI's real JSON shape. Check your own install with `loopwright doctor --ping claude-code` |
+| Claude Code provider | The adapter and a full turn through the harness are tested against a stubbed `claude` that returns the CLI's real JSON shape. Check your own install with `loopwright selftest --provider claude-code` |
 | Anthropic and OpenAI-compatible providers | Request and response translation tested with a fake transport. Not called live in CI |
 | Web search | The demo backend end to end; the DuckDuckGo parser, Tavily, Brave and Claude Code backends against fixed response shapes. Not called live in CI |
 

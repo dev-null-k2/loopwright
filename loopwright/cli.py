@@ -10,6 +10,7 @@
     loopwright learn [term]    read a handbook card
     loopwright memory          show what is stored
     loopwright doctor          check which models can run here
+    loopwright selftest        ask eight real questions through a provider and check what it did
     loopwright mcp             serve over MCP on stdio (for Claude Code and other clients)
 """
 
@@ -284,6 +285,38 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_selftest(args: argparse.Namespace) -> int:
+    """Eight questions, end to end, through whichever model you pick. The checks are on behaviour (which tool
+    ran, what was stored, what was not sent), so they hold for a real model that words things its own way."""
+    from loopwright.evals.runner import load_cases, run_case
+    from loopwright.models.gateway import pick_provider
+    provider = pick_provider(args.provider or "auto")
+    print(f"Self-test on {provider}{' (' + args.model + ')' if args.model else ''}. Each question runs in a fresh, temporary state folder.\n")
+    passed = 0
+    cases = load_cases("live")
+    for case in cases:
+        started = time.perf_counter()
+        # no fallback: this is a test of the provider you named, so a failure must show as a failure
+        overrides = {"provider": provider, "fast": provider == "scripted", "fallback": False,
+                     **({"model": args.model} if args.model else {})}
+        result = run_case(case, overrides)
+        trial = result["trials"][0]
+        passed += result["passed"]
+        print(f"  {'pass' if result['passed'] else 'FAIL'}  {case['id']}  {case['title']}  "
+              f"({time.perf_counter() - started:.1f}s, {trial['steps']} steps)")
+        print(f"        asked: {result['prompt']}")
+        print(f"        reply: {' '.join(trial['reply'].split())[:150]}")
+        for check in trial["checks"]:
+            if not check["pass"]:
+                print(f"        failed check: {check['check']}  ->  {check['note'][:160]}")
+        if "could not get an answer from the model" in trial["reply"]:
+            print(f"\nStopping: {provider} cannot be reached, so the remaining questions would fail the same way. "
+                  "Run `loopwright doctor` to see what is set up.")
+            return 1
+    print(f"\n{passed}/{len(cases)} passed on {provider}.")
+    return 0 if passed == len(cases) else 1
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     from loopwright.mcp_server import main as mcp_main
     return mcp_main()
@@ -353,6 +386,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("doctor", help="check which models can run here")
     p.add_argument("--ping", nargs="?", const="auto", metavar="PROVIDER", help="send one real test message")
     p.set_defaults(fn=cmd_doctor)
+
+    p = sub.add_parser("selftest", help="ask eight real questions through a provider and check what it did")
+    p.add_argument("--provider", choices=["auto", "scripted", "claude-code", "anthropic", "openai"])
+    p.add_argument("--model")
+    p.set_defaults(fn=cmd_selftest)
 
     p = sub.add_parser("mcp", help="serve over MCP on stdio")
     p.set_defaults(fn=cmd_mcp)

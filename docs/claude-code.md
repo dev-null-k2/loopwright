@@ -36,7 +36,10 @@ enabled.
 
 **Status.** The adapter is tested in CI against a stubbed `claude` that returns the CLI's real JSON output shape,
 including a full turn through the harness, a prose reply, an authentication error and an overload. CI has no
-signed-in Claude Code, so check your own install with `loopwright doctor --ping claude-code`. If your CLI version
+signed-in Claude Code, so check your own install with `loopwright selftest --provider claude-code`: eight
+questions end to end, checked on what the agent did, not on how the model worded it. The exact command line was also run against Claude Code
+2.1.323 on a machine with no login: the CLI accepted every flag and returned its JSON authentication error, which
+Loopwright reports as "not signed in". That is as far as a machine without an account can go. If your CLI version
 rejects a flag, the error says which.
 
 ## Loopwright as a tool server for Claude Code (MCP)

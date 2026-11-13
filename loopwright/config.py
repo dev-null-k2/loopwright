@@ -40,7 +40,7 @@ def load_dotenv(path: Path | None = None) -> None:
 @dataclass
 class Options:
     # ---- model
-    provider: str = "auto"          # auto | scripted | claude-code | anthropic | openai
+    provider: str = "auto"          # auto | scripted | local | claude-code | anthropic | openai
     model: str = ""                 # empty = the provider's default
     # ---- orchestration
     pattern: str = "react"          # react | plan | reflect

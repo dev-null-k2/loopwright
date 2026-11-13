@@ -27,5 +27,7 @@ def post_json(url: str, headers: dict[str, str], body: dict[str, Any], timeout: 
         if exc.code in RETRYABLE:
             raise TransientModelError(f"HTTP {exc.code}: {detail}") from exc
         raise FatalModelError(f"HTTP {exc.code}: {detail}") from exc
+    except json.JSONDecodeError as exc:
+        raise TransientModelError("the server answered with something that is not JSON") from exc
     except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
         raise TransientModelError(f"network error: {exc}") from exc

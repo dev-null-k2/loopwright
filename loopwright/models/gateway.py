@@ -26,10 +26,12 @@ from typing import Any
 
 from loopwright.config import Options
 from loopwright.events import Recorder
+from loopwright.models import local as local_models
 from loopwright.models import pricing
 from loopwright.models.anthropic_api import AnthropicProvider
 from loopwright.models.base import FatalModelError, Message, ModelError, ModelResponse, Provider, TransientModelError
 from loopwright.models.claude_code import ClaudeCodeProvider, find_cli
+from loopwright.models.local import LocalProvider
 from loopwright.models.openai_compat import OpenAICompatProvider
 from loopwright.models.scripted import ScriptedProvider
 
@@ -37,15 +39,19 @@ BREAKER_THRESHOLD = 3       # consecutive failures before a provider is skipped
 BREAKER_COOLDOWN_S = 30.0
 _breaker: dict[str, dict[str, float]] = {}   # provider name -> {"failures", "open_until"}
 
-PROVIDERS = {"scripted": ScriptedProvider, "claude-code": ClaudeCodeProvider,
+PROVIDERS = {"scripted": ScriptedProvider, "local": LocalProvider, "claude-code": ClaudeCodeProvider,
              "anthropic": AnthropicProvider, "openai": OpenAICompatProvider}
 
 
 def available_providers() -> dict[str, dict[str, Any]]:
     """What can run on this machine right now, and why not when it cannot."""
     cli = find_cli()
+    server = local_models.detect()
     return {
         "scripted": {"ok": True, "note": "built in: offline, deterministic, rule-based"},
+        "local": {"ok": bool(server and server["models"]), "models": server["models"] if server else [],
+                  "note": (f"{server['name']} at {server['url']}: " + (", ".join(server["models"][:6]) or "no models downloaded yet"))
+                  if server else "no local server found. Start Ollama, LM Studio or llama.cpp to run fully offline"},
         "claude-code": {"ok": bool(cli), "note": f"uses your Claude subscription via {cli}" if cli
                         else "install Claude Code and sign in to use your subscription"},
         "anthropic": {"ok": bool(os.environ.get("ANTHROPIC_API_KEY")),
@@ -57,14 +63,14 @@ def available_providers() -> dict[str, dict[str, Any]]:
 
 def pick_provider(requested: str = "auto") -> str:
     """auto = an explicit LOOPWRIGHT_PROVIDER, else an API key, else Claude
-    Code if installed, else the scripted model."""
+    Code if installed, else a local model server, else the scripted model."""
     if requested and requested != "auto":
         return requested if requested in PROVIDERS else "scripted"
     env = os.environ.get("LOOPWRIGHT_PROVIDER", "")
     if env in PROVIDERS:
         return env
     status = available_providers()
-    for name in ("anthropic", "openai", "claude-code"):
+    for name in ("anthropic", "openai", "claude-code", "local"):
         if status[name]["ok"]:
             return name
     return "scripted"
@@ -98,6 +104,9 @@ class ModelGateway:
             if options.fallback:
                 if backup and ":" in backup and backup.split(":")[0] in PROVIDERS:
                     self.chain.append(PROVIDERS[backup.split(":")[0]](backup.split(":", 1)[1]))
+                server = local_models.detect() if name not in ("local", "scripted") else None
+                if server and server["models"]:            # no network? a model on this machine still answers
+                    self.chain.append(LocalProvider(server["models"][0]))
                 self.chain.append(ScriptedProvider("scripted-backup"))
         if options.chaos_model_failures > 0:
             self.chain[0] = _Chaos(self.chain[0], options.chaos_model_failures)

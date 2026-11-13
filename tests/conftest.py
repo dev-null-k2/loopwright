@@ -4,6 +4,7 @@ import pytest
 
 from loopwright.config import Options
 from loopwright.harness import Agent
+from loopwright.models import local
 from loopwright.models.base import ModelResponse, ToolCall, Usage
 from loopwright.models.gateway import reset_breakers
 
@@ -16,6 +17,9 @@ def _isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("LOOPWRIGHT_HOME", str(tmp_path / "home"))
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LOOPWRIGHT_PROVIDER", "TAVILY_API_KEY", "BRAVE_API_KEY", "LOOPWRIGHT_SEARCH"):
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("LOOPWRIGHT_LOCAL_URL", "http://127.0.0.1:9")      # nothing listens here: no real local server leaks in
+    local._found.update(at=0.0, value=None)
+    local._text_only.clear()
     reset_breakers()
 
 

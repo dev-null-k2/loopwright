@@ -12,12 +12,14 @@ First release.
   detection, approvals, idempotency and a taint rule that blocks outside effects after untrusted content.
 - Reliability: retries with backoff and jitter, a fallback chain, a circuit breaker, checkpoints and resume, and
   a failure lab that injects model and tool failures.
-- Models: an offline scripted model, Claude Code subscription, Anthropic API, OpenAI-compatible endpoints.
+- Models: an offline scripted model, local open-source models (Ollama, LM Studio, llama.cpp) with automatic
+  detection and three levels of tool-calling fallback, Claude Code subscription, Anthropic API,
+  OpenAI-compatible endpoints.
 - Tools: 17 built in, including web search with five backends and parallel subagents; your own Python tools;
   an MCP client; an MCP server.
 - The cockpit: an architecture board that lights up, replay with play, pause, step, scrub and speed, a step
   inspector, a per-reply list of everything the agent did, 18 guided lessons in a scratch classroom, the Lab,
   and Learn, Evals, Memory, Tools and Activity pages.
-- Learning: an 83-card handbook, 12 interview scenarios, flashcards.
+- Learning: an 84-card handbook, 12 interview scenarios, flashcards.
 - Evals: 50 cases in five suites, trials, four ablations, retrieval and gate evals, an optional model judge, and
   a release gate.

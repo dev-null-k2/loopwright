@@ -132,10 +132,13 @@ function drawLegend() {
 
 function drawProviders() {
   const select = $("provider");
-  const label = { scripted: "Scripted (offline)", "claude-code": "Claude Code subscription", anthropic: "Anthropic API", openai: "OpenAI-compatible" };
+  const localModel = health.providers.local?.models?.[0];
+  const label = { scripted: "Scripted (offline)", local: `Local model${localModel ? `: ${localModel}` : ""}`, "claude-code": "Claude Code subscription", anthropic: "Anthropic API", openai: "OpenAI-compatible" };
   put(select, h("option", { value: "auto" }, `Auto: ${label[health.default_provider]}`),
     Object.entries(health.providers).map(([name, p]) => h("option", { value: name, disabled: !p.ok, title: p.note }, label[name] + (p.ok ? "" : " (not set up)"))));
   select.value = lab.provider && health.providers[lab.provider]?.ok ? lab.provider : "auto";
+  // a local server can hold several models: one entry each
+  for (const m of (health.providers.local?.models || []).slice(1, 12)) select.append(h("option", { value: `local|${m}` }, `Local model: ${m}`));
   select.addEventListener("change", () => { lab.provider = select.value; saveLab(); });
 }
 
@@ -309,7 +312,8 @@ async function send(text, { options = {}, quiet = false, inSession = null, lesso
   messages.push(m);
   if (lessonRun && !quiet && !lessonRun.message) lessonRun.message = m;
   drawChat();
-  const turnOptions = { ...lab, provider: $("provider").value, ...options };
+  const [provider, model] = $("provider").value.split("|");
+  const turnOptions = { ...lab, provider, model: model || "", ...options };
   if (!quiet) {
     player.setSpeed(Number($("speed").value));
     player.load([], { title: message, live: true, owner: m }, { live: true, autoplay: true });

@@ -329,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command")
 
     def model_flags(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--provider", choices=["auto", "scripted", "claude-code", "anthropic", "openai"])
+        p.add_argument("--provider", choices=["auto", "scripted", "local", "claude-code", "anthropic", "openai"])
         p.add_argument("--model")
         p.add_argument("--pattern", choices=["react", "plan", "reflect"])
         p.add_argument("--set", action="append", metavar="KEY=VALUE", help="any Options field, e.g. --set guardrails=false")
@@ -388,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_doctor)
 
     p = sub.add_parser("selftest", help="ask eight real questions through a provider and check what it did")
-    p.add_argument("--provider", choices=["auto", "scripted", "claude-code", "anthropic", "openai"])
+    p.add_argument("--provider", choices=["auto", "scripted", "local", "claude-code", "anthropic", "openai"])
     p.add_argument("--model")
     p.set_defaults(fn=cmd_selftest)
 

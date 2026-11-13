@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-12T20:02:18",
+  "generated": "2026-11-12T20:10:56",
   "version": "0.1.0",
   "model": "scripted-v1 (rule-based; these are evals of the harness, not of an LLM)",
   "suites": {
@@ -224,9 +224,9 @@
             }
           ],
           "trial": {},
-          "reply": "**Retrieval gate**: A cheap check, before any search, of whether this turn needs memory at all.\n\nMost tutorials search memory on every message. The gate asks first: does answering this need what the agent knows about this person? Loopwright can decide by rules (personal words, known names, action verbs) or with one small-model call. Whatever the mode, it fails open: if the decision itself breaks, it retrieves.\n\nWhy it exists: Retrieving on every turn is slower, and loosely related memories in the prompt bias the answer. 'What is 2+2' does not need your address.\n\nThe tradeoff: A gate that wrongly skips loses a memory the turn needed. So it needs its own eval, and the model keeps a recall tool to pull memory mid-turn when the gate was wrong.\n\nIn this repo: `loopwright/memory/gate.py`\n\n[handbook: Retrieval gate]\n\nRelated: Push and pull retrieval, Release gate.",
+          "reply": "**Retrieval gate**: A cheap check, before any search, of whether this turn needs memory at all.\n\nMost tutorials search memory on every message. The gate asks first: does answering this need what the agent knows about this person? Loopwright can decide by rules (personal words, known names, action verbs) or with one small-model call. Whatever the mode, it fails open: if the decision itself breaks, it retrieves.\n\nWhy it exists: Retrieving on every turn is slower, and loosely related memories in the prompt bias the answer. 'What is 2+2' does not need your address.\n\nThe tradeoff: A gate that wrongly skips loses a memory the turn needed. So it needs its own eval, and the model keeps a recall tool to pull memory mid-turn when the gate was wrong.\n\nIn this repo: `loopwright/memory/gate.py`\n\n[handbook: Retrieval gate]\n\nRelated: Push and pull retrieval, Agentic retrieval.",
           "steps": 21,
-          "tokens_in": 4640,
+          "tokens_in": 4654,
           "turns": 1,
           "memory_searches": 0,
           "attack_succeeded": false
@@ -450,7 +450,7 @@
           "trial": {},
           "reply": "Here is how they compare.\n\n**retrieval gate**: A cheap check, before any search, of whether this turn needs memory at all. It exists because: Retrieving on every turn is slower, and loosely related memories in the prompt bias the answer. 'What is 2+2' does not need your address. Tradeoff: a gate that wrongly skips loses a memory the turn needed. So it needs its own eval, and the model keeps a recall tool to pull memory mid-turn when the gate was wrong. [handbook: Retrieval gate]\n\n**compaction**: Replacing older conversation with a summary when history outgrows its share of the window. It exists because: Without it a long session either overflows the window or spends most of every call re-reading old small talk. Tradeoff: It is lossy and irreversible in the model's view: whatever the summary omits is gone. That is why durable facts are also written to long-term memory, and why the recent messages stay verbatim. [handbook: Compaction]\n\nIn short: A cheap check, before any search, of whether this turn needs memory at all. Replacing older conversation with a summary when history outgrows its share of the window.",
           "steps": 40,
-          "tokens_in": 9467,
+          "tokens_in": 9480,
           "turns": 1,
           "memory_searches": 0,
           "attack_succeeded": false
@@ -2327,7 +2327,7 @@
       "attack_success_rate": 0.0,
       "attacks_succeeded": 0,
       "attacks": 4,
-      "avg_tokens_in_per_turn": 3489,
+      "avg_tokens_in_per_turn": 3490,
       "memory_searches": 0,
       "turns": 69,
       "failed": [
@@ -2566,5 +2566,5 @@
       "gate_false_skip_rate_max": 0.2
     }
   },
-  "seconds": 5.49
+  "seconds": 5.73
 }

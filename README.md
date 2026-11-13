@@ -12,13 +12,15 @@ and any run can be replayed, paused and stepped through afterwards.
 [Learn agent design](#learn-agent-design-while-you-use-it) ·
 [Evals](#measured-not-claimed) ·
 [Add your own tools](#make-it-yours) ·
-[Claude Code](#runs-on-your-claude-code-subscription)
+[Claude Code](#runs-on-your-claude-code-subscription) ·
+[Offline and local models](docs/offline.md)
 
 [![CI](https://github.com/dev-null-k2/loopwright/actions/workflows/ci.yml/badge.svg)](https://github.com/dev-null-k2/loopwright/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2456d6)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-12805a)
 ![Dependencies](https://img.shields.io/badge/dependencies-none-12805a)
 ![API key](https://img.shields.io/badge/API_key-not_needed-12805a)
+![Works offline](https://img.shields.io/badge/works-offline-12805a)
 ![Eval gate](https://img.shields.io/badge/eval_gate-passing-12805a)
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/cockpit-dark.png"><img alt="The Loopwright cockpit. Left: a chat where each reply lists what the agent did (loaded a skill, looked in memory, recalled a fact, called create_event). Centre: the architecture board with the Semantic memory box lit and a caption explaining the step. Right: the step inspector with the ranks from two search rankers, above the list of 22 recorded steps." src="docs/media/cockpit-light.png" width="100%"></picture>
@@ -49,9 +51,9 @@ that says which part of the system it happened in and why. That one decision giv
 |---|---|
 | **Replay is the interface** | Play, pause, step forward and back, scrub a strip coloured by subsystem, 0.4x to 4x. Live turns and old traces use the same player. |
 | **Every reply shows its work** | Under each answer: what it looked up in memory, which skill loaded, every tool call with its arguments and raw output, retries, refusals. Click a row and the board jumps to that step. |
-| **It teaches while it runs** | Each step is explained in plain words, linked to an 83-card handbook and to the file that implements it. Eighteen guided lessons run real turns and tell you where to look. |
+| **It teaches while it runs** | Each step is explained in plain words, linked to an 84-card handbook and to the file that implements it. Eighteen guided lessons run real turns and tell you where to look. |
 | **Switch any mechanism off** | The Lab turns off memory, the retrieval gate or guardrails, injects model and tool failures, and changes the orchestration pattern, per message. |
-| **Runs with no key** | A built-in scripted model makes everything work offline the moment you clone. Or use your Claude Code subscription, or any Anthropic or OpenAI-compatible key. |
+| **Runs with no key, and with no internet** | A built-in scripted model makes everything work the moment you clone. Or use an open-source model on your own machine (Ollama, LM Studio, llama.cpp), your Claude Code subscription, or any Anthropic or OpenAI-compatible key. |
 | **Measured, with teeth** | 50 eval cases, five ablations, a release gate, and gate rules that fail if the *evals themselves* stop being able to fail. |
 | **Zero dependencies** | Python standard library only. No framework, no SDK, no build step for the UI. |
 
@@ -106,13 +108,14 @@ loopwright doctor                                                      # which m
 Things to try, in order: *"Remember that Alex prefers morning meetings"*, then **New chat**, then
 *"Book a catch-up with Alex on Friday"*. It books 09:00, and the reply shows where that came from.
 
-### Three ways to give it a model
+### Four ways to give it a model
 
 | | How | Notes |
 |---|---|---|
 | **Scripted** (default with nothing set up) | nothing | A rule-based stand-in, not an LLM. Instant, offline, deterministic. It handles the request shapes the lessons use and says so honestly about anything else. It is what the evals and CI run on. |
+| **A local open-source model** | run Ollama, LM Studio or llama.cpp | Found automatically. No key, no internet. Also the automatic fallback when the network drops. See [docs/offline.md](docs/offline.md). |
 | **Claude Code subscription** | install Claude Code and sign in | No API key. See [below](#runs-on-your-claude-code-subscription). |
-| **API key** | `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for Ollama, LM Studio, OpenRouter...) | Native tool calling; prompt caching on Anthropic. |
+| **API key** | `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for OpenRouter, Groq, Together...) | Native tool calling; prompt caching on Anthropic. |
 
 `loopwright doctor --ping <provider>` sends one real message to check a provider. `loopwright selftest --provider
 <provider>` asks eight questions end to end (memory across sessions, tools, RAG, web search, an injection, a denied
@@ -126,11 +129,11 @@ Loopwright is meant to be the fastest way to understand how agents are built, in
   "watch for this" into a link that jumps the board to that step: the loop, context as a budget, writing and
   reading memory, the gate saying no, RAG with citations, subagents, human approval, an injection defended and
   undefended, web search, failure and recovery, limits, planning, a critic, teaching it a skill.
-- **[The handbook](docs/glossary.md)**: 83 terms, each with what it is, why it exists, the tradeoff, the file
+- **[The handbook](docs/glossary.md)**: 84 terms, each with what it is, why it exists, the tradeoff, the file
   that implements it, and an interview question with a strong answer. Harness, ReAct, context engineering,
   context rot, compaction, prompt caching, the retrieval gate, hybrid search and RRF, consolidation, tool gates,
   MCP, prompt injection, the lethal trifecta, idempotency, circuit breakers, trajectory evals, pass^k, ablations,
-  release gates, and the rest. 71 of them run in this repository; 12 are explained and labelled as not built here.
+  release gates, and the rest. 72 of them run in this repository; 12 are explained and labelled as not built here.
 - **[Interview practice](docs/interview-prep.md)**: 12 scenario questions (design a support agent, add memory, an
   agent that reads and sends email, cut cost by two thirds, "is this ready for production?") with full answers on
   one spine: clarify, shape, design, failure, measure. Plus a flashcard deck.
@@ -151,7 +154,7 @@ One turn, top to bottom. Each row is a box on the board and a file you can read.
 | Semantic + episodic memory | Facts and dated episodes in one SQLite file. BM25 + vectors fused with RRF. Facts are superseded, never overwritten | [`memory/store.py`](loopwright/memory/store.py), [`memory/retrieval.py`](loopwright/memory/retrieval.py) |
 | Context builder | Assembles the prompt section by section and counts each one against a budget you can see | [`context.py`](loopwright/context.py) |
 | **The loop** | Model, tools, results, repeat. Three stop conditions. About 100 lines | [`loop.py`](loopwright/loop.py) |
-| Model gateway | Four providers behind one interface; retries with backoff and jitter, fallback chain, circuit breaker, accounting | [`models/gateway.py`](loopwright/models/gateway.py) |
+| Model gateway | Five providers behind one interface; retries with backoff and jitter, fallback chain, circuit breaker, accounting | [`models/gateway.py`](loopwright/models/gateway.py) |
 | Tool gate | Six checks before any tool runs: exists, valid arguments, budget, not a repeat, permitted, not already done. Outside effects need approval; after untrusted content they are denied | [`toolgate.py`](loopwright/toolgate.py) |
 | Tools | 17 built in, plus yours, plus any MCP server's | [`tools/`](loopwright/tools/) |
 | Subagents | Parallel workers with a fresh context and read-only tools that return a summary | [`tools/delegate.py`](loopwright/tools/delegate.py) |
@@ -185,7 +188,7 @@ answer. Reliability cases run three trials with failures injected at different p
 | Handbook retrieval, 36 labelled questions, recall@1 / @3 | BM25 89% / 100% · dense 81% / 94% · hybrid 94% / 100% |
 | Retrieval gate (rules), 30 labelled messages | 83% accurate; 2 false skips, 3 false retrieves |
 | Lessons | all 17 runnable lessons produce every step they promise (a test enforces it) |
-| Unit and end-to-end tests | 48 passing |
+| Unit and end-to-end tests | 55 passing |
 
 **Read these numbers honestly.**
 
@@ -255,7 +258,8 @@ trifecta"*. More in [docs/claude-code.md](docs/claude-code.md).
 
 | Part | How it is verified |
 |---|---|
-| Harness, loop, tool gate, memory, guardrails, evals, CLI, web server, MCP server and client | 48 automated tests and the 50-case eval suite, on every push |
+| Harness, loop, tool gate, memory, guardrails, evals, CLI, web server, MCP server and client | 55 automated tests and the 50-case eval suite, on every push, on Python 3.11 and 3.13 |
+| Local open-source models | Full turns over real HTTP against a stub server that behaves like three kinds of local model (native tool calling, tool calls written as text, tools refused), plus the offline fallback. Not run against every runner and model; `loopwright selftest --provider local` checks yours |
 | The cockpit | Driven in headless Chrome for every flow in the screenshots; scripts are syntax-checked in CI |
 | Claude Code provider | The adapter and a full turn through the harness are tested against a stubbed `claude` that returns the CLI's real JSON shape. Check your own install with `loopwright selftest --provider claude-code` |
 | Anthropic and OpenAI-compatible providers | Request and response translation tested with a fake transport. Not called live in CI |
@@ -283,14 +287,14 @@ loopwright/
   guardrails.py     input, tool-result and output guards
   patterns.py       planner, critic
   memory/           store, retrieval (BM25, vectors, RRF), gate, consolidation, skills, knowledge base
-  models/           gateway, scripted, claude_code, anthropic_api, openai_compat
+  models/           gateway, scripted, local, claude_code, anthropic_api, openai_compat
   tools/            builtin, web_search, delegate, mcp_client, plugins, registry
   evals/            runner, graders, judge, gate, datasets/
   learn/            concepts.toml, lessons.toml, interview.toml
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              48 tests
-docs/               architecture, replay, evals, tools, claude-code, security, glossary, lessons, interview prep, events
+tests/              55 tests
+docs/               architecture, replay, evals, tools, offline, claude-code, security, glossary, lessons, interview prep, events
                     + the static demo served by GitHub Pages
 results/            the committed eval report
 ```

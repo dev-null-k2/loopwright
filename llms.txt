@@ -1,7 +1,7 @@
 # Loopwright
 
 > An AI agent built to be watched: every step emits a typed event, the cockpit lights up the architecture as events
-> play, and any run can be replayed. Python standard library only. Runs offline on a scripted model, on a Claude Code
+> play, and any run can be replayed. Python standard library only. Runs offline on a scripted model or a local open-source model, on a Claude Code
 > subscription, or on an Anthropic or OpenAI-compatible API key.
 
 ## Start here
@@ -10,13 +10,14 @@
 - [Events](docs/events.md): every event kind and the box it lands on
 
 ## Learn
-- [Handbook](docs/glossary.md): 83 agent-design terms
+- [Handbook](docs/glossary.md): 84 agent-design terms
 - [Lessons](docs/lessons.md): 18 guided runs
 - [Interview practice](docs/interview-prep.md): 12 scenarios with answers
 
 ## Use and extend
 - [Tools, skills and MCP](docs/tools.md)
 - [Claude Code](docs/claude-code.md)
+- [Offline and local models](docs/offline.md)
 - [Replay](docs/replay.md)
 - [Evals](docs/evals.md)
 - [Security](docs/security.md)

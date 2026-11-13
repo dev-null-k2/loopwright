@@ -160,7 +160,12 @@ def web_search(args: dict[str, Any], ctx: ToolContext) -> str:
     if not query:
         raise ToolError("the query is empty")
     backend = pick_backend(ctx.options.search)
-    results = SEARCHERS[backend](query)
+    try:
+        results = SEARCHERS[backend](query)
+    except TransientToolError as exc:
+        # offline (a flight, a dead network): say so in words the model can act on
+        raise TransientToolError(f"web search is unreachable right now ({exc}). If you are offline, answer from "
+                                 "memory and the handbook and say the web could not be checked") from exc
     ctx.rec.emit("web.search", "tools", f"Web search ({backend}): {len(results)} result(s)",
                  "Search brings in text written by strangers. It is the freshest input an agent has and the "
                  "least trustworthy, so every result is about to be fenced as untrusted and the turn tainted.",

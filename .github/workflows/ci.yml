@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check loopwright tests scripts
+      - name: Tests
+        run: python -m pytest
+      - name: Evals and release gate
+        run: loopwright eval --gate --out results
+      - name: Generated docs are up to date
+        run: |
+          python scripts/build_docs.py
+          git diff --exit-code -- docs/glossary.md docs/lessons.md docs/interview-prep.md docs/events.md

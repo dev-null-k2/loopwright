@@ -1,0 +1,36 @@
+{"q": "What is a harness?", "expect": "harness"}
+{"q": "explain the agent loop", "expect": "react-loop"}
+{"q": "what is ReAct", "expect": "react-loop"}
+{"q": "how do I stop an agent from looping forever", "expect": "stop-conditions"}
+{"q": "what is context engineering", "expect": "context-engineering"}
+{"q": "why does quality drop when the context fills up", "expect": "context-rot"}
+{"q": "how does compaction work", "expect": "compaction"}
+{"q": "what is prompt caching", "expect": "prompt-caching"}
+{"q": "difference between semantic and episodic memory", "expect": "episodic-memory"}
+{"q": "what are skills and progressive disclosure", "expect": "procedural-memory"}
+{"q": "should the agent search memory on every turn", "expect": "retrieval-gate"}
+{"q": "how does memory consolidation decide what to keep", "expect": "consolidation"}
+{"q": "what is RAG", "expect": "rag"}
+{"q": "how should I split documents into chunks", "expect": "chunking"}
+{"q": "what is BM25", "expect": "bm25"}
+{"q": "how does reciprocal rank fusion work", "expect": "hybrid-search"}
+{"q": "what does a reranker do", "expect": "reranking"}
+{"q": "what is function calling", "expect": "tool-calling"}
+{"q": "what is the model context protocol", "expect": "mcp"}
+{"q": "explain prompt injection", "expect": "prompt-injection"}
+{"q": "what is the lethal trifecta", "expect": "lethal-trifecta"}
+{"q": "when should a human approve an action", "expect": "human-in-the-loop"}
+{"q": "what is exponential backoff with jitter", "expect": "retry-backoff"}
+{"q": "what is a circuit breaker", "expect": "circuit-breaker"}
+{"q": "how do I avoid booking the same meeting twice on retry", "expect": "idempotency"}
+{"q": "what is tracing", "expect": "tracing"}
+{"q": "what is LLM as judge", "expect": "llm-as-judge"}
+{"q": "what is the difference between pass@k and pass^k", "expect": "pass-k"}
+{"q": "what is an ablation study", "expect": "ablations"}
+{"q": "how do I gate a release on evals", "expect": "release-gate"}
+{"q": "when should I use subagents", "expect": "subagents"}
+{"q": "RAG or fine-tuning", "expect": "customisation-options"}
+{"q": "why do models make things up", "expect": "hallucination"}
+{"q": "resume a crashed agent run", "expect": "checkpointing"}
+{"q": "grading the steps an agent took, not just the answer", "expect": "trajectory-evals"}
+{"q": "workflow versus agent", "expect": "agent"}

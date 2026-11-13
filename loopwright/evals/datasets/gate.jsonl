@@ -1,0 +1,30 @@
+{"message": "What's 18% of 2450?", "retrieve": false}
+{"message": "hi", "retrieve": false}
+{"message": "thanks!", "retrieve": false}
+{"message": "What is a retrieval gate?", "retrieve": false}
+{"message": "Explain prompt injection", "retrieve": false}
+{"message": "Compare BM25 and embeddings", "retrieve": false}
+{"message": "What time is it?", "retrieve": false}
+{"message": "12 * 7.5", "retrieve": false}
+{"message": "Summarise demo://release-notes", "retrieve": false}
+{"message": "How does a circuit breaker work?", "retrieve": false}
+{"message": "Remember that Alex prefers morning meetings", "retrieve": false}
+{"message": "Translate 'good morning' into Spanish", "retrieve": false}
+{"message": "Book a catch-up with Alex on Friday", "retrieve": true}
+{"message": "When am I meeting Priya?", "retrieve": true}
+{"message": "What do you know about me?", "retrieve": true}
+{"message": "What's my manager's name?", "retrieve": true}
+{"message": "Schedule lunch with Sam tomorrow", "retrieve": true}
+{"message": "Does Alex like mornings or afternoons?", "retrieve": true}
+{"message": "Where do I live?", "retrieve": true}
+{"message": "Email Dana about the usual thing", "retrieve": true}
+{"message": "What did we decide last time?", "retrieve": true}
+{"message": "Plan something Priya would enjoy", "retrieve": true}
+{"message": "Is that restaurant good for our anniversary?", "retrieve": true}
+{"message": "Draft the weekly update the way I usually write it", "retrieve": true}
+{"message": "Can you help me understand transformers?", "retrieve": false}
+{"message": "I need a quick recipe for pancakes", "retrieve": false}
+{"message": "Same as last week, please", "retrieve": true}
+{"message": "Any allergies to keep in mind for the dinner?", "retrieve": true}
+{"message": "The usual order", "retrieve": true}
+{"message": "Give me a summary of the French Revolution", "retrieve": false}

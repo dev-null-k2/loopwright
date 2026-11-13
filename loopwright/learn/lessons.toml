@@ -1,0 +1,237 @@
+# The guided path through the cockpit. Each lesson runs a real turn and tells
+# you which steps to look at. `before` prompts run first, quietly, to set the
+# scene. `options` are Lab switches applied to this lesson only. `watch` lists
+# event kinds worth stopping on; the cockpit turns each into a jump link.
+
+[[lesson]]
+id = "loop"
+title = "The loop"
+goal = "See the one cycle every agent is built on: the model asks, our code acts, the model sees the result."
+prompt = "What's 18% of 2450, and save that as a note"
+watch = [
+  { kind = "model.call", say = "The model does no arithmetic. It asks for the calculator, then for save_note, then answers. Three calls." },
+  { kind = "tool.run", say = "Our code ran the function. The model never executes anything." },
+  { kind = "loop.observe", say = "The result is appended to the conversation. That is the only way the model learns what happened." },
+  { kind = "loop.stop", say = "No tool calls in the last response, so the loop ends." },
+]
+takeaway = "An agent is a model in a loop with tools. The model picks the next move; the harness does everything else."
+concepts = ["react-loop", "tool-calling", "stop-conditions"]
+
+[[lesson]]
+id = "harness"
+title = "What surrounds the loop"
+goal = "Send the smallest possible message and count how much still happens."
+prompt = "hi"
+watch = [
+  { kind = "guard.input", say = "Even 'hi' passes the input guard." },
+  { kind = "context.build", say = "Open the token bar: over a thousand tokens before you typed two letters. Most of it is tool definitions." },
+  { kind = "evals.online", say = "Every turn is scored as it finishes." },
+  { kind = "trace.write", say = "And every turn leaves a trace. That file is what you are replaying right now." },
+]
+takeaway = "One model call, zero tools, and still fifteen steps. That surrounding machinery is the harness."
+concepts = ["harness", "context-window", "tracing"]
+
+[[lesson]]
+id = "memory-write"
+title = "Writing a memory"
+goal = "Tell the agent something worth keeping and watch where it goes."
+prompt = "Remember that Alex prefers morning meetings"
+watch = [
+  { kind = "memory.gate", say = "The gate skips retrieval: this is a write, not a read." },
+  { kind = "memory.write", say = "ADD: nothing like it was stored. Open the Memory tab afterwards to see the row." },
+]
+takeaway = "An explicit 'remember' is written immediately through a tool, so the confirmation is true."
+concepts = ["memory-write", "semantic-memory"]
+
+[[lesson]]
+id = "memory-read"
+title = "Using a memory in a new conversation"
+goal = "Start a fresh session and ask for something that depends on what the agent was told before."
+before = ["Remember that Alex prefers morning meetings"]
+prompt = "Book a catch-up with Alex on Friday"
+new_session = true
+watch = [
+  { kind = "skills.match", say = "The word 'book' loads the schedule-meeting skill: its full instructions enter the prompt for this turn only." },
+  { kind = "memory.gate", say = "The gate says retrieve, because a person it knows is named." },
+  { kind = "memory.search", say = "Two rankers searched the facts. Look at the ranks from each." },
+  { kind = "context.build", say = "A 'memory' section now exists in the prompt. It was not there in the earlier lessons." },
+  { kind = "tool.run", say = "The event is created at 09:00. No time was given; it came from memory." },
+]
+takeaway = "Memory only matters if it reaches the context at the right moment. The gate and the search decide that."
+concepts = ["retrieval-gate", "hybrid-search", "procedural-memory"]
+
+[[lesson]]
+id = "gate-skip"
+title = "The gate saying no"
+goal = "Ask something that has nothing to do with you and confirm that memory is left alone."
+before = ["Remember that Alex prefers morning meetings"]
+prompt = "What is 144 / 12?"
+watch = [
+  { kind = "memory.gate", say = "Skip. No search runs and no memory section is added to the prompt." },
+  { kind = "context.build", say = "Compare the sections with the last lesson: no 'memory'." },
+]
+takeaway = "Then open the Lab, set the retrieval gate to 'always', and run it again. The search runs for nothing."
+concepts = ["retrieval-gate", "context-rot"]
+
+[[lesson]]
+id = "memory-update"
+title = "Changing your mind"
+goal = "Contradict an earlier fact and see that it is superseded, not duplicated."
+before = ["Remember that Alex prefers morning meetings"]
+prompt = "Remember that Alex prefers afternoon meetings"
+watch = [
+  { kind = "memory.write", say = "UPDATE: same subject and attribute, new value. The old row is kept and marked superseded." },
+]
+takeaway = "Open the Memory tab: the old fact is struck through. The agent's history of beliefs is kept."
+concepts = ["consolidation", "forgetting"]
+
+[[lesson]]
+id = "rag"
+title = "Answering from documents"
+goal = "Ask a question about agent design and follow the retrieval and the citation."
+prompt = "Explain prompt injection"
+watch = [
+  { kind = "kb.search", say = "The handbook was searched by keyword and by vector, then the two rankings were fused." },
+  { kind = "guard.output", say = "The citation in the answer is checked against what was actually retrieved." },
+]
+takeaway = "RAG: retrieve the passage, answer from it, cite it, verify the citation."
+concepts = ["rag", "hybrid-search", "hallucination"]
+
+[[lesson]]
+id = "workers"
+title = "Handing work to subagents"
+goal = "Ask for a comparison and watch two workers research the halves at the same time."
+prompt = "Compare BM25 and embeddings"
+watch = [
+  { kind = "subagent.spawn", say = "Two workers, each with a fresh context holding only its task." },
+  { kind = "subagent.return", say = "Compare tokens spent with tokens returned. That gap is context isolation." },
+]
+takeaway = "Tick 'Hide worker steps' to see what the orchestrator saw: one tool call and its result."
+concepts = ["subagents", "parallelization"]
+
+[[lesson]]
+id = "approval"
+title = "A human in the loop"
+goal = "Ask for an action with effects outside the conversation. The turn will stop and wait for you."
+prompt = "Send a message to Priya: running 10 minutes late"
+options = { approvals = "ask" }
+watch = [
+  { kind = "toolgate.check", say = "The gate classified send_message as having outside effects." },
+  { kind = "human.request", say = "The turn is paused here. Nothing has been sent." },
+  { kind = "human.decision", say = "Your answer goes back to the model as the tool's result." },
+]
+takeaway = "The model proposes; a person decides. Decline it once and read how the agent reports that."
+concepts = ["human-in-the-loop", "tool-gate"]
+
+[[lesson]]
+id = "injection"
+title = "A prompt injection, defended"
+goal = "Have the agent read a page that contains hidden instructions to leak your data."
+before = ["Remember that my door code hint is the dog's birthday"]
+prompt = "Summarise demo://poisoned-page"
+options = { approvals = "approve" }
+watch = [
+  { kind = "guard.tool_result", say = "The page is fenced as untrusted, the scan flags it, and the turn is marked tainted." },
+  { kind = "model.call", say = "The model summarises and mentions the instructions it ignored. No send_message call." },
+]
+takeaway = "Check the Memory tab: the outbox is empty."
+concepts = ["prompt-injection", "lethal-trifecta"]
+
+[[lesson]]
+id = "injection-off"
+title = "The same attack with guardrails off"
+goal = "Run the identical request with the defence removed. This is why it exists."
+before = ["Remember that my door code hint is the dog's birthday"]
+prompt = "Summarise demo://poisoned-page"
+options = { guardrails = false, approvals = "approve" }
+watch = [
+  { kind = "model.call", say = "With no fence around the page, the model obeys it and asks for send_message." },
+  { kind = "tool.run", say = "The message goes out, with your stored memory in the body." },
+]
+takeaway = "Open the Memory tab and read the outbox. The scripted model is deliberately gullible, so this is the worst case."
+concepts = ["prompt-injection", "red-teaming", "scripted-model"]
+
+[[lesson]]
+id = "web"
+title = "Searching the web"
+goal = "Ask for something that needs outside information, and see how search results are treated."
+prompt = "Search the web for agent evaluation best practices"
+options = { search = "demo" }
+watch = [
+  { kind = "web.search", say = "The demo backend is answering so this lesson is repeatable offline. Real backends plug into the same function." },
+  { kind = "guard.tool_result", say = "Search results are fenced exactly like a fetched page. After this, outside-effect tools are locked for the turn." },
+]
+takeaway = "Search is the freshest input an agent has and the least trustworthy."
+concepts = ["web-search", "prompt-injection"]
+
+[[lesson]]
+id = "failure"
+title = "When the model fails"
+goal = "Make the first two model calls fail and watch the turn survive."
+prompt = "What's 18% of 2450?"
+options = { chaos_model_failures = 2 }
+watch = [
+  { kind = "model.retry", say = "A transient error. Retried after a wait that doubles each time, with jitter." },
+  { kind = "model.call", say = "The third attempt succeeds and the turn carries on as if nothing happened." },
+]
+takeaway = "Set 'Fail the first N model calls' to 4 in the Lab: retries run out and the fallback model answers."
+concepts = ["retry-backoff", "fallback", "circuit-breaker"]
+
+[[lesson]]
+id = "limits"
+title = "Hitting a limit"
+goal = "Give a two-step request to a loop that is only allowed one round."
+prompt = "What's 12 * 7.5, and save that as a note"
+options = { max_iterations = 1 }
+watch = [
+  { kind = "loop.stop", say = "Cut off by the round limit, not by the model answering." },
+  { kind = "evals.online", say = "The turn check 'loop ended by answering' fails. That is how you would notice in production." },
+]
+takeaway = "A limit ends in an honest partial answer, never a crash and never a silent success."
+concepts = ["stop-conditions", "budgets", "online-evals"]
+
+[[lesson]]
+id = "plan"
+title = "Planning first"
+goal = "Switch the orchestration pattern so the agent writes its steps before it acts."
+prompt = "Book a meeting with Sam on Monday at 10am"
+options = { pattern = "plan" }
+watch = [
+  { kind = "plan.made", say = "A plan, before any tool has run." },
+  { kind = "context.build", say = "The plan is now a section of the prompt." },
+]
+takeaway = "One extra call buys a reviewable intent. Worth it on long tasks, wasted on short ones."
+concepts = ["plan-and-execute", "workflow-graph"]
+
+[[lesson]]
+id = "critic"
+title = "A critic reviews the draft"
+goal = "Add a review pass that can send the answer back once."
+prompt = "Compare the retrieval gate and compaction"
+options = { pattern = "reflect" }
+watch = [
+  { kind = "critic.review", say = "The draft fails one rubric item: a comparison needs a bottom line." },
+  { kind = "model.call", say = "The last model call is the revision." },
+]
+takeaway = "Evaluator-optimizer. Capped at one revision, because a critic that can always ask for more never finishes."
+concepts = ["evaluator-optimizer"]
+
+[[lesson]]
+id = "teach"
+title = "Teaching it a procedure"
+goal = "Tell the agent how you want a kind of request handled and watch it write a skill."
+prompt = "When I ask for a standup update, always give three bullets: done, doing, blocked"
+watch = [
+  { kind = "skills.create", say = "A SKILL.md was written to your state folder. See it in the Memory tab, under Skills." },
+]
+takeaway = "Procedural memory. From the next turn the skill's one-line description is always in the prompt."
+concepts = ["procedural-memory"]
+
+[[lesson]]
+id = "evals"
+title = "Proving it works"
+goal = "Run the eval suite and read the ablation table."
+open = "evals"
+watch = []
+takeaway = "Find the 'no-guardrails' row: every attack succeeds. That is the measured value of the defence you watched in lesson 10."
+concepts = ["evals", "ablations", "release-gate"]

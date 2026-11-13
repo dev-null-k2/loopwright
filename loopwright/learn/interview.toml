@@ -1,0 +1,248 @@
+# Interview practice: scenario questions of the kind asked in agent-engineering,
+# solutions and forward-deployed engineering interviews.
+#
+# Each answer follows the same spine, because interviewers grade the spine more
+# than the details:
+#   1. Clarify   who uses it, what "good" means, what must never happen
+#   2. Shape     workflow or agent? what are the tools? where is the human?
+#   3. Design    context, memory, tools, guardrails: name the mechanisms
+#   4. Failure   how it breaks, and what catches each break
+#   5. Measure   the evals and the launch plan
+#
+# `concepts` links each scenario to glossary cards you can open and see running.
+
+[[scenario]]
+id = "support-agent"
+kind = "System design"
+title = "Design a customer-support agent for a telecom"
+prompt = "A mobile carrier wants an agent that answers billing and plan questions in chat and can apply credits up to $20. Two million customers. Walk me through your design."
+concepts = ["agent", "tool-gate", "rag", "human-in-the-loop", "evals", "release-gate"]
+answer = """
+Clarify first. Which questions make up most of the volume? What may the agent do without a person, and what is the cost of a wrong credit versus a wrong answer? What exists today: knowledge base, billing API, escalation queue?
+
+Shape. Most traffic is a few intents, so I would route: FAQ-type questions to retrieval over the help centre, account questions to an agent with read tools for the billing system, and anything else to a human with a summary. It is a workflow with an agent inside it, not one free-roaming agent.
+
+Design. Tools are narrow and typed: get_account, get_invoice, apply_credit(amount, reason). The $20 limit is enforced in the tool gate in code, never in the prompt. apply_credit carries an idempotency key. Context holds the customer's plan and the current invoice, retrieved per turn; history is compacted. Answers cite help-centre articles and the output guard checks the citations.
+
+Failure. Injection through a customer message asking for a larger credit: the cap is in code. Hallucinated policy: answer only from retrieved articles, otherwise escalate. Billing API down: retry, then hand off, never guess a balance.
+
+Measure. An eval set from real transcripts: resolution correctness, correct tool and arguments, policy violations (must be zero), escalation precision. Launch in shadow mode drafting replies for human agents, then a small share of live chats, watching containment, re-contact rate and credit totals.
+"""
+
+[[scenario]]
+id = "internal-knowledge"
+kind = "System design"
+title = "Build an assistant over a company's internal documents"
+prompt = "A 5,000-person company wants employees to ask questions over Confluence, Google Drive and Slack. What do you build, and what goes wrong?"
+concepts = ["rag", "chunking", "hybrid-search", "reranking", "hallucination", "least-privilege"]
+answer = """
+Clarify. Who may see what? Permissions are the hard requirement here: an assistant that shows a salary document to the wrong person ends the project. How fresh must answers be? What are the top question types?
+
+Shape. This is RAG, with agentic retrieval for multi-part questions. Not fine-tuning: the content changes daily and answers must cite sources.
+
+Design. Ingestion per source with change tracking. Chunk on document structure, keeping title and path with each chunk. Hybrid search (BM25 for names, ticket ids and acronyms; vectors for paraphrase), then a reranker. Permission filtering happens at query time against the user's own access, inside the retrieval layer, so a document the user cannot open can never enter the context. Answers cite passages; the output guard verifies the citations.
+
+Failure. Stale or contradictory documents: show dates, prefer recent, surface the conflict instead of blending it. Retrieval misses: say so and show the closest sources. Injection in a shared document: content is fenced as untrusted and the assistant has no write tools.
+
+Measure. Two evals. Retrieval: labelled questions with their source documents, recall at k. Answers: faithfulness to the retrieved passages and correctness, with a judge calibrated against human labels. Plus permission tests that must pass 100%. Roll out by department, starting with the one that has the cleanest documents.
+"""
+
+[[scenario]]
+id = "debug-regression"
+kind = "Debugging"
+title = "Quality dropped after a prompt change"
+prompt = "You changed the system prompt on Tuesday to fix one bug. On Thursday the customer says the agent 'feels worse'. What do you do?"
+concepts = ["evals", "release-gate", "tracing", "ablations", "online-evals"]
+answer = """
+First make the complaint concrete. Ask for examples, and pull traces from before and after the change for similar requests. 'Feels worse' usually means one or two behaviours changed: longer answers, a tool used less, a refusal that was not there before.
+
+Then measure. Run the eval suite on both prompt versions. If it shows a drop, I have a reproduction and can bisect the prompt edit. If it shows nothing, the suite is missing what the customer cares about, which is the more important finding: I turn their examples into cases.
+
+Check what else moved. Model version, a tool's output format, retrieval content and traffic mix all change behaviour too. Versioning prompt, model and config together in every trace is what makes this answerable.
+
+Fix and prevent. Revert if the impact is real, then re-apply the original bug fix in a narrower form and confirm with the suite that it fixes the bug without the regression. Add the new cases to the release gate so this class of change is caught in CI.
+
+What I would tell the customer: what changed, what we measured, what we rolled back, and which test now guards against it.
+"""
+
+[[scenario]]
+id = "agent-loops"
+kind = "Debugging"
+title = "The agent gets stuck repeating itself"
+prompt = "In production, about 2% of sessions hit the iteration limit. Traces show the agent calling the same search tool over and over. Diagnose and fix."
+concepts = ["stop-conditions", "budgets", "tool-errors", "tool-schema", "trajectory-evals"]
+answer = """
+Read the traces first; the pattern in the repeated calls tells you which problem it is.
+
+Same arguments each time: the tool result is not telling the model anything it can act on. Often the search returns an empty list with no explanation, or an error the model reads as transient. Fix the tool's output: say 'no results for X; try a broader term or a different field', and return errors written for the model.
+
+Slightly different arguments each time: the model is searching for something that is not there. It needs a way to conclude: an instruction that two empty searches means report 'not found', plus a tool that can tell it what does exist.
+
+Result too long: the answer is in the result but buried or truncated. Return fewer, better-ranked items.
+
+Harness-side protection either way: a repeat detector that refuses an identical call the third time and tells the model so, and a final no-tools call at the limit so the user gets a useful partial answer instead of an error.
+
+Then lock it in. Add the failing inputs to a trajectory eval that asserts a bound on tool calls and a sensible final answer, and track the share of sessions hitting the limit as an online metric. 2% hitting a cap is a quality signal worth a dashboard.
+"""
+
+[[scenario]]
+id = "memory-design"
+kind = "System design"
+title = "Add long-term memory to an assistant"
+prompt = "Users complain the assistant forgets everything between sessions. Design memory for it. What are the risks?"
+concepts = ["semantic-memory", "consolidation", "retrieval-gate", "memory-write", "episodic-memory", "context-rot"]
+answer = """
+Clarify what they want remembered: preferences and facts about them, past decisions, or whole conversations? Those are different stores.
+
+Design the write path and the read path separately.
+
+Write. Two routes. Explicit requests ('remember that...') are written immediately through a tool, so the confirmation is true. Everything else is extracted in the background after the reply, in batches. Each candidate is resolved against existing memory: skip duplicates, and when a fact replaces an older value, supersede the old row instead of adding a contradiction beside it. Filter out secrets and sensitive categories by policy. Write a dated episode summary for 'what happened when' questions.
+
+Read. Do not search on every turn. A retrieval gate decides whether the message concerns the user's own world; if so, hybrid search and inject only the top few. Give the model a recall tool for the cases the gate misses.
+
+Risks. Stale or wrong memories quietly degrading answers: show users what is stored and let them edit and delete. Privacy: scope memory per user, encrypt it, set retention, never mix tenants. Context pollution: cap what is injected. Memory as an injection vector: content from untrusted sources must not be written to memory unreviewed, or the attack becomes persistent.
+
+Measure. Cross-session recall cases, update cases (the new value wins), a gate eval for false skips, and an ablation with memory off to prove it helps.
+"""
+
+[[scenario]]
+id = "injection-email"
+kind = "Security"
+title = "An agent that reads and sends email"
+prompt = "A client wants an executive-assistant agent with access to the inbox and calendar that can reply to email. Their security team is nervous. What do you tell them?"
+concepts = ["prompt-injection", "lethal-trifecta", "human-in-the-loop", "least-privilege", "red-teaming"]
+answer = """
+Their security team is right, and I would say so. This design has all three legs of the lethal trifecta: private data (the inbox), untrusted content (anyone can email the executive), and an exfiltration path (sending mail). One crafted message could instruct the agent to forward confidential threads.
+
+No filter reliably detects injection, so the design must hold when an injection succeeds. Options, from most to least restrictive:
+
+Drafts only. The agent prepares replies; a person sends. This removes the exfiltration leg and is where I would start.
+
+Constrained sending. Replies only to the thread's existing participants, no new recipients, no attachments or quoted content beyond the thread, and anything else needs approval.
+
+Quarantine. Untrusted email is processed by a model call with no tools that outputs only structured fields (sender, intent, proposed slots). The privileged agent acts on those fields and never reads the raw text.
+
+Around all of them: least-privilege OAuth scopes, taint tracking so that reading external content locks sensitive tools for that turn, full audit logs, and rate limits on sends.
+
+Then prove it. A red-team suite of injected emails with exfiltration as the success condition, run in CI, with the attack success rate reported to their security team, including the result with defences off so they can see the attacks are real.
+"""
+
+[[scenario]]
+id = "cost-latency"
+kind = "Tradeoffs"
+title = "Cut latency and cost"
+prompt = "The agent works, but the median response takes 14 seconds and costs 9 cents. The customer needs under 5 seconds and 3 cents. Where do you look?"
+concepts = ["cost-accounting", "prompt-caching", "trimming", "routing", "parallelization", "context-engineering"]
+answer = """
+Measure before changing anything. From traces I want, per turn: number of model calls, input and output tokens per call, time per call and per tool, and how that splits by request type. The breakdown nearly always shows two or three dominant costs.
+
+Fewer calls. If simple requests take four iterations, the tools are too granular or the prompt makes the model over-verify. One better tool can replace three calls. Route trivial requests to a direct answer or a fixed workflow.
+
+Smaller calls. Cache the stable prefix; in a loop that alone can cut input cost by most of the system prompt and tool schemas. Cap and trim tool results. Gate retrieval and lower top-k. Remove tools the request type never uses.
+
+Cheaper calls. A smaller model for classification, extraction and easy turns; the large model only where the evals show it is needed.
+
+Faster wall-clock. Parallel tool calls and parallel workers for independent work. Streaming, so time to first token drops even if total time does not.
+
+Each change goes through the eval suite, because every one of these can cost quality, and I report the frontier honestly: here is what 5 seconds and 3 cents costs in pass rate, if anything. Sometimes the right answer is two tiers: fast path for 80% of requests, full agent for the rest.
+"""
+
+[[scenario]]
+id = "eval-from-zero"
+kind = "Evals"
+title = "There are no evals. Start."
+prompt = "You join a team with an agent in production and no evals. They ship prompt changes by trying a few examples by hand. What do you do in your first two weeks?"
+concepts = ["evals", "deterministic-graders", "llm-as-judge", "pass-k", "release-gate", "tracing"]
+answer = """
+Week one: get signal quickly. Make sure every turn is traced with its prompt version. Read a hundred real traces with the team and write down each failure in plain words. That open-coding pass is the most valuable hour, and it tells me what to measure.
+
+Turn those into a first set of thirty to fifty cases: real inputs, with the expected outcome stated as checkably as I can. Prefer code graders: the right tool was called, the record changed, the answer contains the figure, the forbidden phrase is absent. For the few criteria that need judgement, write a narrow pass-or-fail rubric for a judge model and check it against the team's own labels before trusting it.
+
+Run each case several times and report pass rate and consistency, so nobody is fooled by one lucky run.
+
+Week two: make it part of how they ship. One command, runs in CI, thresholds on the deterministic checks, a diff against the last run. The habit I want is: every production failure becomes a case before it is fixed.
+
+What I would not do: buy a platform first, or aim for coverage. A small set the team believes in, run on every change, beats a large one nobody reads. And I would say plainly that a suite written from known failures is a regression bar, not proof the agent is good.
+"""
+
+[[scenario]]
+id = "workflow-or-agent"
+kind = "Tradeoffs"
+title = "Do you even need an agent?"
+prompt = "A customer wants 'an AI agent' to process incoming invoices: extract fields, match against purchase orders, flag mismatches, post to the ERP. How do you respond?"
+concepts = ["agent", "prompt-chaining", "structured-output", "human-in-the-loop", "idempotency"]
+answer = """
+I would ask what they are trying to improve, then say that what they have described is mostly a workflow, and that is good news.
+
+The steps are known in advance: extract, validate, match, decide, post. Fixed steps should be code. A pipeline is cheaper, faster, testable step by step and auditable, which matters for finance.
+
+Where a model earns its place: extraction from messy documents into a strict schema (structured output, validated); fuzzy matching of line items to purchase-order lines; and writing the explanation for a flagged mismatch. Where an agent loop might help: the exception path, where resolving a mismatch means looking things up in several systems in an order that depends on what is found. That can be a bounded agent with read-only tools that proposes a resolution.
+
+Controls. Deterministic checks between steps: totals add up, vendor exists, currency matches. Confidence thresholds route low-confidence extractions to a person. Posting to the ERP is idempotent and above a value threshold needs approval. Full audit trail per invoice.
+
+Measure on a labelled sample of historical invoices: field-level extraction accuracy, match precision and recall, straight-through rate, and the error rate on posted entries, which must be near zero.
+
+Being willing to say 'you need less agent than you think' is part of the job. The goal is their outcome, not the architecture.
+"""
+
+[[scenario]]
+id = "scoping-customer"
+kind = "Customer"
+title = "Scope a first deployment with a new customer"
+prompt = "You have a first meeting with an enterprise customer who says: 'We want to use AI agents across operations.' How do you turn that into a project?"
+concepts = ["evals", "online-evals", "release-gate", "tool-gate"]
+answer = """
+Narrow it to one workflow with a number attached. 'Across operations' is a direction, not a project.
+
+In the meeting I am listening for: a process with volume, where people do repetitive work across several systems; an owner who feels the pain and can give access; data and APIs that exist; and a tolerance for error that I can state. I ask them to walk me through one real case end to end, on their screen if possible. The detail in that walk-through is worth more than any requirements document.
+
+Then I propose a first slice that can show value in weeks: one workflow, a clear success metric they already track (handle time, backlog, error rate), a human in the loop at the start, and an explicit list of what the agent will not do.
+
+Before building, agree on how we will know it works. A sample of historical cases with known outcomes becomes the eval set, and the customer helps define 'correct'. That conversation surfaces hidden requirements early.
+
+Delivery in stages: shadow mode (the agent suggests, people decide), then assisted, then autonomous for the safe subset. At each stage we look at the numbers together.
+
+Also on the first-meeting list: security review and data handling, who owns the system after I leave, and what happens when it is wrong. Raising those myself builds more trust than waiting to be asked.
+"""
+
+[[scenario]]
+id = "multi-agent"
+kind = "Tradeoffs"
+title = "Single agent or multi-agent?"
+prompt = "Your team wants to split the agent into a planner, a researcher, a coder and a reviewer because 'that is how the frameworks do it'. Do you agree?"
+concepts = ["subagents", "context-engineering", "evaluator-optimizer", "plan-and-execute", "ablations"]
+answer = """
+Not by default. I would ask what problem the split solves, because each boundary between agents is a place where context is lost.
+
+What multiple agents buy you: context isolation (a researcher can read a lot and hand back a little), parallelism for independent work, and separate toolsets and permissions. What they cost: more total tokens, lossy hand-offs where the detail that mattered did not make it into the summary, harder debugging, and coordination failures that a single agent does not have.
+
+So the test is the shape of the task. Broad, read-heavy, separable work such as research across many sources suits an orchestrator with workers. Tightly coupled work such as editing one codebase, where every decision depends on the others, suits one agent with good context management, because splitting it means each part acts on partial information.
+
+Roles like 'planner' and 'reviewer' are often better as steps than as agents: a planning call and a critic pass inside one loop share the full context and cost one extra call each.
+
+How I would decide in practice: build the single-agent version with a plan step and a critic, measure it, then try the worker split on the read-heavy part only and compare on the same evals for quality, tokens and latency. Keep whichever wins. Architecture by ablation, not by diagram.
+"""
+
+[[scenario]]
+id = "production-readiness"
+kind = "System design"
+title = "Is this agent ready for production?"
+prompt = "A prototype agent demos well. The VP asks you: 'Can we launch next week?' What is on your checklist?"
+concepts = ["release-gate", "retry-backoff", "fallback", "budgets", "tracing", "prompt-injection", "checkpointing"]
+answer = """
+A demo shows it can work once. Production asks whether it works every time, fails safely and can be fixed when it does not. My checklist:
+
+Quality. An eval suite on realistic cases with several trials each, a known pass rate, and a regression gate in CI. If there are no evals, the answer to 'next week' is no, or 'to five users'.
+
+Safety. Every tool classified by consequence. Limits enforced in code. Approval on irreversible actions. Untrusted content fenced and tainted. A red-team run with the result written down.
+
+Reliability. Retries with backoff on transient errors, a fallback model, timeouts everywhere, idempotent writes, a clean message when everything is down. Hard budgets per turn and per user.
+
+Observability. Every turn traced with prompt and model versions. Dashboards for success, latency, cost and guardrail triggers. Alerts. A way to pull one user's trace in a minute.
+
+Operations. A rollback that takes one step. Rate limits. A kill switch. An owner on call. A plan for model deprecations.
+
+People. Users told what it can and cannot do, a feedback button, and an escalation path to a person.
+
+Then I would offer the VP a real option instead of a yes or no: a staged launch next week to a small group with a human in the loop, with the criteria for widening it written down. That gets real usage data sooner than waiting, and it bounds the risk.
+"""

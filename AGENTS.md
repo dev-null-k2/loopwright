@@ -19,8 +19,12 @@ Loopwright is an agent built to be watched and read. Every change has to keep bo
    inside the tool.
 7. **Say what was and was not tested.** No number in the README that `results/eval-report.json` or the test suite
    does not back. The scripted model is described as what it is.
-8. **Never wipe a user's state** (`~/.loopwright`) except on their explicit request.
-9. **Generated files are generated.** `docs/glossary.md`, `lessons.md`, `interview-prep.md`, `events.md` come from
+8. **A new way in is a gateway, not a fork of the harness.** Chat apps, the scheduler and workflows all end in
+   `Agent.run_turn`. What differs per door is the approver and the approval policy, nothing else.
+9. **Anything the agent writes for its own later use is a privileged action.** A tool that creates a scheduled
+   task, or anything else that will run without a person, has `effect="external"`.
+10. **Never wipe a user's state** (`~/.loopwright`) except on their explicit request.
+11. **Generated files are generated.** `docs/glossary.md`, `lessons.md`, `interview-prep.md`, `events.md` come from
    `python scripts/build_docs.py`; `docs/index.html`, `docs/js`, `docs/demo` from `python scripts/build_demo.py`.
    Edit the sources.
 

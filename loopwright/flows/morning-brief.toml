@@ -1,0 +1,43 @@
+# PATTERN: parallelisation, then synthesis.
+# Three lookups that do not depend on each other run at the same time. One
+# model call then writes the brief from all three. The model is called once,
+# at the end; it never decides what to look up.
+name = "morning-brief"
+description = "Today's calendar, your recent notes and one idea from the handbook, written up as a short brief."
+input = "optional: a topic for the idea of the day"
+
+[[node]]
+id = "agenda"
+kind = "tool"
+tool = "list_events"
+args = { date_from = "{{today}}", date_to = "{{tomorrow}}" }
+
+[[node]]
+id = "notes"
+kind = "tool"
+tool = "search_notes"
+args = { query = "" }
+
+[[node]]
+id = "idea"
+kind = "tool"
+tool = "search_knowledge"
+args = { query = "{{input|the agent loop}}", k = 1 }
+
+[[node]]
+id = "brief"
+kind = "model"
+after = ["agenda", "notes", "idea"]
+output = true
+prompt = """
+Write a short morning brief for {{today}} from the three sections below. Use plain sentences. Do not invent anything that is not in them.
+
+## Calendar
+{{agenda}}
+
+## Notes
+{{notes}}
+
+## Idea of the day
+{{idea}}
+"""

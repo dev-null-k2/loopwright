@@ -17,6 +17,7 @@ from loopwright.evals.runner import SUITES, load_cases, run_all, run_case
 from loopwright.events import STAGES
 from loopwright.learn import load_concepts, load_interview, load_lessons
 from loopwright.server import App, make_handler
+from loopwright.tools.browser import find_chrome
 
 ROOT = PACKAGE_DIR.parent
 
@@ -214,13 +215,18 @@ def test_lessons_run_as_written_on_the_scripted_model(tmp_path):
     for lesson in load_lessons():
         if not lesson.get("prompt"):
             continue
-        agent = Agent(home=tmp_path / lesson["id"], now=lambda: NOW)
+        if lesson.get("needs") == "browser" and not find_chrome():
+            continue
+        home = tmp_path / lesson["id"]
+        home.mkdir()
+        (home / "settings.json").write_text(json.dumps({"enabled_tools": lesson.get("enable", [])}))
+        agent = Agent(home=home, now=lambda: NOW)
         base = {"provider": "scripted", "fast": True, "search": "demo"}
         for prompt in lesson.get("before", []):
             agent.run_turn(prompt, session="a", options=Options.from_dict({**base, "approvals": "approve"}))
         options = Options.from_dict({**base, "approvals": "approve", **lesson.get("options", {})})
         result = agent.run_turn(lesson["prompt"], session="b" if lesson.get("new_session") else "a", options=options,
                                 approver=lambda request: True)
-        kinds = [e.kind for e in result.events if e.span == "main"]
+        kinds = [e.kind for e in result.events]
         for watch in lesson["watch"]:
             assert watch["kind"] in kinds, f"lesson {lesson['id']} promises {watch['kind']}"

@@ -98,3 +98,57 @@ turn.
 | `send_message` | external | Writes to a local outbox; nothing is transmitted |
 | `connect_mcp_server` | external | Starts a program, so it needs approval |
 | `delegate` | read | Up to three parallel workers with read-only tools |
+
+## The shell tool
+
+`run_command` runs one shell command in `~/.loopwright/workspace`. It ships **switched off**. Turn it on from the
+Tools tab, or:
+
+```json
+// ~/.loopwright/settings.json
+{"enabled_tools": ["run_command"]}
+```
+
+What stands around it ([`tools/shell.py`](../loopwright/tools/shell.py)):
+
+| Control | What it does |
+|---|---|
+| Approval | It is an outside-effect tool: every command is shown to you before it runs. Denied in a turn that read untrusted content, and in scheduled runs. |
+| OS sandbox | `sandbox-exec` on macOS, `bubblewrap` on Linux when installed: no network, writes only inside the workspace. Each candidate is tried once with a harmless command; if none works the step says `sandbox: none` in plain words. `loopwright doctor` shows which applies on your machine. |
+| Clean environment | `PATH` and locale only. No API keys or tokens reach the command. `HOME` is the workspace. |
+| Limits | 20 seconds, output capped, and the output is fenced as untrusted like a web page. |
+
+There is deliberately no list of forbidden commands. A string denylist is easy to walk around, so it would only
+look like safety. On a machine with no OS sandbox, approval is the real control: read the command before you
+say yes.
+
+## The browser agent
+
+`browse_web(task)` hands a task to a worker that drives a real headless browser: open, look, click, type, look
+again ([`tools/browser.py`](../loopwright/tools/browser.py)). It needs Chrome, Chromium, Edge or Brave installed
+(`loopwright doctor` says whether one was found; `LOOPWRIGHT_CHROME` points at another). Nothing else: the
+browser is driven over the Chrome DevTools Protocol with the WebSocket client in `ws.py`.
+
+```
+Use the browser: open demo://site, follow the Pricing link and tell me what the Team plan costs
+In the browser, open https://example.com and search for refunds
+```
+
+- **How the model sees a page.** After each action the page becomes text: title, address, a numbered list of what
+  can be clicked or typed into, and the visible text. The model answers with a number. A screenshot of every step
+  is saved for you and shown in the inspector; the model never sees pixels.
+- **It is a worker.** The main agent has one tool. The four `browser_*` tools exist only inside the worker, whose
+  context is fresh. The main agent gets a short summary back, fenced as untrusted.
+- **Approval.** Clicking and submitting forms on the web is an outside effect, so it needs your approval and is
+  denied in a tainted turn and in scheduled runs.
+- **Request filter.** Every request the page makes is intercepted. Loopback, private and link-local addresses and
+  local files are refused, for navigations and for sub-resources.
+- **`demo://site`** is a four-page site bundled for offline use, including a page with a hidden injection.
+
+Limits: one tab, no file upload or download, no drag and drop, nothing that needs pixels (canvas apps). It is the
+slowest tool there is, a model call per action. If a page can be read with `fetch_url`, use that.
+
+## Scheduling and workflows
+
+`schedule_task`, `list_tasks`, `cancel_task` and `run_workflow` are covered in
+[automations.md](automations.md).

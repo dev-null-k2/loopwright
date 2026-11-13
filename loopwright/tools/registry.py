@@ -44,6 +44,9 @@ class ToolContext:
     spawn: Callable[[str, int], dict[str, Any]] | None = None   # set by the harness for `delegate`
     cited: set[str] = field(default_factory=set)                # handbook passages read this turn
     reload: Callable[[], None] | None = None                    # re-read user tools and MCP servers
+    origin: str = ""                                            # "telegram:12345": where a scheduled result should go
+    worker: Callable[..., dict[str, Any]] | None = None         # run a sub-loop with its own tools (browser agent)
+    workflow: Callable[[str, str], dict[str, Any]] | None = None  # run a named workflow inside this turn
 
 
 @dataclass
@@ -56,6 +59,7 @@ class Tool:
     untrusted: bool = False
     private: bool = False
     stage: str = "tools"
+    repeatable: bool = False      # the same call twice is normal (clicking [2] on two different pages)
 
     def schema(self) -> dict[str, Any]:
         """The provider-neutral shape sent to the model."""

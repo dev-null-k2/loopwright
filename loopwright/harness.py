@@ -8,7 +8,8 @@ agent better than another, on the same model, is in the harness.
 One turn, top to bottom. Each step emits an event; the numbers match the
 flow on the architecture diagram:
 
-   1  gateway        a message arrives (terminal, browser or MCP)
+   0  scheduler      (scheduled tasks only) a clock, not a person, starts the turn
+   1  gateway        a message arrives (terminal, browser, MCP or a chat app)
    2  guard_in       secrets in the message are masked
    3  working        the session's conversation is loaded (compacted if long)
    4  procedural     skills whose triggers match are loaded
@@ -17,6 +18,7 @@ flow on the architecture diagram:
    7  context        assemble the prompt and count where the tokens went
    8  planner        (pattern=plan) write the steps first
    9  THE LOOP       model -> tool gate -> tools -> model ... (loop.py)
+                     or, for "/workflow <name>", a fixed graph of steps (workflows.py)
   10  critic         (pattern=reflect) check the draft, allow one revision
   11  guard_out      mask secrets, check citations
   12  reply          out through the same gateway
@@ -30,6 +32,8 @@ Read `run_turn` first; every method it calls is one of the steps above.
 from __future__ import annotations
 
 import datetime as dt
+import os
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -38,6 +42,7 @@ from typing import Any
 
 from loopwright import context as ctx_mod
 from loopwright import guardrails, patterns, receipt
+from loopwright import workflows as wf
 from loopwright.config import Options, home_dir
 from loopwright.events import Event, Recorder, Sink, new_id, write_trace
 from loopwright.loop import LoopResult, run_loop
@@ -94,6 +99,9 @@ class _Turn:
     ok: bool = True
     written: int = 0
     resumed_from: int = 0
+    channel: str = "local"             # which gateway the message came in by
+    trigger: dict[str, Any] | None = None      # set when a scheduled task started this turn
+    workers: int = 0
 
 
 class Agent:
@@ -110,25 +118,36 @@ class Agent:
         """(Re)load everything the user added: their own tool files, MCP servers,
         and the list of tools they switched off."""
         from loopwright.tools.mcp_client import load_mcp_tools
-        from loopwright.tools.plugins import load_settings, load_user_tools
+        from loopwright.tools.plugins import load_user_tools, switched_off
         for name in getattr(self, "_extension_tools", []):
             self.registry._tools.pop(name, None)
         before = set(self.registry.names())
         self.plugin_status = load_user_tools(self.home, self.registry)
         self.mcp_status = load_mcp_tools(self.home, self.registry)     # tools borrowed from other MCP servers
         self._extension_tools = [n for n in self.registry.names() if n not in before]
-        self.disabled_tools = load_settings(self.home)["disabled_tools"]
+        self.disabled_tools = switched_off(self.home)
 
     # ================================================================ one turn
     def run_turn(self, message: str, session: str = "default", options: Options | None = None,
                  sinks: list[Sink] | None = None, approver: Approver | None = None,
-                 turn_id: str | None = None) -> TurnResult:
+                 turn_id: str | None = None, channel: str = "local", origin: str = "",
+                 trigger: dict[str, Any] | None = None) -> TurnResult:
+        run_now = re.fullmatch(r"/task\s+#?(\d+)", message.strip()) if trigger is None else None
+        if run_now and self.store.task(int(run_now.group(1))):       # "/task 3": run a scheduled task now, as the clock would
+            from loopwright.scheduler import Scheduler
+            return Scheduler(self, options).run_task(self.store.task(int(run_now.group(1))), sinks=sinks, turn_id=turn_id)
         t = self._begin(message, session, options or Options(), sinks, approver, turn_id or new_id())
+        t.channel, t.tools.origin, t.trigger = channel, origin, trigger
         try:
-            self._prepare(t)        # steps 1-8
-            self._run_loop(t)       # step 9
-            self._review(t)         # step 10
-            self._guard_reply(t)    # steps 11-12
+            self._arrive(t)             # steps 0-2
+            command = wf.COMMAND.match(t.message.strip())
+            if command:
+                self._run_workflow(t, command.group(1), command.group(2))   # the code decides the path
+            else:
+                self._prepare(t)        # steps 3-8
+                self._run_loop(t)       # step 9: the model decides the path
+                self._review(t)         # step 10
+            self._guard_reply(t)        # steps 11-12
         except ModelError as exc:
             self._fail(t, exc)
         except Exception as exc:    # a bug anywhere must still end in a reply and a trace, never a hung turn
@@ -171,18 +190,29 @@ class Agent:
         gate = ToolGate(registry, tools, options, rec, state, approver)
         t = _Turn(message, session, options, rec, gateway, state, tools, registry, gate, time.perf_counter())
         tools.spawn = lambda task, n: self._spawn(t, task, n)
+        tools.worker = lambda **kw: self._work(t, **kw)
+        tools.workflow = lambda name, text: self._workflow(t, name, text)
         tools.reload = self.load_extensions
         return t
 
-    def _prepare(self, t: _Turn) -> None:
+    def _arrive(self, t: _Turn) -> None:
         rec, opts = t.rec, t.options
+        # 0 ---- a scheduled task: the clock is the "user"
+        if t.trigger:
+            rec.emit("schedule.fire", "scheduler", f"Scheduled task #{t.trigger['task_id']} is due ({t.trigger['schedule']})",
+                     "No person sent this message: a saved prompt reached its scheduled time. The turn that follows is "
+                     "ordinary except for one thing. Nobody is here to approve anything, so the approval policy is "
+                     "'deny' and tools with outside effects are refused in code.",
+                     src="scheduler", data={**t.trigger, "prompt": t.message, "approvals": opts.approvals})
         # 1 ---- gateway
-        rec.emit("gateway.receive", "gateway", "Message received",
-                 "A turn starts when a message comes in through a gateway: the terminal, the browser or an MCP "
-                 "client. The gateway is only a door; the same harness runs behind all of them.",
-                 src="user", data={"message": t.message, "session": t.session,
-                                   "provider": t.gateway.primary.name, "model": t.gateway.primary.model,
-                                   "options": opts.to_dict()})
+        door = {"local": "", "web": " from the browser", "schedule": " from the scheduler"}.get(t.channel, f" from {t.channel.capitalize()}")
+        rec.emit("gateway.receive", "gateway", f"Message received{door}",
+                 "A turn starts when a message comes in through a gateway: the terminal, the browser, an MCP client, "
+                 "a chat app or the scheduler. The gateway is only a door; the same harness runs behind all of them.",
+                 src="scheduler" if t.trigger else "user",
+                 data={"message": t.message, "session": t.session, "channel": t.channel,
+                       "provider": t.gateway.primary.name, "model": t.gateway.primary.model,
+                       "options": opts.to_dict()})
         # 2 ---- input guardrail
         if opts.guardrails:
             guarded = guardrails.guard_input(t.message)
@@ -195,6 +225,9 @@ class Agent:
         else:
             rec.emit("guard.input", "guard_in", "Input guard is off", "Guardrails are switched off for this turn.",
                      src="gateway", status="skip")
+
+    def _prepare(self, t: _Turn) -> None:
+        rec, opts = t.rec, t.options
         # 3 ---- working memory
         summary, history = ctx_mod.load_history(self.store, t.session, opts, rec, t.gateway.small("compact"))
         rec.emit("working.load", "working", f"Loaded {len(history)} earlier message(s)",
@@ -373,28 +406,66 @@ class Agent:
                   "options": t.options.to_dict()}
         footer = {"reply": t.reply, "ok": t.ok, "receipt": rcpt, "checks": checks}
         path = write_trace(self.home, header, rec.events, footer)
+        if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+            from loopwright import otel
+            otel.export_in_background({"turn": header, "events": [e.to_json() for e in rec.events], "end": footer})
         return TurnResult(rec.turn_id, t.reply, t.ok, list(rec.events), rcpt, checks, list(t.state.log), str(path))
 
     # ================================================================ helpers
     def _spawn(self, t: _Turn, task: str, n: int) -> dict[str, Any]:
-        """Run one worker: same loop, fresh context, read-only tools."""
-        rec = t.rec.child(f"sub:{n}")
-        registry = self.registry.subset(WORKER_TOOLS)
-        tools = ToolContext(self.store, self.home, rec, t.options, self.now)      # spawn=None: no grandchildren
-        gate = ToolGate(registry, tools, t.options, rec, TurnState(chaos_left=0))
-        rec.emit("subagent.start", "subagent", f"Worker {n} starts with a fresh context",
+        """Run one research worker: same loop, fresh context, read-only tools."""
+        return {"task": task, **self._work(t, system=ctx_mod.SUBAGENT_SYSTEM, task=task,
+                                           registry=self.registry.subset(WORKER_TOOLS), label=str(n))}
+
+    def _work(self, t: _Turn, *, system: str, task: str, registry: Registry, label: str,
+              purpose: str = "subagent", max_iterations: int = 4) -> dict[str, Any]:
+        """A worker is the same loop with a different prompt, a different toolset and an empty context.
+        Research workers, the browser worker and a workflow's agent steps are all this one function."""
+        rec = t.rec.child(f"sub:{label}")
+        tools = ToolContext(self.store, self.home, rec, t.options, self.now)      # no spawn, no worker: one level deep
+        state = TurnState(chaos_left=0)
+        gate = ToolGate(registry, tools, t.options, rec, state)
+        rec.emit("subagent.start", "subagent", f"Worker '{label}' starts with a fresh context",
                  "The worker's context holds its task and nothing else: none of the conversation, none of the "
                  "user's memory.", src="tools", data={"task": task, "tools": registry.names()})
-        options = Options.from_dict({**t.options.to_dict(), "max_iterations": 4})
+        options = Options.from_dict({**t.options.to_dict(), "max_iterations": max_iterations})
         messages: list[Message] = [{"role": "user", "content": task}]
         try:
-            result = run_loop(t.gateway, ctx_mod.SUBAGENT_SYSTEM, messages, registry, gate, rec, options, purpose="subagent")
+            result = run_loop(t.gateway, system, messages, registry, gate, rec, options, purpose=purpose)
             summary = result.text
         except ModelError as exc:
             summary = f"(worker failed: {exc})"
         tokens = sum(e.data.get("tokens_in", 0) + e.data.get("tokens_out", 0)
                      for e in t.rec.events if e.span == rec.span and e.kind == "model.call")
-        return {"task": task, "summary": summary, "tokens": tokens, "cited": sorted(tools.cited)}
+        if state.tainted:
+            t.state.tainted = True          # what a worker read taints the turn that hears its summary
+            t.state.taint_sources.extend(s for s in state.taint_sources if s not in t.state.taint_sources)
+        return {"summary": summary, "tokens": tokens, "steps": len(state.log), "cited": sorted(tools.cited)}
+
+    # ================================================================ workflows
+    def _workflow(self, t: _Turn, name: str, text: str) -> dict[str, Any]:
+        """Run a named workflow inside this turn, on this turn's gateway, gate and trace."""
+        found = wf.load_all(self.home)
+        if name not in found:
+            raise wf.WorkflowError(f"no workflow named '{name}'. Available: {', '.join(found) or 'none'}")
+
+        def agent_loop(prompt: str, tool_names: list[str], node_id: str) -> str:
+            done = self._work(t, system=ctx_mod.SUBAGENT_SYSTEM, task=prompt, registry=self.registry.subset(tool_names), label=node_id)
+            t.tools.cited.update(done["cited"])
+            return done["summary"]
+
+        return wf.run(found[name], text, gateway=t.gateway, gate=t.gate, rec=t.rec, registry=t.registry,
+                      now=self.now(), agent_loop=agent_loop)
+
+    def _run_workflow(self, t: _Turn, name: str, text: str) -> None:
+        try:
+            done = self._workflow(t, name, text)
+        except wf.WorkflowError as exc:
+            t.reply = str(exc)
+            t.loop = LoopResult(t.reply, 0, "workflow")
+            return
+        t.reply = done["reply"]
+        t.loop = LoopResult(t.reply, 0, "workflow")
 
     def _online_checks(self, t: _Turn) -> list[dict[str, Any]]:
         log = t.state.log
@@ -403,7 +474,7 @@ class Agent:
         ungrounded = [f for e in t.rec.find("guard.output") for f in e.data.get("findings", []) if f["kind"] == "citation"]
         return [
             {"check": "replied", "pass": bool(t.reply.strip()) and t.ok, "note": "" if t.ok else "the model could not answer"},
-            {"check": "loop ended by answering", "pass": bool(t.loop and t.loop.stop == "answered"),
+            {"check": "loop ended by answering", "pass": bool(t.loop and t.loop.stop in ("answered", "workflow")),
              "note": t.loop.stop if t.loop else "no loop ran"},
             {"check": "within budget", "pass": t.gateway.tokens <= t.options.token_budget and t.state.calls <= t.options.max_tool_calls,
              "note": f"{t.gateway.tokens:,} tokens, {t.state.calls} tool call(s)"},

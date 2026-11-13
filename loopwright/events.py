@@ -31,6 +31,7 @@ from typing import Any
 STAGES: dict[str, tuple[str, str, str]] = {
     "user":        ("You", "gateway", "loopwright/cli.py"),
     "gateway":     ("Gateway", "gateway", "loopwright/server.py"),
+    "scheduler":   ("Scheduler", "gateway", "loopwright/scheduler.py"),
     "guard_in":    ("Input guardrails", "safety", "loopwright/guardrails.py"),
     "working":     ("Working memory", "memory", "loopwright/memory/store.py"),
     "procedural":  ("Skills (procedural)", "memory", "loopwright/memory/skills.py"),
@@ -46,6 +47,7 @@ STAGES: dict[str, tuple[str, str, str]] = {
     "tools":       ("Tools", "loop", "loopwright/tools/builtin.py"),
     "guard_tool":  ("Tool-result guard", "safety", "loopwright/guardrails.py"),
     "subagent":    ("Subagents", "loop", "loopwright/tools/delegate.py"),
+    "workflow":    ("Workflow", "loop", "loopwright/workflows.py"),
     "critic":      ("Critic", "loop", "loopwright/patterns.py"),
     "guard_out":   ("Output guardrails", "safety", "loopwright/guardrails.py"),
     "reply":       ("Reply", "gateway", "loopwright/harness.py"),

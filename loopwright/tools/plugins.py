@@ -28,6 +28,10 @@ Any tool can be switched off in ~/.loopwright/settings.json
 (`{"disabled_tools": ["send_message"]}`) or on the Tools page. A disabled tool
 is never shown to the model, which is also the cheapest way to cut tokens.
 
+A few tools are powerful enough to ship switched OFF (`OPT_IN` below: the
+shell). They appear on the Tools page with a switch like every other tool;
+turning one on adds it to `enabled_tools` in settings.json.
+
 A tool file is your own code running with your own permissions. Loopwright
 loads only from your state folder and never downloads one.
 """
@@ -41,6 +45,8 @@ from typing import Any
 
 from loopwright.tools.registry import Registry, Tool
 
+OPT_IN = {"run_command"}        # tools that stay off until the user switches them on
+
 
 def load_settings(home: Path) -> dict[str, Any]:
     path = Path(home) / "settings.json"
@@ -48,7 +54,14 @@ def load_settings(home: Path) -> dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     except (OSError, json.JSONDecodeError):
         data = {}
-    return {"disabled_tools": [str(t) for t in data.get("disabled_tools", [])]}
+    enabled = [str(t) for t in data.get("enabled_tools", [])]
+    return {**data, "disabled_tools": [str(t) for t in data.get("disabled_tools", [])], "enabled_tools": enabled}
+
+
+def switched_off(home: Path) -> list[str]:
+    """Every tool the model must not be shown: the ones switched off, plus opt-in tools never switched on."""
+    settings = load_settings(home)
+    return sorted(set(settings["disabled_tools"]) | (OPT_IN - set(settings["enabled_tools"])))
 
 
 def save_settings(home: Path, settings: dict[str, Any]) -> None:
@@ -57,11 +70,13 @@ def save_settings(home: Path, settings: dict[str, Any]) -> None:
 
 def set_tool_enabled(home: Path, name: str, enabled: bool) -> list[str]:
     settings = load_settings(home)
-    disabled = set(settings["disabled_tools"])
+    disabled, opted = set(settings["disabled_tools"]), set(settings["enabled_tools"])
     disabled.discard(name) if enabled else disabled.add(name)
-    settings["disabled_tools"] = sorted(disabled)
+    if name in OPT_IN:
+        opted.add(name) if enabled else opted.discard(name)
+    settings["disabled_tools"], settings["enabled_tools"] = sorted(disabled), sorted(opted)
     save_settings(home, settings)
-    return settings["disabled_tools"]
+    return switched_off(home)
 
 
 def load_user_tools(home: Path, registry: Registry) -> list[dict[str, Any]]:

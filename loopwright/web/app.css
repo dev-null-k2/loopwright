@@ -343,3 +343,22 @@ dialog.source pre { margin: 0; padding: 14px 18px 30px; font-size: 13px; line-he
   .page { padding: 18px 14px 40px; } .legend { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .node rect { transition: none; } }
+
+/* ---- workflows drawn as rounds; browser screenshots; comparison table; feedback */
+.wf { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 8px 0 2px; }
+.wf-round { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 8px; border: 1px dashed var(--line); border-radius: var(--r); min-width: 128px; }
+.wf-round small { color: var(--ink-3); font-size: 12.5px; }
+.wf-node { border: 1px solid var(--line); border-left: 4px solid var(--loop); border-radius: 5px; background: var(--panel); padding: 4px 8px; }
+.wf-node b { display: block; font-size: 14px; } .wf-node span { color: var(--ink-2); font-size: 12.5px; overflow-wrap: anywhere; }
+.wf-node.tool { border-left-color: var(--harness); } .wf-node.route { border-left-color: var(--safety); } .wf-node.agent { border-left-color: var(--memory); }
+.wf-arrow { align-self: center; color: var(--ink-3); font-size: 12.5px; }
+img.shot { display: block; width: 100%; border: 1px solid var(--line); border-radius: var(--r); margin: 10px 0 6px; background: #fff; }
+table.cmp td { vertical-align: top; } table.cmp td.clickable { cursor: pointer; } table.cmp td.clickable:hover { background: var(--sunk); }
+table.cmp tr.total td { border-top: 2px solid var(--line); font-variant-numeric: tabular-nums; }
+.fail-why { color: var(--blocked); }
+.row-actions { display: flex; gap: 12px; white-space: nowrap; }
+.msg .meta .fb { display: inline-flex; gap: 6px; margin-left: auto; }
+.msg .meta .fb button.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.msg.agent .meta .fb button { border-color: var(--line); color: var(--ink-2); font-weight: 400; }
+.msg.agent .meta .fb button.on { color: var(--panel); }
+.editor .row button { white-space: nowrap; }

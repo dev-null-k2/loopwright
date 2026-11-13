@@ -1,0 +1,55 @@
+# PATTERN: routing.
+# One cheap classification decides which specialised path handles the input.
+# Each path can then have a narrower prompt and a smaller toolset than a
+# general agent would need.
+name = "triage"
+description = "Sort an incoming message: questions get researched, things to do get captured as a note, anything else gets a short reply."
+input = "the message to sort"
+
+[[node]]
+id = "sort"
+kind = "route"
+by = "model"
+value = "{{input}}"
+default = "reply"
+  [[node.choice]]
+  to = "research"
+  when = "a question about how AI agents work: what is, how does, why, explain, difference, harness, memory, evals, loop, tools"
+  [[node.choice]]
+  to = "capture"
+  when = "something to do or keep: todo, task, remind, buy, call, fix, book, send, finish, need to, must, don't forget"
+  [[node.choice]]
+  to = "reply"
+  when = "a greeting, thanks or small talk: hi, hello, thanks, bye"
+
+[[node]]
+id = "research"
+kind = "agent"
+after = ["sort"]
+tools = ["search_knowledge", "calculator"]
+prompt = "{{input}}"
+
+[[node]]
+id = "capture"
+kind = "tool"
+after = ["sort"]
+tool = "save_note"
+args = { text = "To do: {{input}}" }
+
+[[node]]
+id = "reply"
+kind = "model"
+after = ["sort"]
+prompt = "Reply in one friendly sentence to this message: {{input}}"
+
+[[node]]
+id = "done"
+kind = "model"
+after = ["research", "capture", "reply"]
+output = true
+prompt = """
+Tell the user what was done with their message, in one or two sentences, using the section below.
+
+## Result
+{{research}}{{capture}}{{reply}}
+"""

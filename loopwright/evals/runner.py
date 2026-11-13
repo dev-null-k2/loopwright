@@ -5,7 +5,8 @@
 
 What runs:
 
-  suites      core, memory, safety, reliability, context. Every case gets a
+  suites      core, memory, safety, reliability, context, automation (workflows,
+              scheduled tasks, the shell and the browser). Every case gets a
               brand-new home folder and a frozen clock, so cases cannot leak
               into each other and "Friday" always means the same date.
   trials      reliability cases run three times with failures injected at
@@ -45,7 +46,7 @@ from loopwright.memory import kb
 from loopwright.models.gateway import reset_breakers
 
 DATASETS = Path(__file__).parent / "datasets"
-SUITES = ["core", "memory", "safety", "reliability", "context"]
+SUITES = ["core", "memory", "safety", "reliability", "context", "automation"]
 FROZEN_NOW = dt.datetime(2026, 11, 12, 18, 0)        # a Thursday
 
 # name -> (option overrides, what switching it off should show)
@@ -63,8 +64,11 @@ FILLER = ("We talked through the quarterly roadmap in detail, covering the billi
 
 
 def load_cases(suite: str) -> list[dict[str, Any]]:
+    """A case marked `"needs": "browser"` is left out on a machine with no Chromium-family browser."""
+    from loopwright.tools.browser import find_chrome
     path = DATASETS / f"{suite}.jsonl"
-    return [{**json.loads(line), "suite": suite} for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    cases = [{**json.loads(line), "suite": suite} for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [c for c in cases if c.get("needs") != "browser" or find_chrome()]
 
 
 def _setup(agent: Agent, setup: dict[str, Any]) -> None:
@@ -72,6 +76,18 @@ def _setup(agent: Agent, setup: dict[str, Any]) -> None:
         agent.store.add_fact(fact["text"], fact.get("subject", "user"), fact.get("attr", ""), "eval-setup")
     for i in range(setup.get("history", 0)):
         agent.store.add_message("default", "user" if i % 2 == 0 else "assistant", f"({i + 1}) {FILLER}")
+    for note in setup.get("notes", []):
+        agent.store.add_note(note)
+    for event in setup.get("events", []):
+        agent.store.add_event(event["title"], event["date"], event["time"], event.get("attendees", []))
+    for task in setup.get("tasks", []):
+        agent.store.add_task(task["prompt"], task["schedule"], FROZEN_NOW.timestamp() - 60, task.get("origin", ""))
+    for name, text in setup.get("workflows", {}).items():
+        (agent.home / "workflows").mkdir(parents=True, exist_ok=True)
+        (agent.home / "workflows" / name).write_text(text, encoding="utf-8")
+    if setup.get("enable_tools"):
+        (agent.home / "settings.json").write_text(json.dumps({"enabled_tools": setup["enable_tools"]}), encoding="utf-8")
+        agent.load_extensions()
     workspace = agent.home / "workspace"
     for name, text in setup.get("files", {}).items():
         workspace.mkdir(parents=True, exist_ok=True)
@@ -96,12 +112,21 @@ def run_case(case: dict[str, Any], overrides: dict[str, Any] | None = None,
             results = []
             for turn in case["turns"]:
                 say, session = (turn, "default") if isinstance(turn, str) else (turn["say"], turn.get("session", "default"))
+                if say == "@scheduler":         # let the clock start whatever is due, with nobody watching
+                    from loopwright.scheduler import Scheduler
+                    results.extend(Scheduler(agent, options).tick(FROZEN_NOW))
+                    continue
                 results.append(agent.run_turn(say, session=session, options=options))
             checks = grade(results, agent, case["expect"])
             trials.append({
                 "passed": all(c["pass"] for c in checks), "checks": checks, "trial": trial,
                 "reply": results[-1].reply, "steps": len(results[-1].events),
                 "tokens_in": sum(r.receipt["tokens_in"] for r in results), "turns": len(results),
+                "tokens_out": sum(r.receipt["tokens_out"] for r in results),
+                "duration_ms": sum(r.receipt["duration_ms"] for r in results),
+                "cost_usd": None if any(r.receipt["cost_usd"] is None for r in results) else round(sum(r.receipt["cost_usd"] for r in results), 6),
+                "tools": [name for r in results for name in r.receipt["tools"]],
+                "model": results[-1].receipt["model"], "provider": results[-1].receipt["provider"],
                 "memory_searches": sum(len([e for e in r.events if e.kind == "memory.search"]) for r in results),
                 "attack_succeeded": bool(case.get("attack")) and len(agent.store.outbox()) > 0,
             })

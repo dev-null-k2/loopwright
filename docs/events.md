@@ -8,6 +8,9 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 
 | Kind | Box | Explained by |
 |---|---|---|
+| `browser.action` | Tools | [Page snapshots and numbered elements](glossary.md#page-snapshot) |
+| `browser.return` | Subagents | [Browser agent](glossary.md#browser-agent) |
+| `browser.start` | Subagents | [Browser agent](glossary.md#browser-agent) |
 | `checkpoint.resume` | Checkpoints | [Checkpointing](glossary.md#checkpointing) |
 | `checkpoint.save` | Checkpoints | [Checkpointing](glossary.md#checkpointing) |
 | `consolidate.episode` | Episodic memory | [Episodic memory](glossary.md#episodic-memory) |
@@ -43,6 +46,9 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 | `model.retry` | Model gateway | [Retries with backoff](glossary.md#retry-backoff) |
 | `plan.made` | Planner | [Plan-and-execute](glossary.md#plan-and-execute) |
 | `reply.send` | Reply | [Harness](glossary.md#harness) |
+| `schedule.create` | Scheduler | [Standing instructions and persistence](glossary.md#standing-instructions) |
+| `schedule.fire` | Scheduler | [Scheduled and proactive agents](glossary.md#scheduled-agents) |
+| `shell.run` | Tools | [Code execution sandbox](glossary.md#code-sandbox) |
 | `skills.create` | Skills (procedural) | [Skills (procedural memory)](glossary.md#procedural-memory) |
 | `skills.match` | Skills (procedural) | [Skills (procedural memory)](glossary.md#procedural-memory) |
 | `subagent.return` | Subagents | [Subagents](glossary.md#subagents) |
@@ -57,6 +63,10 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 | `trace.write` | Trace | [Tracing](glossary.md#tracing) |
 | `turn.failed` | Model gateway | [Model fallback](glossary.md#fallback) |
 | `web.search` | Tools | [Web search](glossary.md#web-search) |
+| `workflow.end` | Workflow | [Workflow graphs](glossary.md#workflow-graph) |
+| `workflow.node` | Workflow | [Workflow graphs](glossary.md#workflow-graph) |
+| `workflow.route` | Workflow | [Routing](glossary.md#routing) |
+| `workflow.start` | Workflow | [Workflow versus agent](glossary.md#workflow-vs-agent) |
 | `working.load` | Working memory | [Working memory](glossary.md#working-memory) |
 | `working.save` | Working memory | [Working memory](glossary.md#working-memory) |
 
@@ -66,6 +76,7 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 |---|---|---|
 | You | gateway | [`loopwright/cli.py`](../loopwright/cli.py) |
 | Gateway | gateway | [`loopwright/server.py`](../loopwright/server.py) |
+| Scheduler | gateway | [`loopwright/scheduler.py`](../loopwright/scheduler.py) |
 | Input guardrails | safety | [`loopwright/guardrails.py`](../loopwright/guardrails.py) |
 | Working memory | memory | [`loopwright/memory/store.py`](../loopwright/memory/store.py) |
 | Skills (procedural) | memory | [`loopwright/memory/skills.py`](../loopwright/memory/skills.py) |
@@ -81,6 +92,7 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 | Tools | loop | [`loopwright/tools/builtin.py`](../loopwright/tools/builtin.py) |
 | Tool-result guard | safety | [`loopwright/guardrails.py`](../loopwright/guardrails.py) |
 | Subagents | loop | [`loopwright/tools/delegate.py`](../loopwright/tools/delegate.py) |
+| Workflow | loop | [`loopwright/workflows.py`](../loopwright/workflows.py) |
 | Critic | loop | [`loopwright/patterns.py`](../loopwright/patterns.py) |
 | Output guardrails | safety | [`loopwright/guardrails.py`](../loopwright/guardrails.py) |
 | Reply | gateway | [`loopwright/harness.py`](../loopwright/harness.py) |

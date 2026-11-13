@@ -11,6 +11,11 @@
     loopwright memory          show what is stored
     loopwright doctor          check which models can run here
     loopwright selftest        ask eight real questions through a provider and check what it did
+    loopwright compare         the same eight questions through several models, side by side
+    loopwright workflow [name] run a workflow (a fixed graph of steps); no name lists them
+    loopwright tasks           scheduled tasks: list, add, run, pause, resume, rm
+    loopwright telegram | discord | slack | whatsapp     talk to the agent from a chat app
+    loopwright export [id]     write a turn as OpenTelemetry (OTLP) JSON, or send it to a collector
     loopwright mcp             serve over MCP on stdio (for Claude Code and other clients)
 """
 
@@ -190,6 +195,21 @@ def cmd_eval(args: argparse.Namespace) -> int:
         elif p["stage"] == "ablation" and p["variant"] != "full":
             print(f"  ablation: {p['variant']}")
 
+    if args.mine:
+        from loopwright.evals.mine import cases_path, run_mine
+        from loopwright.models.gateway import pick_provider
+        provider = pick_provider("auto")
+        outcome = run_mine(home_dir(), {"provider": provider, "fast": provider == "scripted"})
+        if not outcome["total"]:
+            print(f"You have no cases yet. In the cockpit, press 'Save as eval case' under any reply. They are kept in {cases_path(home_dir())}.")
+            return 0
+        for case in outcome["cases"]:
+            print(f"  {'pass' if case['passed'] else 'FAIL'}  {case['id']:<14} {case['title']}")
+            for check in case["trials"][0]["checks"]:
+                if not check["pass"]:
+                    print(f"        failed check: {check['check']}  ->  {check['note'][:140]}")
+        print(f"\n{outcome['passed']}/{outcome['total']} of your cases passed on {provider}.")
+        return 0 if outcome["passed"] == outcome["total"] else 1
     print("Running evals on the scripted model (these test the harness, not an LLM)\n")
     report = run_all(Path(args.out), ablations=not args.no_ablations, judge_model=judge_model, judge_turn=judge_turn,
                      on_progress=progress)
@@ -282,6 +302,23 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             return 1
     else:
         print("\nTest a provider end to end with: loopwright doctor --ping claude-code")
+    import os
+
+    from loopwright.gateways.chat import CHANNELS
+    from loopwright.tools.browser import find_chrome
+    from loopwright.tools.plugins import switched_off
+    from loopwright.tools.shell import sandbox_for
+    chrome = find_chrome()
+    workspace = home_dir() / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    print("\nTools that need something on this machine")
+    print(f"  {'ready ' if chrome else 'no    '} browser      {chrome or 'no Chrome, Chromium, Edge or Brave found (set LOOPWRIGHT_CHROME)'}")
+    print(f"  {'off   ' if 'run_command' in switched_off(home_dir()) else 'on    '} shell        sandbox here: {sandbox_for(workspace.resolve())[1]}"
+          "   (switch run_command on from the Tools page)")
+    print("\nChat gateways")
+    for name, (token, allow, how) in CHANNELS.items():
+        state = "ready " if os.environ.get(token) and os.environ.get(allow) else "token " if os.environ.get(token) else "no    "
+        print(f"  {state} {name:<12} {how}   (set {token} and {allow}; start with: loopwright {name})")
     return 0
 
 
@@ -315,6 +352,137 @@ def cmd_selftest(args: argparse.Namespace) -> int:
             return 1
     print(f"\n{passed}/{len(cases)} passed on {provider}.")
     return 0 if passed == len(cases) else 1
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    from loopwright.evals.compare import format_table, parse_target, run_compare
+    try:
+        targets = [parse_target(t) for t in (args.targets or ["scripted", "auto"])]
+    except ValueError as exc:
+        print(exc)
+        return 2
+    seen, unique = set(), []
+    for t in targets:
+        if t["label"] not in seen:
+            seen.add(t["label"])
+            unique.append(t)
+    print("Comparing " + ", ".join(t["label"] for t in unique) + " on the eight self-test questions.\n")
+    report = run_compare(unique, Path(args.out) if args.out else home_dir() / "compare",
+                         on_progress=lambda p: print(f"  {p['status']:<12} {p['target']:<28} {p['case']}"))
+    print("\n" + format_table(report))
+    print("\nOpen the cockpit (loopwright serve), Evals, Compare, to replay any cell.")
+    return 0
+
+
+def cmd_workflow(args: argparse.Namespace) -> int:
+    from loopwright import workflows
+    if args.check:
+        try:
+            wf = workflows.parse(Path(args.check).read_text(encoding="utf-8"), "yours")
+        except (OSError, workflows.WorkflowError, Exception) as exc:
+            print(f"not valid: {exc}")
+            return 1
+        print(f"{wf.name}: valid. Rounds: " + " -> ".join("[" + ", ".join(w) + "]" for w in wf.waves()))
+        return 0
+    found = workflows.load_all(home_dir())
+    if not args.name:
+        for wf in found.values():
+            print(f"{wf.name:<18} {wf.description}  ({wf.source})")
+            print(f"{'':<18} " + " -> ".join("[" + ", ".join(w) + "]" for w in wf.waves()))
+        print(f"\nYour own go in {home_dir() / 'workflows'} as .toml files. Run one: loopwright workflow <name> [input]")
+        return 0
+    agent, options = _agent(), _options(args)
+    sinks = [lambda e: print(format_step(e, args.why))] if not args.quiet else []
+    result = agent.run_turn(f"/workflow {args.name}: {' '.join(args.input)}", session=f"workflow-{args.name}", options=options,
+                            sinks=sinks, approver=_ask_approval if sys.stdin.isatty() else None)
+    print(f"\n{result.reply}\n")
+    return 0 if result.ok else 1
+
+
+def cmd_tasks(args: argparse.Namespace) -> int:
+    import datetime as dt
+
+    from loopwright import scheduler
+    agent = _agent()
+    store = agent.store
+    if args.action == "add":
+        if len(args.rest) < 2:
+            print('usage: loopwright tasks add "<schedule>" "<prompt>"     e.g. loopwright tasks add "weekdays 08:00" "What is on my calendar today?"')
+            return 2
+        try:
+            task = scheduler.add_task(store, " ".join(args.rest[1:]), args.rest[0], agent.now(), "local:cli")
+        except ValueError as exc:
+            print(exc)
+            return 2
+        print(f"Task #{task['id']} will run {task['runs']}. Next: {task['next_run']}.")
+        print("It runs while `loopwright serve` or a chat gateway is running, or when you call `loopwright tasks tick`.")
+        return 0
+    if args.action == "tick":
+        results = scheduler.Scheduler(agent, _options(args)).tick()
+        for r in results:
+            print(f"ran {r.turn_id}: {' '.join(r.reply.split())[:160]}")
+        print(f"{len(results)} task(s) were due.")
+        return 0
+    if args.action in ("rm", "run", "pause", "resume"):
+        task = store.task(int(args.rest[0])) if args.rest and args.rest[0].isdigit() else None
+        if not task:
+            print("Give the number of an existing task (see: loopwright tasks).")
+            return 2
+        if args.action == "rm":
+            store.delete_task(task["id"])
+            print(f"Removed task #{task['id']}.")
+        elif args.action == "run":
+            result = scheduler.Scheduler(agent, _options(args)).run_task(task)
+            print(result.reply)
+        else:
+            upcoming = scheduler.next_after(task["schedule"], agent.now())
+            store.set_task(task["id"], enabled=args.action == "resume", next_run=upcoming.timestamp() if upcoming else None)
+            print(f"Task #{task['id']} {'resumed' if args.action == 'resume' else 'paused'}.")
+        return 0
+    rows = store.tasks()
+    if not rows:
+        print('No scheduled tasks. Add one: loopwright tasks add "weekdays 08:00" "What is on my calendar today?"')
+        return 0
+    for t in rows:
+        when = dt.datetime.fromtimestamp(t["next_run"]).strftime("%a %Y-%m-%d %H:%M") if t["next_run"] else "never"
+        print(f"#{t['id']:<3} {'on ' if t['enabled'] else 'off'} {scheduler.describe(t['schedule']):<28} next {when:<21} runs {t['runs']:<3} {t['prompt'][:60]}")
+    return 0
+
+
+def cmd_gateway(args: argparse.Namespace) -> int:
+    import importlib
+    module = importlib.import_module(f"loopwright.gateways.{args.command}")
+    agent = _agent()
+    try:
+        module.run(agent, port=args.port) if args.command == "whatsapp" else module.run(agent)
+    except KeyboardInterrupt:
+        print("\nstopped")
+    return 0
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    from loopwright import otel
+    rows = list_traces(home_dir(), limit=1)
+    turn_id = args.turn_id if args.turn_id and args.turn_id != "last" else (rows[0]["turn_id"] if rows else "")
+    path = trace_dir(home_dir()) / f"{turn_id}.jsonl"
+    if not turn_id or not path.is_file():
+        print("No such run. List them with: loopwright runs")
+        return 1
+    trace = read_trace(path)
+    if args.otlp:
+        try:
+            print(f"sent to {args.otlp}: HTTP {otel.send(trace, args.otlp)}")
+        except Exception as exc:
+            print(f"could not send: {exc}")
+            return 1
+        return 0
+    text = json.dumps(otel.to_otlp(trace), indent=1)
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+        print(f"wrote {args.out} ({len(trace['events'])} events as OTLP spans)")
+    else:
+        print(text)
+    return 0
 
 
 def cmd_mcp(args: argparse.Namespace) -> int:
@@ -372,7 +540,42 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-ablations", action="store_true")
     p.add_argument("--judge", action="store_true", help="also run model-graded cases (needs a real model)")
     p.add_argument("--out", default="results")
+    p.add_argument("--mine", action="store_true", help="run only the cases you saved from your own runs")
     p.set_defaults(fn=cmd_eval)
+
+    p = sub.add_parser("compare", help="the same questions through several models, side by side")
+    p.add_argument("--targets", nargs="+", metavar="PROVIDER[:MODEL][+key=value]",
+                   help="e.g. scripted local claude-code local:qwen2.5:7b scripted+pattern=plan")
+    p.add_argument("--out", help="folder for the report and traces (default: your state folder)")
+    p.set_defaults(fn=cmd_compare)
+
+    p = sub.add_parser("workflow", help="run or list workflows")
+    p.add_argument("name", nargs="?")
+    p.add_argument("input", nargs="*")
+    model_flags(p)
+    p.add_argument("--quiet", action="store_true", help="do not print the steps")
+    p.add_argument("--why", action="store_true", help="add the explanation of each step")
+    p.add_argument("--check", metavar="FILE", help="validate a workflow file and show its rounds")
+    p.set_defaults(fn=cmd_workflow)
+
+    p = sub.add_parser("tasks", help="scheduled tasks")
+    p.add_argument("action", nargs="?", choices=["list", "add", "rm", "run", "pause", "resume", "tick"], default="list")
+    p.add_argument("rest", nargs="*")
+    model_flags(p)
+    p.set_defaults(fn=cmd_tasks)
+
+    for name, text in (("telegram", "Telegram bot (long polling)"), ("discord", "Discord bot (gateway WebSocket)"),
+                       ("slack", "Slack app (Socket Mode)"), ("whatsapp", "WhatsApp Cloud API (webhook)")):
+        p = sub.add_parser(name, help=f"chat gateway: {text}")
+        if name == "whatsapp":
+            p.add_argument("--port", type=int, default=8790)
+        p.set_defaults(fn=cmd_gateway)
+
+    p = sub.add_parser("export", help="export a turn as OpenTelemetry (OTLP) JSON")
+    p.add_argument("turn_id", nargs="?", default="last")
+    p.add_argument("--out", help="write to a file instead of printing")
+    p.add_argument("--otlp", metavar="URL", help="POST to an OTLP/HTTP collector, e.g. http://localhost:4318")
+    p.set_defaults(fn=cmd_export)
 
     p = sub.add_parser("learn", help="read the handbook")
     p.add_argument("term", nargs="*")

@@ -11,6 +11,8 @@ memory the handbook describes:
   events_cal, notes, outbox   the world the tools act on (all local)
   tool_log   idempotency      results of side-effecting calls, by key
   checkpoints durable runs    the loop's state after every iteration
+  tasks      scheduled runs   prompts the agent runs on a clock, with no one watching
+  deliveries scheduled runs   results waiting to go back to the chat app that asked
 
 Facts are never edited in place. A changed fact gets a new row and the old row
 points at it (`superseded_by`), so the history of what the agent believed, and
@@ -50,6 +52,12 @@ CREATE TABLE IF NOT EXISTS tool_log (idem_key TEXT PRIMARY KEY, result TEXT NOT 
 CREATE TABLE IF NOT EXISTS checkpoints (
     turn_id TEXT NOT NULL, step INTEGER NOT NULL, state TEXT NOT NULL, created REAL NOT NULL,
     PRIMARY KEY (turn_id, step));
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY, prompt TEXT NOT NULL, schedule TEXT NOT NULL, next_run REAL, last_run REAL,
+    last_status TEXT DEFAULT '', last_reply TEXT DEFAULT '', last_turn TEXT DEFAULT '', origin TEXT DEFAULT '',
+    enabled INTEGER DEFAULT 1, runs INTEGER DEFAULT 0, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS deliveries (
+    id INTEGER PRIMARY KEY, origin TEXT NOT NULL, body TEXT NOT NULL, created REAL NOT NULL, sent INTEGER DEFAULT 0);
 """
 
 
@@ -210,8 +218,54 @@ class Store:
         self._run("DELETE FROM checkpoints WHERE turn_id=?", (turn_id,))
 
     # ------------------------------------------------ housekeeping
+    # ---------------------------------------------------------------- scheduled tasks
+    def add_task(self, prompt: str, schedule: str, next_run: float | None, origin: str = "") -> int:
+        return self._run("INSERT INTO tasks (prompt, schedule, next_run, origin, created) VALUES (?,?,?,?,?)",
+                         (prompt, schedule, next_run, origin, time.time())).lastrowid
+
+    def tasks(self) -> list[dict[str, Any]]:
+        return self._rows("SELECT * FROM tasks ORDER BY id")
+
+    def task(self, task_id: int) -> dict[str, Any] | None:
+        rows = self._rows("SELECT * FROM tasks WHERE id=?", (task_id,))
+        return rows[0] if rows else None
+
+    def due_tasks(self, now: float) -> list[dict[str, Any]]:
+        return self._rows("SELECT * FROM tasks WHERE enabled=1 AND next_run IS NOT NULL AND next_run<=? ORDER BY next_run", (now,))
+
+    def claim_task(self, task_id: int, expected_next: float, new_next: float | None) -> bool:
+        """Move a due task's next run forward, but only if nobody else already did.
+        Two processes (the web server and a chat gateway) may both be watching the
+        clock; this compare-and-set is what stops a task from running twice."""
+        return self._run("UPDATE tasks SET next_run=? WHERE id=? AND next_run=?", (new_next, task_id, expected_next)).rowcount == 1
+
+    def finish_task(self, task_id: int, status: str, reply: str, turn_id: str, when: float) -> None:
+        self._run("UPDATE tasks SET last_run=?, last_status=?, last_reply=?, last_turn=?, runs=runs+1 WHERE id=?",
+                  (when, status, reply[:4000], turn_id, task_id))
+
+    def set_task(self, task_id: int, *, enabled: bool | None = None, next_run: float | None = None) -> bool:
+        if enabled is not None:
+            self._run("UPDATE tasks SET enabled=? WHERE id=?", (int(enabled), task_id))
+        if next_run is not None:
+            self._run("UPDATE tasks SET next_run=? WHERE id=?", (next_run, task_id))
+        return self.task(task_id) is not None
+
+    def delete_task(self, task_id: int) -> bool:
+        return self._run("DELETE FROM tasks WHERE id=?", (task_id,)).rowcount == 1
+
+    def add_delivery(self, origin: str, body: str) -> int:
+        return self._run("INSERT INTO deliveries (origin, body, created) VALUES (?,?,?)", (origin, body, time.time())).lastrowid
+
+    def take_deliveries(self, channel: str) -> list[dict[str, Any]]:
+        """Results waiting for one chat channel. Each row is handed out once."""
+        with self._lock:
+            rows = self._rows("SELECT * FROM deliveries WHERE sent=0 AND origin LIKE ? ORDER BY id", (channel + ":%",))
+            for row in rows:
+                self._run("UPDATE deliveries SET sent=1 WHERE id=?", (row["id"],))
+        return rows
+
     def counts(self) -> dict[str, int]:
-        tables = ("messages", "facts", "episodes", "events_cal", "notes", "outbox")
+        tables = ("messages", "facts", "episodes", "events_cal", "notes", "outbox", "tasks")
         out = {t: self._rows(f"SELECT COUNT(*) AS n FROM {t}")[0]["n"] for t in tables}
         out["facts_live"] = self._rows("SELECT COUNT(*) AS n FROM facts WHERE superseded_by IS NULL")[0]["n"]
         return out
@@ -220,6 +274,6 @@ class Store:
         """Wipe everything. Only ever called on an explicit user request."""
         with self._lock:
             for table in ("messages", "sessions", "facts", "episodes", "events_cal", "notes",
-                          "outbox", "tool_log", "checkpoints"):
+                          "outbox", "tool_log", "checkpoints", "tasks", "deliveries"):
                 self._db.execute(f"DELETE FROM {table}")
             self._db.commit()

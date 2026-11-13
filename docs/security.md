@@ -24,7 +24,7 @@ The cost is real: after reading a web page, the agent cannot send a message unti
 |---|---|
 | read | allowed |
 | write (local, visible in the Memory tab) | allowed |
-| external (`send_message`, `connect_mcp_server`, MCP tools by default) | needs your approval; denied outright in a tainted turn |
+| external (`send_message`, `browse_web`, `run_command`, `schedule_task`, `connect_mcp_server`, MCP tools by default) | needs your approval; denied outright in a tainted turn, and in any unattended (scheduled) run |
 
 Also enforced by the gate: argument schemas, a tool-call budget, and a limit of two identical calls per turn.
 
@@ -34,8 +34,29 @@ Also enforced by the gate: argument schemas, a tool-call budget, and a limit of 
 - `fetch_url` allows only `http(s)` and refuses hosts that resolve to loopback, private, link-local or reserved
   addresses (SSRF, including the cloud metadata address).
 - `calculator` walks a syntax tree and allows arithmetic only.
-- There is no shell or code-execution tool.
+- `run_command` (the shell) ships switched off. Switched on, each command needs approval and runs in the
+  workspace with a scrubbed environment, a time limit, and the OS sandbox when one exists (`sandbox-exec`,
+  `bubblewrap`). Where none exists the step says so. See [tools.md](tools.md#the-shell-tool).
+- `browse_web` drives a headless browser in a throwaway profile. Every request the page makes is intercepted and
+  refused if it targets loopback, private or link-local addresses or a local file.
 - `send_message` writes to a local table. Nothing is transmitted.
+
+## Unattended runs and standing instructions
+
+A scheduled task runs with nobody to approve anything, so its approval policy is forced to `deny`: every
+outside-effect tool is refused in code. Creating a task is itself an outside-effect action, approved by you and
+denied in a tainted turn, because a task is an instruction the agent leaves for a later run that no person reads
+first. Without that rule one poisoned page could install an instruction that runs every day.
+
+Workflows get no exemption: each tool step in a workflow goes through the same gate.
+
+## Chat gateways
+
+A bot on a public platform can be messaged by anyone, so each gateway answers only the ids on its allowlist and
+tells everyone else nothing but their own id. The WhatsApp webhook is a public URL: every delivery's HMAC
+signature is checked against your app secret and unsigned requests are dropped. Bot tokens are read from the
+environment and are never written to the state folder or a trace. Messages pass through the chat platform itself.
+See [gateways.md](gateways.md).
 
 ## The local web server
 
@@ -55,7 +76,10 @@ matching: it catches common key formats, not every secret.
   downloads a tool.
 - **MCP servers you connect** are programs you chose to start. Their output is fenced and their tools need
   approval by default, but a malicious server is still a malicious program on your machine.
-- **Traces** contain your prompts and tool results in plain text under `~/.loopwright/traces/`.
+- **Traces** contain your prompts and tool results in plain text under `~/.loopwright/traces/`, and browser
+  screenshots under `traces/shots/`. With `OTEL_EXPORTER_OTLP_ENDPOINT` set, each turn is also sent to that
+  collector.
+- **Workflow files in `~/.loopwright/workflows/`** are yours; they can only call tools the gate would allow.
 - **Your model provider** sees everything in the context.
 
 ## Not covered

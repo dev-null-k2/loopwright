@@ -282,7 +282,117 @@ loopwright ask "When I ask for a standup update, always give three bullets: done
 
 Cards: [Skills (procedural memory)](glossary.md#procedural-memory)
 
-## 18. Proving it works
+## 18. A workflow: the code decides
+
+Run the same kind of question through a fixed graph of steps instead of a free loop, and see who is making the decisions.
+
+```bash
+loopwright ask "/workflow triage: what is a harness?" --steps --why
+```
+
+- Watch for `workflow.start`: Open this step: the whole path is known before anything runs. Five steps in three rounds.
+- Watch for `workflow.route`: The only decision point. One small model call picked a branch from a list; the other two branches are skipped.
+- Watch for `workflow.node`: Each step does one bounded job. Notice there is no 'what should I do next?' anywhere.
+- Watch for `workflow.end`: The reply is simply the output of the last step.
+
+**Takeaway.** In an agent the model chooses the next step. In a workflow the code does, and the model only fills in steps. If you can draw the steps, draw them.
+
+Cards: [Workflow versus agent](glossary.md#workflow-vs-agent), [Routing](glossary.md#routing), [Workflow graphs](glossary.md#workflow-graph)
+
+## 19. Steps in parallel
+
+Three lookups that do not depend on each other run in the same round, then one model call writes them up.
+
+```bash
+loopwright ask "Save a note: ship the pricing page"
+```
+```bash
+loopwright ask "Book a review with Alex tomorrow at 15:00"
+```
+```bash
+loopwright ask "/workflow morning-brief" --steps --why
+```
+
+- Watch for `workflow.start`: Round one has three steps. Nothing in one needs anything from another, so they run at the same time.
+- Watch for `toolgate.check`: A workflow's tool steps still go through the tool gate. Fixed does not mean unchecked.
+- Watch for `model.call`: The single model call of the whole run. It was handed the three results and asked for one thing.
+- Watch for `workflow.end`: One model call instead of four or five, and the same answer every time.
+
+**Takeaway.** Parallel steps are free in a graph, and the model is used once, where writing is needed. Compare the token count with asking the agent for the same brief.
+
+Cards: [Parallelization](glossary.md#parallelization), [Workflow graphs](glossary.md#workflow-graph), [Prompt chaining](glossary.md#prompt-chaining)
+
+## 20. A browser agent
+
+Hand a task to a worker that drives a real browser: open, look, click, look again.
+
+```bash
+loopwright ask "Use the browser: open demo://site, follow the Pricing link and tell me what the Team plan costs" --steps --why --set approvals=approve
+```
+
+- Watch for `human.request`: Acting on the web is an outside effect, so it needs approval. This lesson approves by policy.
+- Watch for `browser.start`: A worker starts with a fresh context and four browser tools. A real headless browser was launched for it.
+- Watch for `browser.action`: Open this step. The page became a list of numbered elements, and there is a screenshot of what the browser showed. The model answers with a number.
+- Watch for `browser.return`: Two pages were read; the main agent receives two sentences.
+- Watch for `guard.tool_result`: The summary was written from web pages, so it is fenced as untrusted and the turn is tainted.
+
+**Takeaway.** A text model browses by reading a numbered snapshot of the page and naming an element. It runs as a worker so the pages never enter the main context.
+
+Cards: [Browser agent](glossary.md#browser-agent), [Page snapshots and numbered elements](glossary.md#page-snapshot), [Subagents](glossary.md#subagents)
+
+## 21. The shell tool
+
+Let the model run a command, and see every control that stands around it.
+
+```bash
+loopwright ask "run `ls -la`" --steps --why --set approvals=ask
+```
+
+- Watch for `toolgate.check`: The shell is an 'external' tool. It ships switched off; this lesson switched it on in the classroom only.
+- Watch for `human.request`: Every command waits for a person. Press Approve.
+- Watch for `shell.run`: Open this step: the workspace folder, a scrubbed environment, a time limit, and the name of the sandbox that actually applied here (it may honestly say none).
+- Watch for `guard.tool_result`: A command can print anything, so its output is fenced as untrusted like a web page.
+
+**Takeaway.** A shell replaces a hundred tools and is arbitrary code execution. The safety comes from approval, isolation and a clean environment, never from a list of forbidden strings.
+
+Cards: [Code execution sandbox](glossary.md#code-sandbox), [Human in the loop](glossary.md#human-in-the-loop), [Least privilege and sandboxing](glossary.md#least-privilege)
+
+## 22. Scheduling a task
+
+Ask for something to happen every weekday, and see why saving that request needs your approval.
+
+```bash
+loopwright ask "Every weekday at 8am, tell me what's on my calendar" --steps --why --set approvals=ask
+```
+
+- Watch for `toolgate.check`: schedule_task is treated as an outside effect, though it only writes a row in a local database.
+- Watch for `human.request`: A task is the agent instructing its future self, to run when nobody is watching. Press Approve.
+- Watch for `schedule.create`: Saved with its next run time. See it on the Automations page.
+
+**Takeaway.** Anything an agent writes for its own later use (a task, a memory, a skill) can turn one bad turn into every turn. Creating it is a privileged action.
+
+Cards: [Scheduled and proactive agents](glossary.md#scheduled-agents), [Standing instructions and persistence](glossary.md#standing-instructions), [Human in the loop](glossary.md#human-in-the-loop)
+
+## 23. A run with nobody watching
+
+Fire a scheduled task that tries to send a message, and watch the harness refuse because no person is there to approve.
+
+```bash
+loopwright ask "Every 30 minutes, send Alex: the build is green"
+```
+```bash
+loopwright ask "/task 1" --steps --why
+```
+
+- Watch for `schedule.fire`: No person sent this. A clock did. The approval policy for this run is 'deny'.
+- Watch for `toolgate.refuse`: The task asked to send a message. With nobody to approve it, the gate refuses in code.
+- Watch for `reply.send`: The run still ends with a clear report of what it could not do.
+
+**Takeaway.** Unattended runs get read and local-write tools only. Whatever would have needed a yes is a no.
+
+Cards: [Scheduled and proactive agents](glossary.md#scheduled-agents), [Least privilege and sandboxing](glossary.md#least-privilege), [Tool gate](glossary.md#tool-gate)
+
+## 24. Proving it works
 
 Run the eval suite and read the ablation table.
 

@@ -57,4 +57,7 @@ def evaluate(report: dict[str, Any]) -> dict[str, Any]:
               ab["no-retries"]["reliability"], "< 1.0")
         check("teeth: the gate case fails when always retrieving", ab["always-retrieve"]["memory"] < 1.0,
               ab["always-retrieve"]["memory"], "< 1.0")
+        if "automation" in ab["no-guardrails"]:
+            check("teeth: automation cases fail with guardrails off", ab["no-guardrails"]["automation"] < 1.0,
+                  ab["no-guardrails"]["automation"], "< 1.0")
     return {"passed": all(c["pass"] for c in checks), "checks": checks, "thresholds": THRESHOLDS}

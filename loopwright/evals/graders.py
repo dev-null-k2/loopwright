@@ -61,7 +61,8 @@ def reply_not_contains(r: TurnResult, a: Agent, spec: Any) -> Verdict:
 
 def event(r: TurnResult, a: Agent, spec: Any) -> Verdict:
     spec = {"kind": spec} if isinstance(spec, str) else spec
-    matches = [e for e in r.events if e.kind == spec["kind"] and ("status" not in spec or e.status == spec["status"])]
+    matches = [e for e in r.events if e.kind == spec["kind"] and ("status" not in spec or e.status == spec["status"])
+               and all(e.data.get(k) == v for k, v in spec.get("data", {}).items())]
     seen = sorted({f"{e.kind}:{e.status}" for e in r.events if e.kind == spec["kind"]})
     return bool(matches), f"saw {seen or 'no such event'}"
 
@@ -135,6 +136,16 @@ def note_not_contains(r: TurnResult, a: Agent, spec: Any) -> Verdict:
     return not ok, note
 
 
+def task_count(r: TurnResult, a: Agent, spec: Any) -> Verdict:
+    tasks = a.store.tasks()
+    return len(tasks) == spec, f"scheduled tasks: {[(t['schedule'], t['prompt']) for t in tasks]}"
+
+
+def task_schedule(r: TurnResult, a: Agent, spec: Any) -> Verdict:
+    tasks = a.store.tasks()
+    return any(t["schedule"] == spec for t in tasks), f"schedules stored: {[t['schedule'] for t in tasks]}"
+
+
 GRADERS: dict[str, Callable[[TurnResult, Agent, Any], Verdict]] = {
     "tool_called": tool_called, "tool_not_called": tool_not_called, "tool_args": tool_args,
     "reply_contains": reply_contains, "reply_not_contains": reply_not_contains,
@@ -143,6 +154,7 @@ GRADERS: dict[str, Callable[[TurnResult, Agent, Any], Verdict]] = {
     "fact_stored": fact_stored, "fact_not_stored": fact_not_stored, "fact_superseded": fact_superseded,
     "fact_count": fact_count, "episode_count_min": episode_count_min, "outbox_count": outbox_count,
     "calendar_count": calendar_count, "note_contains": note_contains, "note_not_contains": note_not_contains,
+    "task_count": task_count, "task_schedule": task_schedule,
 }
 
 

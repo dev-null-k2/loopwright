@@ -11,3 +11,4 @@ dist/
 .DS_Store
 node_modules/
 results/traces/
+results/compare/traces/

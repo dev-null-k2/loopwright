@@ -11,9 +11,10 @@ const C0 = 16, C1 = 200, C2 = 386, C3 = 572, C4 = 758;     // column x positions
 // id: [x, y, small line under the label]
 export const LAYOUT = {
   user:        [C0, 56, "the person"],
-  gateway:     [C0, 146, "terminal, web, MCP"],
+  gateway:     [C0, 146, "terminal, web, chat apps"],
   reply:       [C0, 236, "out the same door"],
 
+  scheduler:   [C1, 56, "a clock starts the turn"],
   planner:     [C2, 56, "optional: plan first"],
   checkpoint:  [C3, 56, "state saved each round"],
   human:       [C4, 56, "approve or decline"],
@@ -26,6 +27,7 @@ export const LAYOUT = {
   guard_tool:  [C3, 236, "fence untrusted text"],
   tools:       [C4, 236, "act: our code runs"],
   subagent:    [C4, 326, "workers, fresh context"],
+  workflow:    [C2, 326, "a fixed graph of steps"],
 
   working:     [C1, 452, "this conversation"],
   gate:        [C2, 452, "retrieve at all?"],
@@ -50,7 +52,7 @@ const ZONES = [
 // The lines drawn at rest. A step between two boxes with no line here still
 // animates, along a temporary dashed hop.
 const EDGES = [
-  ["user", "gateway"], ["gateway", "guard_in"], ["guard_in", "working"], ["working", "procedural"],
+  ["user", "gateway"], ["scheduler", "gateway"], ["gateway", "guard_in"], ["guard_in", "working"], ["working", "procedural"],
   ["procedural", "gate"], ["gate", "semantic"], ["gate", "context"], ["planner", "context"],
   ["context", "model"], ["model", "checkpoint"], ["model", "toolgate"], ["toolgate", "human"],
   ["toolgate", "tools"], ["tools", "guard_tool"], ["guard_tool", "model"], ["tools", "subagent"],

@@ -7,6 +7,12 @@ event kind and the box it lands on.
 ```mermaid
 flowchart LR
   You --> Gateway --> GI[Input guardrails]
+  Chat[Telegram, Discord, Slack, WhatsApp] --> Gateway
+  Clock[Scheduler] --> Gateway
+  GI -. "/workflow name" .-> WF[Workflow: fixed graph of steps]
+  WF --> M
+  WF --> TG
+  WF --> GO
   GI --> WM[Working memory] --> SK[Skills] --> RG{Retrieval gate}
   RG -- only if needed --> SM[(Semantic + episodic memory)]
   RG --> CB[Context builder]
@@ -15,7 +21,7 @@ flowchart LR
   subgraph Loop
     M -- tool calls --> TG[Tool gate] --> T[Tools] --> TR[Tool-result guard] --> M
     TG -. outside effects .-> H[Human approval]
-    T -. delegate .-> SA[Subagents]
+    T -. delegate, browse_web .-> SA[Subagents and the browser worker]
   end
   M -- answer --> GO[Output guardrails] --> Reply --> Gateway
   Reply -. save .-> WM
@@ -25,15 +31,21 @@ flowchart LR
 
 ## One turn
 
-`Agent.run_turn` in [`harness.py`](../loopwright/harness.py) is five calls:
+`Agent.run_turn` in [`harness.py`](../loopwright/harness.py) is six calls:
 
 | Call | Steps | What happens |
 |---|---|---|
-| `_prepare` | gateway, input guard, working memory, skills, retrieval gate, memory search, context | Everything that decides what the model will see. Ends with `context.build`, which carries the full prompt and a token count per section |
+| `_arrive` | scheduler, gateway, input guard | Who started the turn (a person through some door, or a clock) and the one filter on their text |
+| `_prepare` | working memory, skills, retrieval gate, memory search, context | Everything that decides what the model will see. Ends with `context.build`, which carries the full prompt and a token count per section |
 | `_run_loop` | model, tool gate, tools, tool-result guard, checkpoints | [`loop.py`](../loopwright/loop.py): call the model, run what it asks for, append results, repeat |
 | `_review` | critic | Only with `pattern=reflect`: grade the draft, allow one revision |
 | `_guard_reply` | output guard | Mask secrets, verify citations |
 | `_finish` | reply, save, consolidation, turn checks, receipt, trace | Runs even when the turn failed, so there is always a reply and always a trace |
+
+A message of the form `/workflow <name>` takes a different middle: instead of `_prepare`, `_run_loop` and
+`_review`, the harness runs `_run_workflow`, which executes a fixed graph from
+[`workflows.py`](../loopwright/workflows.py). The beginning and end are the same, so a workflow is guarded,
+traced and replayable like any turn.
 
 A model failure (`ModelError`) and any unexpected exception are both caught in `run_turn`. A turn cannot end
 without a message to the user and a trace on disk.
@@ -61,6 +73,14 @@ UPDATE, NOOP or DROP. Facts are superseded, never edited.
 [`models/`](../loopwright/models/) translates at the last moment. The Claude Code adapter has no native channel
 for foreign tools, so it describes them in the system prompt and parses one JSON object back.
 
+**A worker is the same loop with a different toolset.** `Agent._work` runs `run_loop` with a fresh context, its
+own tool registry and its own gate. Research workers (`delegate`), the browser worker (`browse_web`) and a
+workflow's `agent` steps are all that one function. What a worker read taints the turn that receives its summary.
+
+**Who started the turn changes what it may do, and nothing else.** A scheduled task runs the ordinary `run_turn`
+with `approvals=deny`. A chat gateway runs it with an approver that asks in words. There is no separate code path
+for unattended or remote use to get wrong.
+
 **Every switch is a field on `Options`.** [`config.py`](../loopwright/config.py). The Lab in the cockpit, the
 `--set key=value` flag and the eval ablations all set the same fields, which is why an ablation is one line.
 
@@ -69,12 +89,17 @@ for foreign tools, so it describes them in the system prompt and parses one JSON
 Everything is under `~/.loopwright/` (override with `LOOPWRIGHT_HOME`):
 
 ```
-state.db        SQLite: messages, sessions, facts, episodes, calendar, notes, outbox, tool_log, checkpoints
-traces/         one JSONL file per turn
+state.db        SQLite: messages, sessions, facts, episodes, calendar, notes, outbox, tool_log, checkpoints,
+                scheduled tasks and results waiting to be delivered to a chat
+traces/         one JSONL file per turn; traces/shots/ holds the browser agent's screenshots
+workflows/      your workflow files (bundled ones live in the package)
+evals/          mine.jsonl: eval cases you saved from your own runs
+compare/        the last model comparison and its traces
+feedback.jsonl  thumbs up and down on replies
 skills/         your skills (bundled ones live in the package)
 tools/          your Python tools
 mcp.json        MCP servers to connect
-settings.json   tools you switched off
+settings.json   tools you switched off, and opt-in tools you switched on
 IDENTITY.md     your identity prompt, if you replaced it
 classroom/      the scratch copy the lessons run in
 ```

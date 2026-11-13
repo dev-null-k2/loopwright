@@ -1,6 +1,7 @@
-// The four reading pages: Learn, Evals, Memory, Runs.
+// The reading pages: Learn, Evals (report, model comparison, your own cases), Memory, Tools, Automations, Activity.
 
 import { api } from "./api.js";
+import { workflowGraph } from "./inspector.js";
 import { h, put, fmt, pct, pillarVar } from "./util.js";
 
 const spaceNote = () => (api.space === "classroom" ? h("p", { class: "classroom", style: "margin-bottom:14px;border-radius:6px" }, "You are looking at the classroom: the scratch copy of the agent that lessons run in. Leave it from the cockpit to see your own.") : null);
@@ -123,8 +124,98 @@ export function pillarColour(pillar) {
 
 // ============================================================ EVALS
 export function createEvals(actions) {
-  const root = document.getElementById("evals-body");
-  let report = null, busy = false, progress = "";
+  const page = document.getElementById("evals-body");
+  const tabsBar = h("div", { class: "subtabs" }), root = h("div", {});
+  page.append(tabsBar, root);
+  let report = null, busy = false, progress = "", tab = "report";
+  const TABS = [["report", "Harness evals"], ["compare", "Compare models"], ["mine", "Your cases"]];
+  const drawTabs = () => put(tabsBar, TABS.map(([id, label]) => h("button", { class: tab === id ? "on" : "", onclick: () => { location.hash = `#evals/${id}`; } }, label)));
+
+  // ---------------------------------------------------------------- compare models
+  let cmp = null, cmpBusy = false, cmpProgress = "", picked = null;
+  const secs = (ms) => (ms == null ? "n/a" : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`);
+
+  async function drawCompare() {
+    if (!cmp) cmp = await api.compareReport();
+    const providers = cmp.providers || {};
+    if (!picked) picked = new Set(["scripted", ...Object.keys(providers).filter((n) => providers[n].ok && n !== "scripted").slice(0, 2)]);
+    const extra = h("input", { placeholder: "more targets, e.g. local:qwen2.5:7b scripted+pattern=plan", style: "min-width:340px" });
+    const r = cmp.report;
+    const start = async () => {
+      cmpBusy = true; cmpProgress = "Starting..."; drawCompare();
+      try {
+        const report = await api.runCompare([...picked, ...extra.value.trim().split(/\s+/).filter(Boolean)], (p) => {
+          cmpProgress = `${p.target}: ${p.case} ${p.status} (${p.done}/${p.total})`;
+          const line = root.querySelector(".progress"); if (line) line.textContent = cmpProgress;
+        });
+        cmp = { ...cmp, report }; cmpProgress = "";
+      } catch (error) { cmpProgress = `The comparison failed: ${error.message}`; }
+      cmpBusy = false; drawCompare();
+    };
+    put(root,
+      h("div", { class: "page-head" },
+        h("div", {}, h("h1", {}, "Compare models"),
+          h("p", { class: "sub" }, "The same eight questions through each model, in fresh state every time. The checks are on behaviour (did the calculator run, was the fact stored, was the injected message not sent), so a model that words things differently still passes. Read four things off the table: what passes, how long it takes, what it costs, and where two models part ways. Click any cell to replay that run."))),
+      api.static ? h("p", { class: "note" }, "This page is a recorded demo. Run `loopwright compare` or open the cockpit locally to compare the models you have.") :
+        h("div", { class: "editor" }, h("h3", {}, "Pick what to compare"),
+          h("div", { class: "row", style: "flex-wrap:wrap;gap:6px 16px" }, Object.entries(providers).map(([name, p]) => {
+            const box = h("input", { type: "checkbox", style: "width:auto;margin:0 6px 0 0", disabled: !p.ok });
+            box.checked = picked.has(name) && p.ok;
+            box.addEventListener("change", () => { box.checked ? picked.add(name) : picked.delete(name); });
+            return h("label", { class: "check", title: p.note }, box, h("span", {}, name + (p.ok ? "" : " (not set up)")));
+          })),
+          h("div", { class: "row" }, extra, h("button", { class: "primary", disabled: cmpBusy, onclick: start }, cmpBusy ? "Running..." : "Run the comparison")),
+          h("p", { class: "hint" }, "A target is a provider, provider:model, or either with +setting=value to compare two configurations of one model. Real models take a minute or two.")),
+      h("p", { class: "progress" }, cmpProgress),
+      r ? [
+        h("table", { class: "grid cmp" },
+          h("thead", {}, h("tr", {}, h("th", {}, "Question"), r.targets.map((t) => h("th", {}, t.label, t.model && !t.label.includes(t.model) ? h("div", { class: "hint" }, t.model) : null)))),
+          h("tbody", {},
+            r.cases.map((c, i) => h("tr", {},
+              h("td", {}, h("b", {}, c.title), h("div", { class: "hint" }, c.prompt)),
+              r.targets.map((t) => {
+                const row = t.rows[i];
+                return h("td", { class: row.ms != null ? "clickable" : "", title: row.failed_checks?.join("\n") || row.note || "Replay this run",
+                                 onclick: row.ms != null ? () => actions.replayCompare(t.slug, c.id, `${t.label}: ${c.title}`) : null },
+                  h("span", { class: row.status === "pass" ? "pass" : "fail" }, row.status),
+                  row.ms != null ? h("div", { class: "hint" }, `${secs(row.ms)} · ${fmt(row.tokens)} tok · ${row.tools.length} tool call(s)`) : h("div", { class: "hint" }, row.note || ""),
+                  row.failed_checks?.length ? h("div", { class: "hint fail-why" }, row.failed_checks[0]) : null);
+              }))),
+            h("tr", { class: "total" }, h("td", {}, h("b", {}, "Passed")), r.targets.map((t) => h("td", {}, h("b", { class: t.passed === t.total ? "pass" : "fail" }, `${t.passed}/${t.total}`)))),
+            h("tr", { class: "total" }, h("td", {}, "Median time per question"), r.targets.map((t) => h("td", {}, secs(t.median_ms)))),
+            h("tr", { class: "total" }, h("td", {}, "Tokens, all eight"), r.targets.map((t) => h("td", {}, fmt(t.tokens)))),
+            h("tr", { class: "total" }, h("td", {}, "Cost, all eight"), r.targets.map((t) => h("td", {}, t.cost_usd == null ? "n/a" : `$${t.cost_usd.toFixed(4)}`))))),
+        h("p", { class: "note" }, `Generated ${r.generated}. Eight cases are a smoke test, not a verdict: for a real decision, save your own runs as cases (Your cases) and run several trials.`),
+      ] : h("p", { class: "note" }, "No comparison yet."));
+  }
+
+  // ---------------------------------------------------------------- your own cases
+  let mineResult = null;
+  async function drawMine() {
+    const { cases, feedback } = await api.mine();
+    const votes = Object.values(feedback);
+    const outcome = (id) => mineResult?.cases.find((c) => c.id === id);
+    put(root,
+      h("div", { class: "page-head" },
+        h("div", {}, h("h1", {}, "Your cases"),
+          h("p", { class: "sub" }, "The best eval cases are real turns. Under any reply in the cockpit, press Good or Bad to label it, or Save as eval case to turn that run into a regression test: the message, plus checks on what the run did (which tools ran, whether memory was searched, what was refused). They are stored in evals/mine.jsonl in your state folder, in the same format as the built-in suites, so you can tighten them by hand.")),
+        api.static || !cases.length ? null : h("button", { class: "primary", onclick: async () => { mineResult = await api.runMine(actions.options()); drawMine(); } }, "Run my cases")),
+      h("div", { class: "tiles" },
+        h("div", { class: "tile" }, h("b", {}, cases.length), h("span", {}, "Saved cases")),
+        h("div", { class: "tile good" }, h("b", {}, votes.filter((v) => v.rating === "up").length), h("span", {}, "Replies marked good")),
+        h("div", { class: "tile bad" }, h("b", {}, votes.filter((v) => v.rating === "down").length), h("span", {}, "Replies marked bad")),
+        mineResult ? h("div", { class: `tile ${mineResult.passed === mineResult.total ? "good" : "bad"}` }, h("b", {}, `${mineResult.passed}/${mineResult.total}`), h("span", {}, "Passed just now")) : null),
+      cases.length ? h("table", { class: "grid", style: "margin-top:14px" },
+        h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Message"), h("th", {}, "What it checks"), h("th", {}, ""))),
+        h("tbody", {}, cases.map((c) => {
+          const got = outcome(c.id);
+          return h("tr", {}, h("td", { class: got ? (got.passed ? "pass" : "fail") : "hint" }, got ? (got.passed ? "pass" : "fail") : "not run"),
+            h("td", {}, c.turns[0], got && !got.passed ? h("div", { class: "hint fail-why" }, got.trials[0].checks.filter((k) => !k.pass).map((k) => `${k.check}: ${k.note}`).join("; ").slice(0, 220)) : null),
+            h("td", { class: "hint" }, c.expect.map((e) => Object.entries(e).map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join(", ")).join(" · ")),
+            h("td", {}, h("button", { class: "linkish", onclick: async () => { await api.deleteCase(c.id); drawMine(); } }, "Remove")));
+        }))) : h("p", { class: "note" }, api.static ? "The recorded demo has none. Install Loopwright to save your own." : "None yet. Ask something in the cockpit, then press Save as eval case under the reply."),
+      h("p", { class: "note" }, "From the terminal: loopwright eval --mine. These cases are yours, so they are not part of the project's release gate."));
+  }
 
   function heat(value, invert = false) {
     const good = invert ? 1 - value : value;
@@ -200,7 +291,14 @@ export function createEvals(actions) {
     busy = false; draw();
   }
 
-  return { async show() { if (!report) { report = await api.evalReport(); } draw(); } };
+  return { async show(arg) {
+    tab = TABS.some(([id]) => id === arg) ? arg : "report";
+    drawTabs();
+    if (tab === "compare") return drawCompare();
+    if (tab === "mine") return drawMine();
+    if (!report) { report = await api.evalReport(); }
+    draw();
+  } };
 }
 
 // ============================================================ MEMORY
@@ -295,7 +393,8 @@ export function createTools() {
         h("tbody", {}, t.tools.map((x) => h("tr", {},
           h("td", {}, h("b", { class: x.enabled ? "" : "struck" }, x.name)),
           h("td", { class: "hint" }, x.description),
-          h("td", {}, effect[x.effect], x.untrusted ? h("div", { class: "hint" }, "returns untrusted content") : null, x.private ? h("div", { class: "hint" }, "reads private data") : null),
+          h("td", {}, effect[x.effect], x.untrusted ? h("div", { class: "hint" }, "returns untrusted content") : null, x.private ? h("div", { class: "hint" }, "reads private data") : null,
+            x.opt_in ? h("div", { class: "hint" }, "ships switched off") : null),
           h("td", { class: "hint" }, x.origin),
           h("td", {}, api.static ? null : h("button", { class: "linkish", onclick: async () => { await api.toggleTool(x.name, !x.enabled); show(); } }, x.enabled ? "Switch off" : "Switch on")))))),
 
@@ -356,6 +455,77 @@ export function createActivity(actions) {
           h("td", { class: "hint" }, r.started.replace("T", " ")), h("td", {}, r.message), h("td", { class: "hint" }, r.model),
           h("td", { class: "n" }, r.steps), h("td", { class: "n" }, fmt(r.tokens)), h("td", { class: r.ok ? "pass" : "fail" }, r.ok ? "" : "failed"))))) :
         h("p", { class: "note" }, "No runs yet. Send a message in the cockpit."));
+  }
+  return { show };
+}
+
+// ============================================================ AUTOMATIONS
+export function createAutomations(actions) {
+  const root = document.getElementById("automations-body");
+  let tab = "tasks", note = "";
+  const TABS = [["tasks", "Scheduled tasks"], ["workflows", "Workflows"], ["channels", "Chat apps"]];
+
+  async function show(arg) {
+    if (TABS.some(([id]) => id === arg)) tab = arg;
+    const a = await api.automations();
+    let pane;
+    if (tab === "tasks") {
+      const schedule = h("input", { placeholder: "when: weekdays 08:00 · every 30m · weekly mon 09:00 · once 2026-11-20 14:00 · 0 8 * * 1-5" });
+      const prompt = h("textarea", { rows: 2, placeholder: "what to do each time, e.g. Tell me what is on my calendar today and list my recent notes" });
+      const msg = h("span", { class: "hint" }, note);
+      pane = [
+        h("p", { class: "note", style: "margin-bottom:12px" }, "A scheduled task is a saved prompt that a clock sends instead of you. It runs with nobody watching, so anything that would need your approval is refused: a task can read, think, take notes and report, and cannot send messages, browse or run commands. Tasks run while this cockpit or a chat gateway is running. You can also ask in chat: \"Every weekday at 8am, tell me what's on my calendar\" (you will be asked to approve it)."),
+        a.tasks.length ? h("table", { class: "grid" },
+          h("thead", {}, h("tr", {}, h("th", {}, "#"), h("th", {}, "Prompt"), h("th", {}, "Runs"), h("th", {}, "Next"), h("th", {}, "Last result"), h("th", {}, ""))),
+          h("tbody", {}, a.tasks.map((t) => h("tr", {},
+            h("td", { class: "n" }, t.id),
+            h("td", {}, h("b", { class: t.enabled ? "" : "struck" }, t.prompt), t.origin && !t.origin.startsWith("web") && !t.origin.startsWith("local") ? h("div", { class: "hint" }, `results go to ${t.origin.replace(":", " chat ")}`) : null),
+            h("td", {}, t.runs_text, h("div", { class: "hint" }, `${t.runs} run(s) so far`)),
+            h("td", { class: "hint" }, t.enabled ? t.next || "never" : "paused"),
+            h("td", { class: "hint" }, t.last_reply ? [t.last, ": ", t.last_reply.slice(0, 140),
+              t.last_turn && !api.static ? [" ", h("button", { class: "linkish", onclick: () => { actions.replayRun(t.last_turn); location.hash = "#cockpit"; } }, "Replay")] : null] : "has not run yet"),
+            h("td", {}, api.static ? null : h("div", { class: "row-actions" },
+              h("button", { class: "linkish", onclick: () => actions.tryPrompt(`/task ${t.id}`) }, "Run now"),
+              h("button", { class: "linkish", onclick: async () => { await api.toggleTask(t.id, !t.enabled); show(); } }, t.enabled ? "Pause" : "Resume"),
+              h("button", { class: "linkish", onclick: async () => { await api.deleteTask(t.id); show(); } }, "Remove"))))))) :
+          h("p", { class: "note" }, "No scheduled tasks yet."),
+        api.static ? null : h("div", { class: "editor", style: "margin-top:14px" }, h("h3", {}, "Add a task"), schedule, prompt,
+          h("div", { class: "row" }, h("button", { class: "primary", onclick: async () => {
+            const r = await api.addTask(prompt.value, schedule.value).catch(() => ({ error: true }));
+            note = r.error ? "I could not read that schedule. Use one of the forms shown in the box." : "";
+            show();
+          } }, "Schedule it"), msg)),
+        h("p", { class: "note" }, h("button", { class: "linkish", onclick: () => actions.openConcept("scheduled-agents") }, "Read: scheduled and proactive agents"), "  ",
+          h("button", { class: "linkish", onclick: () => actions.openConcept("standing-instructions") }, "why creating one needs approval"))];
+    } else if (tab === "workflows") {
+      pane = [
+        h("p", { class: "note", style: "margin-bottom:12px" }, "A workflow is a path fixed in advance: the code decides what happens next, and the model is called at set points to do one job each. Steps in the same column run at the same time. Run one here, type /workflow <name> in any chat, or put it on a schedule. To write your own, copy a file from loopwright/flows/ into " + a.workflows_folder + "."),
+        a.workflows.map((w) => {
+          const input = h("input", { placeholder: w.input || "no input needed" });
+          return h("div", { class: "editor" },
+            h("div", { class: "row" }, h("h3", {}, w.name), h("span", { class: "badge" }, w.source)),
+            h("p", { class: "hint" }, w.description), workflowGraph(w),
+            h("div", { class: "row", style: "margin-top:8px" }, w.input ? input : null,
+              h("button", { class: "primary", onclick: () => actions.tryPrompt(`/workflow ${w.name}${input.value.trim() ? `: ${input.value.trim()}` : ""}`) }, "Run and watch")));
+        }),
+        h("p", { class: "note" }, h("button", { class: "linkish", onclick: () => actions.openConcept("workflow-vs-agent") }, "Read: workflow versus agent"))];
+    } else {
+      pane = [
+        h("p", { class: "note", style: "margin-bottom:12px" }, "Talk to the same agent from a chat app. Each gateway is a small adapter that starts ordinary turns: same memory, same tools, same guardrails. Only the people on its allowlist are answered; approvals are asked in words (reply yes); /steps shows what the agent did. Tokens are read from environment variables or a .env file and are never stored by Loopwright."),
+        h("table", { class: "grid" },
+          h("thead", {}, h("tr", {}, h("th", {}, "App"), h("th", {}, "How it connects"), h("th", {}, "Status"), h("th", {}, "Start it"))),
+          h("tbody", {}, a.channels.map((c) => h("tr", {},
+            h("td", {}, h("b", {}, { whatsapp: "WhatsApp" }[c.name] || c.name[0].toUpperCase() + c.name.slice(1))), h("td", { class: "hint" }, c.how),
+            h("td", { class: c.configured && c.allowed ? "pass" : "hint" }, c.configured ? (c.allowed ? "ready" : `token set; add ${c.allow_var}`) : `set ${c.token_var}`),
+            h("td", {}, h("code", {}, c.command)))))),
+        h("p", { class: "note" }, "Step-by-step setup for each app is in docs/gateways.md. ",
+          h("button", { class: "linkish", onclick: () => actions.openConcept("messaging-gateways") }, "Read: messaging gateways"))];
+    }
+    put(root,
+      h("h1", {}, "Automations"),
+      h("p", { class: "sub" }, "Three ways the agent works without you typing into this page: on a clock, along a fixed path, and from the chat apps you already use."),
+      h("div", { class: "subtabs" }, TABS.map(([id, label]) => h("button", { class: tab === id ? "on" : "", onclick: () => { tab = id; show(); } }, label))),
+      pane);
   }
   return { show };
 }

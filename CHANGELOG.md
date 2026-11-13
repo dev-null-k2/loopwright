@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.2.0
+
+- **Chat gateways**: Telegram (long polling), Discord (gateway WebSocket), Slack (Socket Mode) and WhatsApp (Cloud
+  API webhook with signature verification), on one shared bridge with an allowlist, a session per chat, approvals
+  asked in words and `/steps`. A standard-library WebSocket client.
+- **Workflows**: a graph engine with tool, model, agent and route nodes, parallel rounds and conditional
+  branches, defined in TOML. Three bundled workflows (parallelisation, routing, prompt chaining with a gate).
+  `/workflow <name>` in any chat, `loopwright workflow`, and a `run_workflow` tool.
+- **Scheduled tasks**: readable schedules and five-field cron, unattended runs with outside effects denied,
+  exactly-once claiming across processes, delivery back to the chat that created the task. `schedule_task`,
+  `list_tasks`, `cancel_task` tools; `loopwright tasks`; `/task <n>` to run one now.
+- **A browser agent**: a worker that drives headless Chrome over the DevTools Protocol with numbered-element page
+  snapshots, a screenshot per action shown in the inspector, and a filter on every request the page makes.
+- **A shell tool** (`run_command`): off by default, approval for every command, OS sandbox where available,
+  scrubbed environment, time limit.
+- **Model comparison**: `loopwright compare` and Evals, Compare models: the same eight behaviour cases through any
+  set of providers, models or settings, with a replayable trace per cell.
+- **Your own eval cases**: Good and Bad on every reply, and Save as eval case, which builds a case from the run's
+  trace. `loopwright eval --mine`.
+- **OpenTelemetry export**: `loopwright export`, and automatic export of every turn when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set, using the GenAI attribute names.
+- Cockpit: an Automations page (scheduled tasks, workflows, chat apps), two new boxes on the board (Scheduler,
+  Workflow), six new lessons. Handbook: seven new cards, three cards moved from "explained" to "built".
+- Evals: a sixth suite, automation, with 19 cases; 69 cases in total. Tools: 23.
+
 ## 0.1.0
 
 First release.

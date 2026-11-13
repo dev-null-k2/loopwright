@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Northwind Notes: search</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:680px;margin:40px auto;padding:0 20px;color:#1d2330}nav a{margin-right:16px}</style></head>
+<body>
+<nav><a href="index.html">Home</a> <a href="pricing.html">Pricing</a> <a href="changelog.html">Changelog</a> <a href="reviews.html">Reviews</a></nav>
+<h1>Search results</h1>
+<p id="summary"></p>
+<ul id="hits"></ul>
+<script>
+const pages = [
+  ["pricing.html", "Pricing", "The Team plan costs $8 per person per month. The Business plan costs $15 per person per month."],
+  ["changelog.html", "Changelog", "Version 3.2 added offline search and a faster sync engine."],
+  ["index.html", "Home", "Notes sync across devices, work without a connection and can be shared with a link."],
+];
+const q = (new URLSearchParams(location.search).get("q") || "").toLowerCase().trim();
+const hits = pages.filter(p => q && q.split(/\s+/).some(w => (p[1] + " " + p[2]).toLowerCase().includes(w)));
+document.getElementById("summary").textContent = hits.length + " result(s) for \"" + q + "\".";
+for (const [href, title, text] of hits) {
+  const li = document.createElement("li"), a = document.createElement("a");
+  a.href = href; a.textContent = title; li.append(a, " " + text); document.getElementById("hits").append(li);
+}
+</script>
+</body></html>

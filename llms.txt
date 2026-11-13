@@ -10,12 +10,14 @@
 - [Events](docs/events.md): every event kind and the box it lands on
 
 ## Learn
-- [Handbook](docs/glossary.md): 84 agent-design terms
-- [Lessons](docs/lessons.md): 18 guided runs
+- [Handbook](docs/glossary.md): 91 agent-design terms
+- [Lessons](docs/lessons.md): 24 guided runs
 - [Interview practice](docs/interview-prep.md): 12 scenarios with answers
 
 ## Use and extend
 - [Tools, skills and MCP](docs/tools.md)
+- [Workflows and scheduled tasks](docs/automations.md)
+- [Chat gateways: Telegram, Discord, Slack, WhatsApp](docs/gateways.md)
 - [Claude Code](docs/claude-code.md)
 - [Offline and local models](docs/offline.md)
 - [Replay](docs/replay.md)
@@ -26,4 +28,6 @@
 - [harness.py](loopwright/harness.py): run_turn, the fifteen steps
 - [loop.py](loopwright/loop.py): the loop
 - [toolgate.py](loopwright/toolgate.py): permissions, budgets, approvals
+- [workflows.py](loopwright/workflows.py): the workflow graph engine
+- [scheduler.py](loopwright/scheduler.py): scheduled, unattended turns
 - [AGENTS.md](AGENTS.md): rules for changing the repository

@@ -10,7 +10,7 @@ export function h(tag, attrs = {}, ...children) {
     else if (key === "html") node.innerHTML = value;
     else node.setAttribute(key, value === true ? "" : value);
   }
-  for (const child of children.flat()) {
+  for (const child of children.flat(Infinity)) {
     if (child == null || child === false) continue;
     node.append(child.nodeType ? child : document.createTextNode(String(child)));
   }
@@ -33,6 +33,6 @@ export const pillarVar = (pillar) => `var(--${pillar || "gateway"})`;
 
 // replaceChildren, minus the nulls (the DOM would print them as the word "null")
 export function put(node, ...children) {
-  node.replaceChildren(...children.flat().filter((c) => c != null && c !== false));
+  node.replaceChildren(...children.flat(Infinity).filter((c) => c != null && c !== false));
   return node;
 }

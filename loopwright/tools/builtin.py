@@ -274,6 +274,23 @@ def connect_mcp_server(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]
     return {"connected": True, "name": args["name"], "note": "its tools are available from the next turn"}
 
 
+def run_workflow(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    """An agent can pick a workflow as one of its moves: the flexible part
+    chooses, the fixed part executes."""
+    from loopwright import workflows
+    name = args["name"].strip().lower()
+    available = workflows.load_all(ctx.home)
+    if name in ("list", "") or name not in available:
+        listing = [{"name": w.name, "description": w.description} for w in available.values()]
+        if name in ("list", ""):
+            return {"workflows": listing}
+        raise ToolError(f"no workflow named '{name}'. Available: {', '.join(w['name'] for w in listing)}")
+    if ctx.workflow is None:
+        raise ToolError("a worker cannot start a workflow")
+    done = ctx.workflow(name, args.get("input", ""))
+    return {"workflow": name, "result": done["reply"], "steps_run": done["ran"]}
+
+
 # ------------------------------------------------------------------ registry
 
 def _obj(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -284,7 +301,10 @@ _S = {"type": "string"}
 
 
 def default_registry() -> Registry:
+    from loopwright.scheduler import scheduler_tools
+    from loopwright.tools.browser import browser_tool
     from loopwright.tools.delegate import delegate_tool
+    from loopwright.tools.shell import shell_tool
     from loopwright.tools.web_search import web_search_tool
     return Registry([
         Tool("calculator", "Evaluate an arithmetic expression exactly. Use it for any calculation instead of "
@@ -338,4 +358,11 @@ def default_registry() -> Registry:
                    "args": {"type": "array", "items": _S}}, ["name", "command"]),
              connect_mcp_server, effect="external"),
         delegate_tool(),
+        browser_tool(),
+        shell_tool(),
+        *scheduler_tools(),
+        Tool("run_workflow", "Run one of the user's saved workflows (fixed multi-step procedures such as morning-brief, "
+             "triage or research-digest) and return its result. Use name 'list' to see what exists.",
+             _obj({"name": _S, "input": {**_S, "description": "the text the workflow works on, if it takes any"}}, ["name"]),
+             run_workflow, stage="workflow"),
     ])

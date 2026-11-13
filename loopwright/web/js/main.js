@@ -5,7 +5,7 @@ import { api } from "./api.js";
 import { createBoard } from "./board.js";
 import { Player } from "./player.js";
 import { renderInspector } from "./inspector.js";
-import { createLearn, createEvals, createMemory, createActivity, createTools } from "./views.js";
+import { createLearn, createEvals, createMemory, createActivity, createTools, createAutomations } from "./views.js";
 import { h, put, lightMarkdown, fmt, pillarVar } from "./util.js";
 
 const $ = (id) => document.getElementById(id);
@@ -24,6 +24,10 @@ const SUGGESTIONS = [
   ["Web", "Search the web for agent evaluation best practices"],
   ["Safety", "Summarise demo://poisoned-page"],
   ["Approval", "Send a message to Priya: running 10 minutes late"],
+  ["Workflow", "/workflow morning-brief"],
+  ["Workflow", "/workflow triage: what is a harness?"],
+  ["Browser", "Use the browser: open demo://site, follow the Pricing link and tell me what the Team plan costs"],
+  ["Schedule", "Every weekday at 8am, tell me what's on my calendar"],
   ["Teach", "When I ask for a standup update, always give three bullets: done, doing, blocked"],
 ];
 
@@ -44,7 +48,7 @@ const LAB = [
   ["fallback", "Fallback model", "Off means a model outage ends the turn.", "bool"],
 ];
 
-let book, board, player, health, learn, evals, memoryView, activity, toolsView;
+let book, board, player, health, learn, evals, memoryView, activity, toolsView, automations;
 let defaults = {}, lab = {}, busy = false, session = newSession(), openLesson = null, lessonRun = null;
 let messages = [];            // {role, node, ...}
 
@@ -59,7 +63,8 @@ async function boot() {
   board = createBoard($("board"), book.stages, pickNode);
   player = new Player(onPlayerChange);
   learn = createLearn(book, { tryPrompt, openSource });
-  evals = createEvals({ replayEval });
+  evals = createEvals({ replayEval, replayCompare, options: () => ({ provider: $("provider").value.split("|")[0] }) });
+  automations = createAutomations({ tryPrompt, replayRun, openConcept });
   memoryView = createMemory();
   activity = createActivity({ replayRun });
   toolsView = createTools();
@@ -80,11 +85,12 @@ async function boot() {
 // ------------------------------------------------------------------ routing
 function route() {
   const [tab, arg] = (location.hash.slice(1) || "cockpit").split("/");
-  const name = ["cockpit", "learn", "evals", "memory", "tools", "activity"].includes(tab) ? tab : "cockpit";
+  const name = ["cockpit", "learn", "evals", "memory", "tools", "automations", "activity"].includes(tab) ? tab : "cockpit";
   for (const view of document.querySelectorAll(".view")) view.hidden = view.id !== `view-${name}`;
   for (const a of document.querySelectorAll(".tabs a")) a.classList.toggle("on", a.dataset.tab === name);
   if (name === "learn" && arg) learn.open(arg);
-  if (name === "evals") evals.show();
+  if (name === "evals") evals.show(arg);
+  if (name === "automations") automations.show(arg);
   if (name === "memory") memoryView.show();
   if (name === "activity") activity.show();
   if (name === "tools") toolsView.show();
@@ -171,8 +177,16 @@ function drawLab() {
 // ------------------------------------------------------------------ the trail: what the agent did, under each reply
 function oneLine(output) {
   let d;
-  try { d = JSON.parse(output); } catch { return String(output).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 110); }
+  const fenced = /<untrusted_content[^>]*>\n?([\s\S]*?)\n?<\/untrusted_content>/.exec(String(output));
+  try { d = JSON.parse(fenced ? fenced[1] : output); } catch { return String(fenced ? fenced[1] : output).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 110); }
   if (d.error) return d.error;
+  if ("exit_code" in d) return `exit ${d.exit_code}: ${(d.stdout || d.stderr || "no output").trim().split("\n")[0].slice(0, 90)}`;
+  if (d.final_url) return `${d.actions} browser action(s), ended on ${d.final_url}`;
+  if (d.workflow) return `${d.steps_run.length} step(s) ran`;
+  if (d.workflows) return `${d.workflows.length} workflow(s)`;
+  if (d.tasks) return `${d.count} scheduled task(s)`;
+  if (d.schedule) return `task #${d.id}: ${d.runs}`;
+  if (d.cancelled) return `task #${d.cancelled} cancelled`;
   if ("result" in d) return `${d.expression} = ${d.result}`;
   if (d.action) return `${d.action}: ${d.text}`;
   if (d.created) return `"${d.title}" on ${d.date} at ${d.time}`;
@@ -204,6 +218,11 @@ function trailRows(events) {
     else if (e.kind === "toolgate.refuse") add("bad", d.tool, `refused: ${d.reason}`, { args: d.args ?? {}, output: d.reason });
     else if (e.kind === "human.decision") add(d.approved ? "" : "bad", "Approval", `${d.approved ? "approved" : "declined"} by ${d.by}`);
     else if (e.kind === "guard.tool_result") add(e.status === "warn" ? "warn" : "", "Fenced as untrusted", d.findings?.length ? `injection suspected: ${d.findings[0].label}` : d.source);
+    else if (e.kind === "schedule.fire") add("warn", "Started by the clock", `task #${d.task_id} (${d.schedule}); nobody to approve, so outside effects are denied`);
+    else if (e.kind === "workflow.start") add("", "Workflow", `${d.name}: ${d.nodes.length} steps in ${d.waves.length} round(s)`);
+    else if (e.kind === "workflow.route") add("", "Route", `chose ${d.chose} (${d.by === "model" ? "a model picked" : "rules in code"})`);
+    else if (e.kind === "workflow.node" && d.status !== "skipped" && d.kind !== "tool") add(d.status === "done" ? "" : "bad", `Step ${d.id}`, `${d.kind}: ${String(d.output || "").replace(/\s+/g, " ").slice(0, 90)}`);
+    else if (e.kind === "browser.return") add("", "Browser worker", `${d.steps} action(s), ended on ${d.final_url}`);
     else if (e.kind === "model.retry") add("warn", "Model retry", d.error);
     else if (e.kind === "model.fallback") add("warn", "Fell back", `to ${d.to}`);
     else if (e.kind === "critic.review") add(d.passed ? "" : "warn", "Critic", d.passed ? "draft passed" : d.feedback);
@@ -269,10 +288,23 @@ function agentNode(m) {
         r.model_calls != null ? h("span", {}, `${r.model_calls} model call(s)`) : null,
         r.tokens_in != null ? h("span", {}, `${r.estimated ? "~" : ""}${fmt(r.tokens_in + r.tokens_out)} tokens`) : null,
         r.duration_ms != null ? h("span", {}, r.duration_ms > 1500 ? `${(r.duration_ms / 1000).toFixed(1)} s` : `${fmt(r.duration_ms)} ms`) : null,
-        r.cost_usd ? h("span", {}, `$${r.cost_usd.toFixed(4)}`) : null));
+        r.cost_usd ? h("span", {}, `$${r.cost_usd.toFixed(4)}`) : null,
+        feedbackButtons(m)));
   };
   m.render();
   return node;
+}
+
+// A thumbs up or down, and "keep this run as a regression test": the feedback loop, in three buttons.
+function feedbackButtons(m) {
+  const id = m.result?.turn_id;
+  if (api.static || !id || api.space !== "main") return null;
+  const rate = async (rating) => { await api.feedback(id, rating); m.rated = rating; m.render(); };
+  return h("span", { class: "fb" },
+    h("button", { class: m.rated === "up" ? "on" : "", title: "This answer was good", "aria-label": "Good answer", onclick: () => rate("up") }, "Good"),
+    h("button", { class: m.rated === "down" ? "on" : "", title: "This answer was wrong or unhelpful", "aria-label": "Bad answer", onclick: () => rate("down") }, "Bad"),
+    h("button", { title: "Save this run as an eval case, so a later change cannot quietly break it",
+      onclick: async () => { await api.saveCase(id); m.saved = true; m.render(); } }, m.saved ? "Saved as eval case" : "Save as eval case"));
 }
 
 function reveal(m) {
@@ -358,7 +390,7 @@ async function openSession(id) {
   messages = [];
   for (const row of rows) {
     if (row.role === "user") { messages.push({ role: "user", node: h("div", { class: "msg user" }, row.content), text: row.content }); continue; }
-    const m = { role: "agent", prompt: messages.at(-1)?.text || "", events: [], revealed: true, result: { reply: row.content, receipt: {} } };
+    const m = { role: "agent", prompt: messages.at(-1)?.text || "", events: [], revealed: true, result: { reply: row.content, receipt: {}, turn_id: row.turn_id } };
     try {
       const trace = await api.run(row.turn_id);
       m.events = trace.events; m.result.receipt = trace.end.receipt || {};
@@ -385,10 +417,12 @@ function drawLessons() {
         h("p", {}, lesson.goal),
         lesson.open
           ? h("button", { class: "run", onclick: () => { markDone(lesson.id); location.hash = `#${lesson.open}`; } }, "Open the Evals tab")
-          : h("button", { class: "run", disabled: busy, onclick: () => runLesson(lesson) }, ran ? "Run it again" : "Run this lesson"),
+          : h("button", { class: "run", disabled: busy || (lesson.needs === "browser" && !health.browser), onclick: () => runLesson(lesson) }, ran ? "Run it again" : "Run this lesson"),
+        lesson.needs === "browser" && !health.browser ? h("p", { class: "hint", style: "margin-top:6px" }, "This lesson drives a real browser and found none here. Install Chrome, Chromium, Edge or Brave, or set LOOPWRIGHT_CHROME.") : null,
         lesson.prompt ? h("p", { class: "hint", style: "margin-top:6px" }, `It sends: "${lesson.prompt}"`) : null,
         lesson.watch.length ? h("ol", {}, lesson.watch.map((w) => {
-          const hit = ran ? lessonRun.message.events.find((e) => e.kind === w.kind && e.span === "main" && !used.has(e.seq)) : null;
+          const fresh = (e) => e.kind === w.kind && !used.has(e.seq);
+          const hit = ran ? (lessonRun.message.events.find((e) => fresh(e) && e.span === "main") || lessonRun.message.events.find(fresh)) : null;
           if (hit) used.add(hit.seq);
           return h("li", { class: ran && !hit ? "dim" : "" }, w.say, " ",
             hit ? h("button", { class: "linkish", onclick: () => jumpTo(lessonRun.message, hit.seq) }, `Show step ${hit.seq}`) : null);
@@ -411,6 +445,7 @@ async function runLesson(lesson) {
   api.space = "classroom";
   $("classroom-note").hidden = false;
   await api.resetClassroom();
+  for (const tool of lesson.enable || []) if (!api.static) await api.toggleTool(tool, true);      // switched on in the classroom only
   messages = [];
   lessonRun = null;
   const first = newSession();
@@ -525,6 +560,11 @@ async function replayRun(id) {
 async function replayEval(c) {
   const trace = await api.evalTrace(c.id);
   if (trace) loadRun(trace.events, { title: `${c.id}: ${c.title}` });
+}
+
+async function replayCompare(slug, id, title) {
+  const trace = await api.compareTrace(slug, id);
+  if (trace) { loadRun(trace.events, { title }); location.hash = "#cockpit"; }
 }
 
 // ------------------------------------------------------------------ handbook hooks

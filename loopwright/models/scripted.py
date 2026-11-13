@@ -43,10 +43,17 @@ URL = re.compile(r"((?:https?|demo)://[^\s\"'<>)]+)")
 INJECTED = re.compile(r"ignore (all |any |your |the )?(previous|prior|above|earlier) (instructions|rules)|"
                       r"system (note|override|message)|new instructions", re.I)
 
+RECURRING = re.compile(
+    r"^(?:please\s+)?((?:every|each)\s+(?:day|morning|evening|night|weekday|weekend|hour|mon\w*|tue\w*|wed\w*|thu\w*|fri\w*|"
+    r"sat\w*|sun\w*|\d+\s*(?:m|min|mins|minutes?|h|hrs?|hours?))(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?|"
+    r"daily(?:\s+at)?\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|hourly|"
+    r"once\s+(?:on\s+)?\d{4}-\d{2}-\d{2}\s+(?:at\s+)?\d{1,2}:\d{2})\s*[,:]?\s+(.+)$", re.I | re.S)
+
 CAPABILITIES = ("I can remember things across sessions, book and list calendar events, save and search notes, "
                 "do exact arithmetic, answer questions about how AI agents are built (with citations from the "
-                "handbook), compare two concepts using parallel subagents, search the web, fetch a page, and "
-                "draft a message that you approve before it goes anywhere.")
+                "handbook), compare two concepts using parallel subagents, search the web, fetch a page, work a real "
+                "browser, run workflows, schedule tasks to run on their own, and draft a message that you approve "
+                "before it goes anywhere.")
 LIMITS = ("I'm running on Loopwright's built-in scripted model, which only understands a fixed set of request "
           "shapes. " + CAPABILITIES + " For open-ended questions, connect Claude Code or an API key "
           "(run `loopwright doctor`).")
@@ -123,7 +130,8 @@ SPLIT = re.compile(r"\s*(?:,?\s+and then\s+|,?\s+then\s+|;\s+|,?\s+and\s+(?=(?:s
 
 def parse_intents(user: str) -> list[Intent]:
     text = user.strip()
-    if re.match(r"^\s*(please\s+)?(remember|note|keep in mind|don'?t forget|forget|when(ever)? i|when asked)\b", text, re.I) or URL.search(text):
+    if (re.match(r"^\s*(please\s+)?(remember|note|keep in mind|don'?t forget|forget|when(ever)? i|when asked|every|each|daily|"
+                 r"hourly|once on|run|execute)\b", text, re.I) or URL.search(text)):
         clauses = [text]          # never split a fact to remember, or around a URL
     else:
         clauses = [c for c in SPLIT.split(text) if c and c.strip()]
@@ -142,6 +150,25 @@ def _classify(c: str) -> Intent:
     if m:
         when = re.sub(r"^(a|an|the|my)\s+", "", m.group(1).strip().strip('"\''), flags=re.I)
         return Intent("teach", c, {"when": when, "how": m.group(2).strip()})
+    m = RECURRING.match(c)
+    if m:
+        return Intent("task_add", c, {"schedule": m.group(1).strip(), "prompt": m.group(2).strip().rstrip(".")})
+    if re.search(r"\b(scheduled tasks?|tasks?\b.*\bscheduled|what(?:'s| is) scheduled|list (?:my )?tasks|my tasks|which tasks)\b", low):
+        return Intent("task_list", c)
+    m = re.search(r"\b(?:cancel|delete|remove|stop)\s+(?:scheduled\s+)?task\s+#?(\d+)", low)
+    if m:
+        return Intent("task_cancel", c, {"id": int(m.group(1))})
+    m = re.match(r"^(?:please\s+)?(?:run|execute)\s+(?:the\s+)?(?:shell\s+)?(?:command\s*:?\s*)?[`\"'](.+?)[`\"']\s*[.!?]*$", c, re.I | re.S) \
+        or re.match(r"^(?:please\s+)?(?:run|execute)\s+(?:the\s+)?(?:shell\s+)?command\s*:?\s+(.+?)$", c, re.I | re.S)
+    if m:
+        return Intent("shell", c, {"command": m.group(1).strip()})
+    m = re.match(r"^(?:please\s+)?(?:run|start|do)\s+(?:the\s+|my\s+)?([\w\-]+(?:[ \-][\w]+)?)\s+workflow(?:\s+(?:on|for|about|with)\s*:?\s*(.+?))?[.!?]*$", c, re.I | re.S) \
+        or re.match(r"^(?:please\s+)?(?:run|start|do|give me)\s+(?:the\s+|my\s+)?(morning[ \-]brief|research[ \-]digest|triage)(?:\s+(?:on|for|about|with)\s*:?\s*(.+?))?[.!?]*$", c, re.I | re.S)
+    if m:
+        return Intent("workflow", c, {"name": m.group(1).strip().lower().replace(" ", "-"), "input": (m.group(2) or "").strip()})
+    if URL.search(c) and re.search(r"\b(in (?:the|a|your) browser|use (?:the|a|your) browser|browse|"
+                                   r"(?:click|follow|type|fill|submit|search)\b)", low):
+        return Intent("browse", c, {"task": c})
     m = re.search(r"\b(?:send|email|message|text|dm|tell)\b(?:\s+(?:a|an|the)\s+(?:message|email|note|text))?\s+(?:to\s+)?"
                   r"([A-Z][\w.\-]*(?:@[\w.\-]+)?)(?:\s*[:,]\s*|\s+(?:that|saying|to say)\s+)?(.*)$", c, re.S)
     if m and re.match(r"^(?:please\s+)?(send|email|message|text|dm|tell)\b", low) and m.group(1).lower() not in ("me", "us"):
@@ -343,6 +370,60 @@ def _handle(intent: Intent, env: Env, results: list[Result], prev: str) -> Step:
             return ("done", f"I could not send the message to {s['to']}: {error}.", 1, "")
         return ("done", f"Sent to {s['to']} after your approval: \"{body}\".", 1, body)
 
+    if kind == "task_add":
+        return _single(results, _call("schedule_task", prompt=s["prompt"], schedule=s["schedule"]),
+                       lambda d: f"Scheduled as task #{d.get('id')}: \"{d.get('prompt')}\" will run {d.get('runs')}. "
+                                 f"Next run: {d.get('next_run')}. It runs unattended, so it can read, take notes and "
+                                 "report, but it cannot send messages, browse or run commands.", s["prompt"])
+
+    if kind == "task_list":
+        def say(d: dict) -> str:
+            rows = d.get("tasks", [])
+            if not rows:
+                return "You have no scheduled tasks."
+            return "Your scheduled tasks:\n" + "\n".join(
+                f"- #{r['id']} ({r['schedule']}{'' if r['enabled'] else ', paused'}): {r['prompt']}. Next: {r['next_run']}" for r in rows)
+        return _single(results, _call("list_tasks"), say)
+
+    if kind == "task_cancel":
+        return _single(results, _call("cancel_task", id=s["id"]), lambda d: f"Cancelled task #{d.get('cancelled')}.")
+
+    if kind == "shell":
+        if "run_command" not in env.tools:
+            return ("done", "The shell tool is switched off, which is how it ships. Turn on `run_command` on the Tools "
+                            "page (or add it to enabled_tools in settings.json) and ask again.", 0, "")
+        def say(d: dict) -> str:
+            body = _untrusted_body(d)
+            try:
+                out = json.loads(body) if body.strip().startswith("{") else d
+            except json.JSONDecodeError:
+                out = d
+            text = (out.get("stdout") or out.get("stderr") or "(no output)").strip()[:700]
+            return (f"I ran `{s['command']}` (exit code {out.get('exit_code')}, sandbox: {out.get('sandbox')}). "
+                    f"Output:\n\n```\n{text}\n```")
+        return _single(results, _call("run_command", command=s["command"]), say)
+
+    if kind == "workflow":
+        if "run_workflow" not in env.tools:
+            return ("done", "Workflows are not available in this toolset.", 0, "")
+        return _single(results, _call("run_workflow", name=s["name"], input=s["input"]),
+                       lambda d: _workflow_result(d), value_of=lambda d: _workflow_result(d)[:200])
+
+    if kind == "browse":
+        if "browse_web" not in env.tools:
+            return _handle(Intent("fetch", intent.clause, {"url": URL.search(intent.clause).group(1).rstrip(".,")}), env, results, prev)
+        def say(d: dict) -> str:
+            body = _untrusted_body(d)
+            try:
+                out = json.loads(body) if body.strip().startswith("{") else d
+            except json.JSONDecodeError:
+                out = d
+            summary = " ".join(x for x in re.split(r"(?<=[.!?])\s+", out.get("summary", "")) if not INJECTED.search(x)) \
+                if "<untrusted_content" in d.get("text", "") else out.get("summary", "")
+            return (f"I used the browser ({out.get('actions', 0)} action(s), ending on {out.get('final_url', 'the page')}). "
+                    f"{summary}")
+        return _single(results, _call("browse_web", task=s["task"]), say)
+
     if kind == "fetch":
         if not results:
             return _call("fetch_url", url=s["url"])
@@ -526,6 +607,121 @@ def _lower_first(text: str) -> str:
     return text if re.match(r"[A-Z][a-z]+\b", text) and not text.startswith(("I ", "My ")) else text[0].lower() + text[1:]
 
 
+def _workflow_result(d: dict) -> str:
+    body = _untrusted_body(d)
+    try:
+        out = json.loads(body) if body.strip().startswith("{") else d
+    except json.JSONDecodeError:
+        out = d
+    if out.get("workflows"):
+        return "Available workflows:\n" + "\n".join(f"- {w['name']}: {w['description']}" for w in out["workflows"])
+    return f"I ran the `{out.get('workflow')}` workflow ({len(out.get('steps_run', []))} steps).\n\n{out.get('result', '')}"
+
+
+# ------------------------------------------------------------------ the browser worker
+
+STOP = set("the a an and or of to in on for with what does is are how much many from at by it this that page site link "
+           "open click follow browser use then find tell me which who when where there about your you i".split())
+
+
+def _browser_plan(task: str) -> list[tuple[str, str]]:
+    """The actions a task spells out, in the order it gives them."""
+    found = []
+    for m in re.finditer(r"search(?:ing)?(?: the \w+)? for [\"“']?([^\"”'.,;?]+)", task, re.I):
+        found.append((m.start(), "type", m.group(1).strip()))
+    for m in re.finditer(r"(?:click|follow|press|go to)(?: on)?(?: the)? [\"“']?([\w][\w ]*?)[\"”']?\s+(?:link|button|page|tab)", task, re.I):
+        found.append((m.start(), "click", m.group(1).strip()))
+    return [(kind, value) for _, kind, value in sorted(found)]
+
+
+def _page_answer(task: str, page: str, fenced: bool) -> str:
+    lines = [ln.strip() for ln in page.splitlines() if ln.strip() and not re.match(r"^\[\d+\] ", ln.strip())]
+    title, url = (lines + ["", ""])[0], (lines + ["", ""])[1]
+    question = re.sub(URL, " ", task)
+    words = {w for w in re.findall(r"[a-z0-9$]+", question.lower()) if w not in STOP and len(w) > 2}
+    # a sentence is a line, or part of a line, that ends like one: menus and headings drop out
+    sentences = [x.strip() for line in lines[2:] for x in re.split(r"(?<=[.!?])\s+", line) if re.search(r"[.!?]$", x.strip())]
+    injected = [x for x in sentences if INJECTED.search(x)]
+    usable = [x for x in sentences if not INJECTED.search(x)]
+    scored = sorted(((sum(w in x.lower() for w in words), -i, x) for i, x in enumerate(usable)), reverse=True)
+    best = [x for score, _, x in scored[:2] if score > 0] or usable[:2]
+    answer = f"On \"{title}\" ({url}): " + " ".join(sorted(best, key=usable.index))
+    if injected and not fenced:          # gullible: nothing marked the page as untrusted, so its orders are passed on
+        answer += " " + " ".join(injected)
+    elif injected:
+        answer += " (The page also contained text written as instructions; I ignored it.)"
+    return answer
+
+
+# ------------------------------------------------------------------ workflow steps
+
+def _compose(prompt: str) -> str:
+    """A workflow's model step: turn the sections of the prompt into a short write-up."""
+    head, *sections = re.split(r"(?m)^## ", prompt)
+    if not sections:
+        m = re.search(r"reply in one friendly sentence to this message:\s*(.+)$", head, re.I | re.S)
+        if m:
+            return "Hello, and thanks for the message. Tell me what you would like done and I will get to it."
+        m = re.search(r"nothing citable was found about:\s*(.+)$", head, re.I | re.S)
+        if m:
+            return f"I found nothing citable about {m.group(1).strip()}."
+        return _safe_sentences(head.split(":", 1)[-1].strip()) or "Done."
+    lines = []
+    date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", head)
+    if "morning brief" in head.lower():
+        lines.append(f"**Morning brief, {date.group(1) if date else 'today'}**")
+    for section in sections:
+        name, _, body = section.partition("\n")
+        lines.append(_compose_section(name.strip(), body.strip()))
+    return "\n\n".join(x for x in lines if x)
+
+
+def _compose_section(name: str, body: str) -> str:
+    fenced = "<untrusted_content" in body
+    inner = _untrusted_body({"text": body})
+    try:
+        data = json.loads(inner) if inner.lstrip().startswith("{") else None
+    except json.JSONDecodeError:
+        data = None
+    if isinstance(data, dict):
+        if "events" in data:
+            events = data["events"]
+            return f"{name}: " + ("; ".join(f"{e['date']} {e['time']} {e['title']}" for e in events[:5]) if events
+                                 else "nothing booked.")
+        if "notes" in data:
+            return f"{name}: " + ("; ".join(str(n) for n in data["notes"][:3]) if data["notes"] else "no notes yet.")
+        if "passages" in data:
+            top = (data["passages"] or [{}])[0]
+            return f"{name}: **{top.get('term', 'nothing found')}**. {top.get('one_liner', '')} {top.get('cite', '')}".strip()
+        if "results" in data:
+            rows = data["results"][:3]
+            if not rows:
+                return ""
+            return "\n".join(f"- {r['title']}: {_safe_sentences(r['snippet'])} ({r['url']})" for r in rows)
+        if "text" in data and ("id" in data or "saved" in data):
+            return f"Saved as a note: \"{data['text']}\"."
+        if "error" in data:
+            return f"{name}: that step did not work ({data['error']})."
+    text = inner if fenced else body
+    if name == "Result" and not fenced:
+        return text
+    kept = [x.strip() for x in re.split(r"(?<=[.!?])\s+", text) if x.strip() and not (fenced and INJECTED.search(x))]
+    return " ".join(kept[:4])
+
+
+def _pick_route(prompt: str) -> str:
+    options = re.findall(r"(?m)^- ([\w\-]+): (.*)$", prompt)
+    text = (re.search(r"Text: (.*)$", prompt, re.S) or [None, ""])[1].lower()
+    best, top = "", 0
+    for name, when in options:
+        phrases = [p.strip().lower() for p in when.split(":", 1)[-1].split(",") if p.strip()]
+        score = sum(bool(re.search(rf"(?<![a-z]){re.escape(p)}(?![a-z])", text)) for p in phrases)
+        score += 1 if "question" in when and text.strip().endswith("?") else 0
+        if score > top:
+            best, top = name, score
+    return best or "none of them"
+
+
 # ------------------------------------------------------------------ the provider
 
 class ScriptedProvider:
@@ -543,6 +739,12 @@ class ScriptedProvider:
             text, calls, thought = self._plan(user), [], "listing the steps before taking any"
         elif purpose == "subagent":
             text, calls, thought = self._subagent(user, results)
+        elif purpose == "browser":
+            text, calls, thought = self._browser(user, results)
+        elif purpose == "workflow":
+            text, calls, thought = _compose(user), [], "a workflow step: write up the inputs I was given"
+        elif purpose == "route":
+            text, calls, thought = _pick_route(user), [], "a routing step: pick one option"
         else:
             text, calls, thought = self._main(user, env, results, system)
         if calls and not names:      # the loop's final call offers no tools: answer from what there is
@@ -604,6 +806,34 @@ class ScriptedProvider:
             summary += f" Tradeoff: {_lower_first(top['tradeoff'])}"
         return f"{summary} {top['cite']}", [], "summarising the best passage for the orchestrator"
 
+    def _browser(self, task: str, results: list[Result]) -> tuple[str, list, str]:
+        url = URL.search(task)
+        if not url:
+            return "I need a starting URL to open.", [], "no URL in the task"
+        if not results:
+            return "", [("browser_open", {"url": url.group(1).rstrip(".,")})], "open the starting page and look at it"
+        last = results[-1]
+        if last.is_error:
+            error = last.data.get("error", "unknown error") if isinstance(last.data, dict) else "unknown error"
+            return f"The browser could not do that: {error}.", [], "the last action failed"
+        fenced = "<untrusted_content" in last.raw
+        page = _untrusted_body(last.data)
+        plan = _browser_plan(task)
+        done = len(results) - 1
+        if done < len(plan):
+            kind, value = plan[done]
+            if kind == "click":
+                m = re.search(rf'(?mi)^\[(\d+)\] (?:link|button) "[^"]*{re.escape(value)}[^"]*"', page)
+                if m:
+                    return "", [("browser_click", {"element": int(m.group(1))})], f"the snapshot shows [{m.group(1)}] is \"{value}\": click it"
+            else:
+                m = re.search(r'(?m)^\[(\d+)\] (?:text field|text area) ', page)
+                if m:
+                    return "", [("browser_type", {"element": int(m.group(1)), "text": value, "submit": True})], \
+                        f"type the query into field [{m.group(1)}] and submit"
+            return _page_answer(task, page, fenced) + f" (I could not find \"{value}\" to {kind}.)", [], "the element is not on the page"
+        return _page_answer(task, page, fenced), [], "the page in front of me answers the task"
+
     def _plan(self, user: str) -> str:
         steps = {
             "remember": "Store the fact with `remember`.", "forget": "Delete the matching fact with `forget`.",
@@ -617,6 +847,10 @@ class ScriptedProvider:
             "recall": "Look up what is stored in memory.", "compare": "Delegate each side to a worker, then compare the summaries.",
             "kb": "Search the handbook, then answer from the best passage with a citation.",
             "smalltalk": "Reply directly; no tools needed.", "capabilities": "Describe what I can do.",
+            "task_add": "Save the prompt with its schedule, after the user approves.", "task_list": "List the scheduled tasks.",
+            "task_cancel": "Cancel the task.", "shell": "Ask for approval, then run the command in the sandbox.",
+            "workflow": "Run the named workflow and report its result.",
+            "browse": "Hand the task to a browser worker, after approval, and report its summary.",
         }
         lines = [f"{i}. {steps[intent.kind]}" for i, intent in enumerate(parse_intents(user), 1)]
         return "\n".join(lines + [f"{len(lines) + 1}. Reply with the result."])

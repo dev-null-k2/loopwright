@@ -108,6 +108,36 @@ export const api = {
   deleteFact(id) { return getJSON(`api/memory/facts/${id}${this.q()}`, { method: "DELETE" }); },
   resetMemory() { return post("api/memory/reset", { confirm: "reset", space: this.space }); },
 
+  // screenshots the browser agent saved, one per action
+  shotUrl(name) { return demo ? `demo/shots/${name}` : `api/shots/${name}${this.q()}`; },
+
+  // automations: scheduled tasks, workflows, chat apps
+  automations() { return demo ? demo.automations : getJSON(`api/automations${this.q()}`); },
+  addTask(prompt, schedule) { return post("api/tasks", { prompt, schedule, space: this.space }); },
+  runTask(id) { return post(`api/tasks/${id}/run`, { space: this.space }); },
+  toggleTask(id, enabled) { return post(`api/tasks/${id}/toggle`, { enabled, space: this.space }); },
+  deleteTask(id) { return getJSON(`api/tasks/${id}${this.q()}`, { method: "DELETE" }); },
+
+  // model comparison
+  async compareReport() { return demo ? { report: demo.compare, providers: demo.health.providers } : getJSON("api/compare/report"); },
+  async compareTrace(slug, id) { return demo ? demo.compareTraces[`${slug}/${id}`] : getJSON(`api/compare/trace/${slug}/${id}`); },
+  async runCompare(targets, onProgress) {
+    let report = null;
+    await stream("api/compare", { targets }, (msg) => {
+      if (msg.type === "progress") onProgress(msg);
+      else if (msg.type === "done") report = msg.report;
+      else if (msg.type === "error") throw new Error(msg.error);
+    });
+    return report;
+  },
+
+  // feedback and your own eval cases
+  feedback(turn_id, rating, note = "") { return post("api/feedback", { turn_id, rating, note, space: this.space }); },
+  saveCase(turn_id, note = "") { return post("api/evals/mine", { turn_id, note, space: this.space }); },
+  async mine() { return demo ? { cases: [], feedback: {} } : getJSON("api/evals/mine"); },
+  runMine(options) { return post("api/evals/mine/run", { options }); },
+  deleteCase(id) { return getJSON(`api/evals/mine/${id}`, { method: "DELETE" }); },
+
   async runEvals(onProgress) {
     let report = null;
     await stream("api/evals/run", {}, (msg) => {

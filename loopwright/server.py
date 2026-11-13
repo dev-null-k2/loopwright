@@ -1,5 +1,8 @@
 """The web gateway: serves the cockpit and streams each turn's events to it.
 
+While the server runs it is also the scheduler's clock: a background thread
+checks every twenty seconds for scheduled tasks that are due.
+
 Standard library only. One endpoint matters most:
 
     POST /api/chat   runs a turn and streams its events as Server-Sent Events,
@@ -18,8 +21,10 @@ web page you visit:
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import mimetypes
+import os
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,16 +32,20 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from loopwright import __version__
+from loopwright import __version__, otel, scheduler, workflows
 from loopwright.config import PACKAGE_DIR, Options, home_dir
 from loopwright.context import IDENTITY, load_identity
+from loopwright.evals import compare as eval_compare
+from loopwright.evals import mine as eval_mine
 from loopwright.evals import runner as eval_runner
 from loopwright.events import STAGES, Event, list_traces, read_trace, trace_dir
+from loopwright.gateways.chat import CHANNELS
 from loopwright.harness import Agent
 from loopwright.learn import PILLARS, load_concepts, load_interview, load_lessons
 from loopwright.memory.skills import delete_skill, load_skills, save_skill
 from loopwright.models.gateway import ModelGateway, available_providers, pick_provider
-from loopwright.tools.plugins import add_mcp_server, read_mcp_config, remove_mcp_server, set_tool_enabled
+from loopwright.tools.browser import find_chrome
+from loopwright.tools.plugins import OPT_IN, add_mcp_server, read_mcp_config, remove_mcp_server, set_tool_enabled
 
 WEB = PACKAGE_DIR / "web"
 APPROVAL_TIMEOUT_S = 180
@@ -106,7 +115,31 @@ class App:
     def health(self) -> dict[str, Any]:
         return {"version": __version__, "providers": available_providers(), "default_provider": pick_provider("auto"),
                 "home": str(self.home), "counts": self.agent.store.counts(), "options": Options().to_dict(),
-                "static": False}
+                "static": False, "browser": bool(find_chrome())}
+
+    def automations(self) -> dict[str, Any]:
+        when = lambda ts: dt.datetime.fromtimestamp(ts).strftime("%a %Y-%m-%d %H:%M") if ts else ""  # noqa: E731
+        tasks = [{**t, "enabled": bool(t["enabled"]), "next": when(t["next_run"]), "last": when(t["last_run"]),
+                  "runs_text": scheduler.describe(t["schedule"])} for t in self.agent.store.tasks()]
+        channels = [{"name": name, "configured": bool(os.environ.get(token)), "allowed": bool(os.environ.get(allow)),
+                     "token_var": token, "allow_var": allow, "how": how, "command": f"loopwright {name}"}
+                    for name, (token, allow, how) in CHANNELS.items()]
+        return {"tasks": tasks, "workflows": [w.to_json() for w in workflows.load_all(self.home).values()],
+                "channels": channels, "workflows_folder": str(self.home / "workflows")}
+
+    def compare_report(self) -> dict[str, Any] | None:
+        for path in (self.root / "compare" / "compare.json", PACKAGE_DIR.parent / "results" / "compare" / "compare.json"):
+            if path.is_file():
+                return json.loads(path.read_text(encoding="utf-8"))
+        return None
+
+    def compare_trace(self, slug: str, case_id: str) -> dict[str, Any] | None:
+        clean = lambda text: "".join(ch for ch in text if ch.isalnum() or ch == "-")  # noqa: E731
+        for root in (self.root / "compare" / "traces", PACKAGE_DIR.parent / "results" / "compare" / "traces"):
+            path = root / clean(slug) / f"{clean(case_id)}.jsonl"
+            if path.is_file():
+                return read_trace(path)
+        return None
 
     def memory(self) -> dict[str, Any]:
         store = self.agent.store
@@ -122,6 +155,7 @@ class App:
         agent = self.agent
         rows = [{"name": t.name, "description": t.description, "effect": t.effect, "untrusted": t.untrusted,
                  "private": t.private, "parameters": t.parameters, "enabled": t.name not in agent.disabled_tools,
+                 "opt_in": t.name in OPT_IN,
                  "origin": "mcp" if "__" in t.name and t.name in agent._extension_tools else
                            "yours" if t.name in agent._extension_tools else "built in"}
                 for t in agent.registry._tools.values()]
@@ -238,6 +272,22 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
                 name = "".join(ch for ch in path.rsplit("/", 1)[1] if ch.isalnum() or ch == "-")
                 file = trace_dir(app.home) / f"{name}.jsonl"
                 return self._json(read_trace(file)) if file.is_file() else self._json({"error": "no such run"}, 404)
+            if path.startswith("/api/shots/"):
+                return self._shot(app, path.rsplit("/", 1)[1])
+            if path.startswith("/api/otlp/"):
+                name = "".join(ch for ch in path.rsplit("/", 1)[1] if ch.isalnum() or ch == "-")
+                file = trace_dir(app.home) / f"{name}.jsonl"
+                return self._json(otel.to_otlp(read_trace(file))) if file.is_file() else self._json({"error": "no such run"}, 404)
+            if path == "/api/automations":
+                return self._json(app.automations())
+            if path == "/api/compare/report":
+                return self._json({"report": app.compare_report(), "providers": available_providers()})
+            if path.startswith("/api/compare/trace/"):
+                parts = path.split("/")
+                trace = app.compare_trace(parts[-2], parts[-1]) if len(parts) >= 6 else None
+                return self._json(trace) if trace else self._json({"error": "no trace for that cell"}, 404)
+            if path == "/api/evals/mine":
+                return self._json({"cases": eval_mine.load_mine(app.home), "feedback": eval_mine.load_feedback(app.home)})
             if path == "/api/memory":
                 return self._json(app.memory())
             if path == "/api/overview":
@@ -256,6 +306,18 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
             if path == "/api/source":
                 return self._source(parse_qs(url.query).get("path", [""])[0])
             return self._static(path)
+
+        def _shot(self, app: App, name: str) -> None:
+            safe = "".join(ch for ch in name if ch.isalnum() or ch in "-.")
+            target = trace_dir(app.home) / "shots" / safe
+            if not safe.endswith(".jpg") or not target.is_file():
+                return self._json({"error": "no such screenshot"}, 404)
+            body = target.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
         def _source(self, rel: str) -> None:
             root = PACKAGE_DIR.parent.resolve()
@@ -295,6 +357,38 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
                 return self._json({"ok": root_app.answer_approval(str(body.get("call_id", "")), bool(body.get("approved")))})
             if path == "/api/evals/run":
                 return self._run_evals(app)
+            if path == "/api/compare":
+                return self._run_compare(app, body)
+            if path == "/api/tasks":
+                try:
+                    return self._json({"ok": True, "task": scheduler.add_task(app.agent.store, str(body.get("prompt", "")).strip() or "(empty)",
+                                                                              str(body.get("schedule", "")), app.agent.now(), "web:cockpit")})
+                except ValueError as exc:
+                    return self._json({"error": str(exc)}, 400)
+            if path.startswith("/api/tasks/") and path.endswith(("/run", "/toggle")):
+                _, _, _, task_id, action = path.split("/")
+                task = app.agent.store.task(int(task_id)) if task_id.isdigit() else None
+                if not task:
+                    return self._json({"error": "no such task"}, 404)
+                if action == "toggle":
+                    upcoming = scheduler.next_after(task["schedule"], app.agent.now())
+                    app.agent.store.set_task(task["id"], enabled=bool(body.get("enabled")),
+                                             next_run=upcoming.timestamp() if upcoming else None)
+                    return self._json({"ok": True})
+                result = scheduler.Scheduler(app.agent).run_task(task)
+                return self._json({"ok": result.ok, "turn_id": result.turn_id, "reply": result.reply})
+            if path == "/api/feedback":
+                return self._json({"ok": True, "feedback": eval_mine.add_feedback(app.home, str(body.get("turn_id", "")),
+                                                                                  str(body.get("rating", "")), str(body.get("note", "")))})
+            if path == "/api/evals/mine":
+                name = "".join(ch for ch in str(body.get("turn_id", "")) if ch.isalnum() or ch == "-")
+                file = trace_dir(app.home) / f"{name}.jsonl"
+                if not file.is_file():
+                    return self._json({"error": "no such run"}, 404)
+                return self._json({"ok": True, "case": eval_mine.add_case(app.home, read_trace(file), str(body.get("note", "")))})
+            if path == "/api/evals/mine/run":
+                provider = pick_provider(str((body.get("options") or {}).get("provider", "auto")))
+                return self._json(eval_mine.run_mine(app.home, {"provider": provider, "fast": provider == "scripted"}))
             if path == "/api/skills":
                 try:
                     saved = save_skill(app.home, str(body.get("name", "")), str(body.get("description", "")),
@@ -344,6 +438,11 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
                 return self._json({"ok": ok})
             if path.startswith("/api/skills/"):
                 return self._json({"ok": delete_skill(app.home, path.rsplit("/", 1)[1])})
+            if path.startswith("/api/tasks/"):
+                tail = path.rsplit("/", 1)[1]
+                return self._json({"ok": tail.isdigit() and app.agent.store.delete_task(int(tail))})
+            if path.startswith("/api/evals/mine/"):
+                return self._json({"ok": eval_mine.remove_case(app.home, path.rsplit("/", 1)[1])})
             self._json({"error": "not found"}, 404)
 
         def _chat(self, app: App, body: dict[str, Any]) -> None:
@@ -358,12 +457,26 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
 
             try:
                 result = app.agent.run_turn(message, session=str(body.get("session") or "default"), options=options,
-                                            sinks=[sink], approver=root_app.wait_for_approval)
+                                            sinks=[sink], approver=root_app.wait_for_approval, channel="web", origin="web:cockpit")
                 self._sse({"type": "done", "turn_id": result.turn_id, "reply": result.reply, "ok": result.ok,
                            "receipt": result.receipt, "checks": result.checks})
             except Exception as exc:          # never leave the browser hanging on a half-open stream
                 self._sse({"type": "done", "turn_id": "", "ok": False, "receipt": {}, "checks": [],
                            "reply": f"The harness itself raised {type(exc).__name__}: {exc}"})
+
+        def _run_compare(self, app: App, body: dict[str, Any]) -> None:
+            try:
+                targets = [eval_compare.parse_target(str(t)) for t in body.get("targets", [])][:6]
+            except ValueError as exc:
+                return self._json({"error": str(exc)}, 400)
+            if not targets:
+                return self._json({"error": "choose at least one model to compare"}, 400)
+            self._sse_start()
+            try:
+                report = eval_compare.run_compare(targets, app.root / "compare", on_progress=lambda p: self._sse({"type": "progress", **p}))
+                self._sse({"type": "done", "report": report})
+            except Exception as exc:
+                self._sse({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
 
         def _run_evals(self, app: App) -> None:
             self._sse_start()
@@ -385,6 +498,9 @@ def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True)
     print(f"Loopwright cockpit  {url}")
     print(f"model               {provider}  ({available_providers()[provider]['note']})")
     print(f"state               {app.root}")
+    print(f"scheduled tasks     {len(app.agent.store.tasks())} (checked every 20s while this runs)")
+    clock = scheduler.Scheduler(app.agent)
+    clock.start()                               # scheduled tasks run for as long as the cockpit is up
     print("Ctrl+C to stop")
     if open_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()

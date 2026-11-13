@@ -54,7 +54,19 @@ async def main() -> None:
         await page.click(".lesson.open ol li:first-child button")
         await page.wait_for_timeout(700)
         await page.screenshot(path=f"{OUT}/lesson-injection.png")
-        for tab, name in (("evals", "evals"), ("learn/retrieval-gate", "learn"), ("memory", "memory"), ("tools", "tools")):
+        for number, watch, name in ((20, 3, "lesson-browser"), (18, 1, "lesson-workflow")):
+            await page.click("#left-mode button[data-mode=lessons]")
+            await page.click(f".lesson:nth-child({number}) > button")
+            await page.click(".lesson.open .run")
+            await page.wait_for_timeout(11000)
+            await page.click(f".lesson.open ol li:nth-child({watch}) button")
+            await page.wait_for_timeout(900)
+            await page.evaluate("document.getElementById('inspector').scrollTop = 330")     # bring the picture into view
+            await page.wait_for_timeout(300)
+            await page.screenshot(path=f"{OUT}/{name}.png")
+            await page.click(f".lesson:nth-child({number}) > button")
+        for tab, name in (("evals", "evals"), ("evals/compare", "compare"), ("automations/workflows", "automations"),
+                          ("learn/retrieval-gate", "learn"), ("memory", "memory"), ("tools", "tools")):
             await page.goto(URL + "#" + tab)
             await page.wait_for_timeout(900)
             await page.screenshot(path=f"{OUT}/{name}.png")

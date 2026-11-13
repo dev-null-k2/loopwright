@@ -228,6 +228,96 @@ takeaway = "Procedural memory. From the next turn the skill's one-line descripti
 concepts = ["procedural-memory"]
 
 [[lesson]]
+id = "workflow"
+title = "A workflow: the code decides"
+goal = "Run the same kind of question through a fixed graph of steps instead of a free loop, and see who is making the decisions."
+prompt = "/workflow triage: what is a harness?"
+watch = [
+  { kind = "workflow.start", say = "Open this step: the whole path is known before anything runs. Five steps in three rounds." },
+  { kind = "workflow.route", say = "The only decision point. One small model call picked a branch from a list; the other two branches are skipped." },
+  { kind = "workflow.node", say = "Each step does one bounded job. Notice there is no 'what should I do next?' anywhere." },
+  { kind = "workflow.end", say = "The reply is simply the output of the last step." },
+]
+takeaway = "In an agent the model chooses the next step. In a workflow the code does, and the model only fills in steps. If you can draw the steps, draw them."
+concepts = ["workflow-vs-agent", "routing", "workflow-graph"]
+
+[[lesson]]
+id = "workflow-parallel"
+title = "Steps in parallel"
+goal = "Three lookups that do not depend on each other run in the same round, then one model call writes them up."
+before = ["Save a note: ship the pricing page", "Book a review with Alex tomorrow at 15:00"]
+prompt = "/workflow morning-brief"
+watch = [
+  { kind = "workflow.start", say = "Round one has three steps. Nothing in one needs anything from another, so they run at the same time." },
+  { kind = "toolgate.check", say = "A workflow's tool steps still go through the tool gate. Fixed does not mean unchecked." },
+  { kind = "model.call", say = "The single model call of the whole run. It was handed the three results and asked for one thing." },
+  { kind = "workflow.end", say = "One model call instead of four or five, and the same answer every time." },
+]
+takeaway = "Parallel steps are free in a graph, and the model is used once, where writing is needed. Compare the token count with asking the agent for the same brief."
+concepts = ["parallelization", "workflow-graph", "prompt-chaining"]
+
+[[lesson]]
+id = "browser"
+title = "A browser agent"
+goal = "Hand a task to a worker that drives a real browser: open, look, click, look again."
+needs = "browser"
+prompt = "Use the browser: open demo://site, follow the Pricing link and tell me what the Team plan costs"
+options = { approvals = "approve" }
+watch = [
+  { kind = "human.request", say = "Acting on the web is an outside effect, so it needs approval. This lesson approves by policy." },
+  { kind = "browser.start", say = "A worker starts with a fresh context and four browser tools. A real headless browser was launched for it." },
+  { kind = "browser.action", say = "Open this step. The page became a list of numbered elements, and there is a screenshot of what the browser showed. The model answers with a number." },
+  { kind = "browser.return", say = "Two pages were read; the main agent receives two sentences." },
+  { kind = "guard.tool_result", say = "The summary was written from web pages, so it is fenced as untrusted and the turn is tainted." },
+]
+takeaway = "A text model browses by reading a numbered snapshot of the page and naming an element. It runs as a worker so the pages never enter the main context."
+concepts = ["browser-agent", "page-snapshot", "subagents"]
+
+[[lesson]]
+id = "shell"
+title = "The shell tool"
+goal = "Let the model run a command, and see every control that stands around it."
+enable = ["run_command"]
+prompt = "run `ls -la`"
+options = { approvals = "ask" }
+watch = [
+  { kind = "toolgate.check", say = "The shell is an 'external' tool. It ships switched off; this lesson switched it on in the classroom only." },
+  { kind = "human.request", say = "Every command waits for a person. Press Approve." },
+  { kind = "shell.run", say = "Open this step: the workspace folder, a scrubbed environment, a time limit, and the name of the sandbox that actually applied here (it may honestly say none)." },
+  { kind = "guard.tool_result", say = "A command can print anything, so its output is fenced as untrusted like a web page." },
+]
+takeaway = "A shell replaces a hundred tools and is arbitrary code execution. The safety comes from approval, isolation and a clean environment, never from a list of forbidden strings."
+concepts = ["code-sandbox", "human-in-the-loop", "least-privilege"]
+
+[[lesson]]
+id = "schedule"
+title = "Scheduling a task"
+goal = "Ask for something to happen every weekday, and see why saving that request needs your approval."
+prompt = "Every weekday at 8am, tell me what's on my calendar"
+options = { approvals = "ask" }
+watch = [
+  { kind = "toolgate.check", say = "schedule_task is treated as an outside effect, though it only writes a row in a local database." },
+  { kind = "human.request", say = "A task is the agent instructing its future self, to run when nobody is watching. Press Approve." },
+  { kind = "schedule.create", say = "Saved with its next run time. See it on the Automations page." },
+]
+takeaway = "Anything an agent writes for its own later use (a task, a memory, a skill) can turn one bad turn into every turn. Creating it is a privileged action."
+concepts = ["scheduled-agents", "standing-instructions", "human-in-the-loop"]
+
+[[lesson]]
+id = "unattended"
+title = "A run with nobody watching"
+goal = "Fire a scheduled task that tries to send a message, and watch the harness refuse because no person is there to approve."
+before = ["Every 30 minutes, send Alex: the build is green"]
+prompt = "/task 1"
+watch = [
+  { kind = "schedule.fire", say = "No person sent this. A clock did. The approval policy for this run is 'deny'." },
+  { kind = "toolgate.refuse", say = "The task asked to send a message. With nobody to approve it, the gate refuses in code." },
+  { kind = "reply.send", say = "The run still ends with a clear report of what it could not do." },
+]
+takeaway = "Unattended runs get read and local-write tools only. Whatever would have needed a yes is a no."
+concepts = ["scheduled-agents", "least-privilege", "tool-gate"]
+
+[[lesson]]
 id = "evals"
 title = "Proving it works"
 goal = "Run the eval suite and read the ablation table."

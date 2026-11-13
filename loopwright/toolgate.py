@@ -110,7 +110,7 @@ class ToolGate:
                           f"tool budget of {self.options.max_tool_calls} calls is spent; answer with what you have")
         fingerprint = name + json.dumps(args, sort_keys=True)
         self.state.seen[fingerprint] += 1
-        if not check("not a repeat", self.state.seen[fingerprint] <= MAX_REPEATS,
+        if not check("not a repeat", tool.repeatable or self.state.seen[fingerprint] <= MAX_REPEATS,
                      f"seen {self.state.seen[fingerprint]} time(s)"):
             return refuse(f"Refused {name}: same call repeated",
                           "The identical call was already made twice this turn. Repeating it is the signature of a stuck loop.",

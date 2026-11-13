@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "loopwright"
-version = "0.1.0"
+version = "0.2.0"
 description = "An AI agent you can watch work: every step lights up on the architecture and can be replayed."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,7 +38,7 @@ include = ["loopwright*"]
 
 [tool.setuptools.package-data]
 loopwright = ["web/*", "web/js/*", "web/fonts/*", "learn/*.toml", "skills/*/SKILL.md", "kb/*.md",
-              "fixtures/*", "evals/datasets/*.jsonl"]
+              "fixtures/*", "fixtures/site/*", "flows/*.toml", "evals/datasets/*.jsonl"]
 
 [tool.ruff]
 line-length = 130

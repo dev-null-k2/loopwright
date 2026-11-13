@@ -34,3 +34,11 @@
 {"q": "resume a crashed agent run", "expect": "checkpointing"}
 {"q": "grading the steps an agent took, not just the answer", "expect": "trajectory-evals"}
 {"q": "workflow versus agent", "expect": "agent"}
+{"q": "when should I use a workflow instead of an agent", "expect": "workflow-vs-agent"}
+{"q": "how does a text model click a button on a web page", "expect": "page-snapshot"}
+{"q": "what is a browser agent", "expect": "browser-agent"}
+{"q": "how do agents run on a cron schedule", "expect": "scheduled-agents"}
+{"q": "should an agent have a shell tool", "expect": "code-sandbox"}
+{"q": "how do I put the agent in Slack or Telegram", "expect": "messaging-gateways"}
+{"q": "which model should we choose for this product", "expect": "model-comparison"}
+{"q": "export traces with OpenTelemetry", "expect": "opentelemetry"}

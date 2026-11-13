@@ -5,6 +5,7 @@
 //   why it exists      the handbook card for this kind of step
 //   what exactly       the data: the prompt, the arguments, the scores
 
+import { api } from "./api.js";
 import { h, put, pretty, fmt, pillarVar } from "./util.js";
 
 const SECTION_COLOURS = ["var(--loop)", "var(--harness)", "var(--memory)", "var(--ops)", "var(--safety)", "var(--gateway)",
@@ -59,10 +60,58 @@ function modelCall(data) {
   return out;
 }
 
+// A workflow drawn as its rounds: every step in a column runs at the same time.
+export function workflowGraph(wf) {
+  const byId = Object.fromEntries(wf.nodes.map((n) => [n.id, n]));
+  return h("div", { class: "wf" }, wf.waves.flatMap((wave, i) => [
+    i ? h("span", { class: "wf-arrow", "aria-hidden": "true" }, "then") : null,
+    h("div", { class: "wf-round" }, h("small", {}, wave.length < 2 ? `round ${i + 1}`
+      : wave.every((id) => byId[id].after.some((a) => byId[a]?.kind === "route")) ? `round ${i + 1}: one of ${wave.length}` : `round ${i + 1}: ${wave.length} at once`),
+      wave.map((id) => h("div", { class: `wf-node ${byId[id].kind}` }, h("b", {}, id), h("span", {}, byId[id].kind + (byId[id].what ? `: ${byId[id].what}` : ""))))),
+  ]));
+}
+
+const raw = (event, d) => h("details", { class: "raw" }, h("summary", {}, "Raw event"), h("pre", { class: "data" }, pretty({ ...event, data: d })));
+
 function body(event) {
   const d = event.data || {};
   if (event.kind === "context.build") return [h("h3", {}, `Where the ${fmt(d.total)} tokens went (budget ${fmt(d.budget)})`), ...budget(d)];
   if (event.kind === "model.call") return modelCall(d);
+  if (event.kind === "browser.action") {
+    return [
+      d.shot ? h("img", { class: "shot", src: api.shotUrl(d.shot), alt: `Screenshot of ${d.title || d.url}`, onerror: (e) => e.target.remove() }) : null,
+      h("p", { class: "hint" }, "Above: what the browser showed (kept for you). Below: what the model was given instead."),
+      h("dl", { class: "kv" }, h("dt", {}, "Action"), h("dd", {}, d.action), h("dt", {}, "Page"), h("dd", {}, d.title), h("dt", {}, "Address"), h("dd", {}, d.url)),
+      h("h3", {}, `Numbered elements the model can act on (${d.elements.length})`), h("pre", { class: "data" }, d.elements.join("\n") || "(none)"),
+      h("h3", {}, "Visible text"), h("pre", { class: "data" }, d.text),
+      d.blocked_requests?.length ? [h("h3", {}, "Requests the filter blocked"), h("pre", { class: "data" }, d.blocked_requests.join("\n"))] : null,
+      raw(event, d)].flat().filter(Boolean);
+  }
+  if (event.kind === "workflow.start") {
+    return [h("h3", {}, "The path, fixed before anything runs"), workflowGraph(d),
+      d.input ? [h("h3", {}, "Input"), h("pre", { class: "data" }, d.input)] : null, raw(event, d)].flat().filter(Boolean);
+  }
+  if (event.kind === "workflow.node" || event.kind === "workflow.route") {
+    return [h("dl", { class: "kv" }, h("dt", {}, "Step"), h("dd", {}, d.id), h("dt", {}, "Round"), h("dd", {}, d.wave),
+        d.kind ? [h("dt", {}, "Kind"), h("dd", {}, d.kind)] : null, d.chose ? [h("dt", {}, "Chose"), h("dd", {}, d.chose)] : null,
+        d.by ? [h("dt", {}, "Decided by"), h("dd", {}, d.by === "model" ? `a model call (it said: ${d.answer})` : "rules in code")] : null,
+        d.tool ? [h("dt", {}, "Tool"), h("dd", {}, `${d.tool}(${JSON.stringify(d.args)})`)] : null),
+      d.prompt ? [h("h3", {}, "The prompt this step sent"), h("pre", { class: "data" }, d.prompt)] : null,
+      d.output ? [h("h3", {}, "Its output"), h("pre", { class: "data" }, d.output)] : null, raw(event, d)].flat().filter(Boolean);
+  }
+  if (event.kind === "shell.run") {
+    return [h("dl", { class: "kv" }, h("dt", {}, "Command"), h("dd", {}, h("code", {}, d.command)), h("dt", {}, "Exit code"), h("dd", {}, d.exit_code),
+        h("dt", {}, "Sandbox"), h("dd", {}, `${d.sandbox}: ${d.sandbox_note}`), h("dt", {}, "Folder"), h("dd", {}, d.cwd),
+        h("dt", {}, "Environment"), h("dd", {}, "scrubbed: PATH and locale only, no keys")),
+      h("h3", {}, "Output"), h("pre", { class: "data" }, d.stdout || "(nothing printed)"),
+      d.stderr ? [h("h3", {}, "Errors"), h("pre", { class: "data" }, d.stderr)] : null, raw(event, d)].flat().filter(Boolean);
+  }
+  if (event.kind === "schedule.fire" || event.kind === "schedule.create") {
+    return [h("dl", { class: "kv" }, h("dt", {}, "Task"), h("dd", {}, `#${d.task_id ?? d.id}`), h("dt", {}, "Schedule"), h("dd", {}, d.schedule),
+        d.next_run ? [h("dt", {}, "Next run"), h("dd", {}, d.next_run)] : null,
+        d.approvals ? [h("dt", {}, "Approvals"), h("dd", {}, `${d.approvals} (nobody is watching)`)] : null),
+      h("h3", {}, "The saved prompt"), h("pre", { class: "data" }, d.prompt), raw(event, d)].flat().filter(Boolean);
+  }
   const out = [];
   if (d.message && event.kind === "gateway.receive") out.push(h("h3", {}, "Message"), h("pre", { class: "data" }, d.message));
   if (d.reply) out.push(h("h3", {}, "Reply"), h("pre", { class: "data" }, d.reply));
@@ -97,7 +146,7 @@ function body(event) {
       h("dt", {}, "Memory"), h("dd", {}, `${d.memory_used} used, ${d.memory_written} written`),
       h("dt", {}, "Time"), h("dd", {}, `${fmt(d.duration_ms)} ms`)));
   }
-  out.push(h("details", { class: "raw" }, h("summary", {}, "Raw event"), h("pre", { class: "data" }, pretty({ ...event, data: d }))));
+  out.push(raw(event, d));
   return out;
 }
 

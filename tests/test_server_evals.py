@@ -194,10 +194,19 @@ def test_every_event_kind_the_engine_emits_is_explained_by_exactly_one_card():
 
 def test_the_board_draws_exactly_the_stages_the_engine_knows():
     board = (PACKAGE_DIR / "web" / "js" / "board.js").read_text()
-    layout = board[board.index("export const LAYOUT"): board.index("const ZONES")]
-    assert set(re.findall(r"^\s+(\w+):\s+\[", layout, re.M)) == set(STAGES)
-    edges = re.findall(r'\["(\w+)", "(\w+)"\]', board)
+    detailed = board[board.index("export const LAYOUT"): board.index("// ============================================================ SIMPLE")]
+    assert set(re.findall(r"^\s+(\w+):\s+\[", detailed, re.M)) == set(STAGES)             # detailed: one box per stage
+    edges = re.findall(r'\["(\w+)", "(\w+)"\]', detailed)
     assert edges and all(a in STAGES and b in STAGES for a, b in edges)
+
+    simple = board[board.index("const SIMPLE_NODES"): board.index("const DETAILED")]
+    boxes = dict(re.findall(r'id: "(\w+)".*?stages: \[([^\]]*)\]', simple))
+    grouped = [stage for stages in boxes.values() for stage in re.findall(r'"(\w+)"', stages)]
+    assert sorted(grouped) == sorted(STAGES), "every stage belongs to exactly one box of the simple drawing"
+    assert len(boxes) < 20 < len(STAGES)
+    links = re.findall(r'^\s+\["(\w+)", "(\w+)", `', simple, re.M)
+    journeys = [key.split(">") for key in re.findall(r'"(\w+>\w+)":', simple)]
+    assert links and all(a in boxes and b in boxes for a, b in [*links, *journeys])
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -230,3 +239,48 @@ def test_lessons_run_as_written_on_the_scripted_model(tmp_path):
         kinds = [e.kind for e in result.events]
         for watch in lesson["watch"]:
             assert watch["kind"] in kinds, f"lesson {lesson['id']} promises {watch['kind']}"
+
+
+def test_a_phone_on_the_network_needs_the_access_key(tmp_path, monkeypatch):
+    """`serve --lan`: a request that is not from this machine must carry the key from the printed link."""
+    monkeypatch.setenv("LOOPWRIGHT_PROVIDER", "scripted")
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(tmp_path / "lan"), access_key="k3y"))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    port = httpd.server_address[1]
+    phone = f"192.168.1.20:{port}"                      # the Host header a phone would send
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args, **kwargs):
+            return None
+
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
+
+    def call(path, headers=None, body=None):
+        request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=json.dumps(body).encode() if body is not None else None,
+                                         headers={"Host": phone, "content-type": "application/json", **(headers or {})})
+        try:
+            with opener.open(request, timeout=20) as response:
+                return response.status, dict(response.headers), response.read().decode()
+        except urllib.error.HTTPError as exc:
+            return exc.code, dict(exc.headers), exc.read().decode()
+
+    try:
+        assert call("/")[0] == 403 and call("/api/memory")[0] == 403                    # no key: nothing, not even the page
+        assert call("/?key=guess")[0] == 403
+        status, headers, _ = call("/?key=k3y")                                           # the link from the terminal
+        assert status == 303 and headers["Location"] == "/" and "lw_key=k3y" in headers["Set-Cookie"] and "HttpOnly" in headers["Set-Cookie"]
+        cookie = {"Cookie": "lw_key=k3y"}
+        assert call("/", cookie)[0] == 200 and json.loads(call("/api/health", cookie)[2])["version"]
+        assert call("/api/feedback", {**cookie, "Origin": f"http://{phone}"}, {"turn_id": "t", "rating": "up"})[0] == 200
+        assert call("/api/feedback", {**cookie, "Origin": "https://evil.example"}, {"turn_id": "t", "rating": "up"})[0] == 403
+        assert call("/api/feedback", {"Cookie": "lw_key=wrong", "Origin": f"http://{phone}"}, {"turn_id": "t", "rating": "up"})[0] == 403
+        assert call("/api/health", {"Host": f"127.0.0.1:{port}"})[0] == 200             # this machine itself still needs no key
+    finally:
+        httpd.shutdown()
+    plain = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(tmp_path / "plain")))  # without --lan there is no key to present
+    threading.Thread(target=plain.serve_forever, daemon=True).start()
+    port = plain.server_address[1]
+    try:
+        assert call("/?key=", {"Host": phone})[0] == 403 and call("/", {"Host": phone, "Cookie": "lw_key="})[0] == 403
+    finally:
+        plain.shutdown()

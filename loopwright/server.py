@@ -17,15 +17,25 @@ web page you visit:
   - binds to 127.0.0.1 only
   - rejects requests whose Host header is not localhost (DNS rebinding)
   - rejects state-changing requests whose Origin is another site (CSRF)
+
+`loopwright serve --lan` opens it to other devices, for using the cockpit from
+a phone. The agent keeps running on this machine; the phone is only a screen.
+Because the agent can read your memory and run tools, every request from
+another device must carry an access key: the link printed at start-up contains
+it, the first visit stores it in a cookie, and anything without it gets a 403.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import hmac
 import json
 import mimetypes
 import os
+import secrets
+import socket
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -206,7 +216,19 @@ class App:
         return None
 
 
-def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
+def lan_address() -> str:
+    """This machine's address on the local network (no packet is sent to find it)."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("10.255.255.255", 1))
+        return probe.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        probe.close()
+
+
+def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = f"loopwright/{__version__}"
 
@@ -214,13 +236,41 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
             pass
 
         # ------------------------------------------------ plumbing
-        def _host_ok(self) -> bool:
+        def _local(self) -> bool:
             host = (self.headers.get("Host") or "").split(":")[0]
-            return host in ("127.0.0.1", "localhost", "[::1]")
+            return host in ("127.0.0.1", "localhost", "[::1]") and self.client_address[0] in ("127.0.0.1", "::1")
+
+        def _has_key(self) -> bool:
+            cookies = dict(pair.strip().split("=", 1) for pair in (self.headers.get("Cookie") or "").split(";") if "=" in pair)
+            return bool(access_key) and hmac.compare_digest(cookies.get("lw_key", ""), access_key)
+
+        def _host_ok(self) -> bool:
+            """Local requests need the right Host header. Requests from another device (only
+            possible with --lan) need the access key instead."""
+            return self._local() or self._has_key()
 
         def _origin_ok(self) -> bool:
             origin = self.headers.get("Origin")
-            return not origin or urlparse(origin).hostname in ("127.0.0.1", "localhost", "::1")
+            if not origin:
+                return True
+            if urlparse(origin).hostname in ("127.0.0.1", "localhost", "::1"):
+                return True
+            return self._has_key() and urlparse(origin).netloc == (self.headers.get("Host") or "")
+
+        def _sign_in(self, url) -> bool:
+            """A first visit from another device: `/?key=...` stores the key in a cookie and reloads without it."""
+            given = (parse_qs(url.query).get("key") or [""])[0]
+            if not access_key or not given:
+                return False
+            if not hmac.compare_digest(given, access_key):
+                time.sleep(1)                     # make guessing slow
+                self._json({"error": "wrong key"}, 403)
+                return True
+            self.send_response(303)
+            self.send_header("Location", url.path or "/")
+            self.send_header("Set-Cookie", f"lw_key={access_key}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000")
+            self.end_headers()
+            return True
 
         def _json(self, data: Any, status: int = 200) -> None:
             body = json.dumps(data, ensure_ascii=False, default=str).encode()
@@ -257,9 +307,11 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
 
         # ------------------------------------------------ GET
         def do_GET(self) -> None:
-            if not self._host_ok():
-                return self._json({"error": "bad host"}, 403)
             url = urlparse(self.path)
+            if not self._local() and self._sign_in(url):
+                return
+            if not self._host_ok():
+                return self._json({"error": "this cockpit is private: open the link with its key, from `loopwright serve --lan`"}, 403)
             path = url.path
             app = root_app.use(parse_qs(url.query).get("space", ["main"])[0])
             if path == "/api/health":
@@ -489,9 +541,10 @@ def make_handler(root_app: App) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True) -> None:
+def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True, lan: bool = False) -> None:
     app = App(home)
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
+    key = secrets.token_hex(5) if lan else ""
+    server = ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", port), make_handler(app, key))
     server.daemon_threads = True
     url = f"http://127.0.0.1:{port}"
     provider = pick_provider("auto")
@@ -499,6 +552,12 @@ def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True)
     print(f"model               {provider}  ({available_providers()[provider]['note']})")
     print(f"state               {app.root}")
     print(f"scheduled tasks     {len(app.agent.store.tasks())} (checked every 20s while this runs)")
+    if lan:
+        print(f"\nOn your phone       http://{lan_address()}:{port}/?key={key}")
+        print("                    Same Wi-Fi as this computer. The agent runs here; the phone is a screen.")
+        print("                    Anyone with this link can use your agent and its tools until you stop it.")
+        print("                    From anywhere: point a tunnel at this port and add ?key=" + key + " to its address")
+        print(f"                    (for example: cloudflared tunnel --url http://localhost:{port}).")
     clock = scheduler.Scheduler(app.agent)
     clock.start()                               # scheduled tasks run for as long as the cockpit is up
     print("Ctrl+C to stop")

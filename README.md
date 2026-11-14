@@ -24,7 +24,7 @@ and any run can be replayed, paused and stepped through afterwards.
 ![Works offline](https://img.shields.io/badge/works-offline-12805a)
 ![Eval gate](https://img.shields.io/badge/eval_gate-passing-12805a)
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/cockpit-dark.png"><img alt="The Loopwright cockpit. Left: a chat where each reply lists what the agent did (loaded a skill, looked in memory, recalled a fact, called create_event). Centre: the architecture board with the Semantic memory box lit and a caption explaining the step. Right: the step inspector with the ranks from two search rankers, above the list of 22 recorded steps." src="docs/media/cockpit-light.png" width="100%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/cockpit-dark.png"><img alt="The Loopwright cockpit. Left: a chat where the reply is followed by a card for each thing the agent did: a skill it loaded, a memory search, the fact it recalled, and the create_event tool call with its arguments and result. Right: the architecture in three bands (the turn from You to Reply with the Model and Tools loop, memory below it, LLM-Ops at the bottom), with the Tools box lit and one sentence underneath saying what just happened." src="docs/media/cockpit-light.png" width="100%"></picture>
 
 </div>
 
@@ -40,7 +40,11 @@ Loopwright is a complete agent, small enough to read, built on one rule: **every
 the codebase prints or logs. Each guardrail check, memory lookup, model call and tool call emits one typed event
 that says which part of the system it happened in and why. That one decision gives you three things:
 
-- **A board that lights up.** The architecture is on screen and each event fills the box it belongs to.
+- **An architecture that lights up.** One clear picture: the turn runs left to right along the top (You, Gateway,
+  Context, Model and Tools in a loop, Reply), memory feeds it from below, LLM-Ops records it at the bottom. Each
+  event fills the box it belongs to. A switch shows the same system with one box per mechanism when you want more.
+- **Every reply shows its work.** Under each answer is a card per step: what was looked up in memory, each tool
+  call with its arguments and its result, anything checked or refused.
 - **Replay.** A turn takes milliseconds, so the cockpit never shows it live at full speed. It plays every run back
   at a readable pace, and you can pause, step, scrub and change speed, during the run or a week later.
 - **Evals that grade behaviour, not just answers.** A test can assert that an attack was *blocked*, because the
@@ -65,6 +69,21 @@ that says which part of the system it happened in and why. That one decision giv
 Every picture below is the real cockpit replaying a recorded run of the scripted model on invented examples,
 captured by [`scripts/shoot.py`](scripts/shoot.py). The [live demo](https://dev-null-k2.github.io/loopwright/)
 is the same thing in your browser.
+
+### On a phone
+
+<picture><img alt="The cockpit on a phone, chat pane: a reply followed by step cards for a skipped memory search and two tool calls, calculator and save_note, each with arguments and result." src="docs/media/phone-chat.png" width="32%"></picture>
+<picture><img alt="The same run on a phone, steps pane: the data behind the calculator call." src="docs/media/phone-steps.png" width="32%"></picture>
+<picture><img alt="The same run on a phone, architecture pane, panned to the active box." src="docs/media/phone-board.png" width="32%"></picture>
+
+The cockpit is a web page, so a phone needs only a link. The [public demo](https://dev-null-k2.github.io/loopwright/)
+replays recorded runs. To use your own agent from a phone, `loopwright serve --lan` prints a link with an access
+key; the model (Claude Code or a local one) keeps running on your computer. [docs/mobile.md](docs/mobile.md).
+
+### The detail is one click away
+
+<picture><img alt="The cockpit with the step panel open on the right: the memory search step, with the ranks from two search rankers and the fused score, and the list of every step of the run below." src="docs/media/cockpit-details.png" width="49%"></picture>
+<picture><img alt="The same run on the detailed drawing: twenty-eight boxes, one per mechanism." src="docs/media/cockpit-detailed.png" width="49%"></picture>
 
 ### A lesson: prompt injection, defended
 
@@ -127,6 +146,7 @@ loopwright workflow morning-brief                                      # a fixed
 loopwright tasks add "weekdays 08:00" "What is on my calendar today?"  # a turn a clock starts
 loopwright compare --targets scripted local claude-code                # the same questions through each model
 loopwright telegram                                                    # or discord, slack, whatsapp
+loopwright serve --lan                                                 # use the cockpit from your phone
 ```
 
 Things to try, in order: *"Remember that Alex prefers morning meetings"*, then **New chat**, then
@@ -170,7 +190,8 @@ Loopwright is meant to be the fastest way to understand how agents are built, in
 
 ## What is inside
 
-One turn, top to bottom. Each row is a box on the board and a file you can read.
+One turn, top to bottom. Each row is a file you can read. The cockpit's simple drawing groups these into
+eighteen boxes; the detailed one shows them all.
 
 | Step | What it does | Code |
 |---|---|---|
@@ -219,7 +240,7 @@ answer. Reliability cases run three trials with failures injected at different p
 | Handbook retrieval, 44 labelled questions, recall@1 / @3 | BM25 84% / 100% · dense 73% / 91% · hybrid 84% / 98% |
 | Retrieval gate (rules), 30 labelled messages | 83% accurate; 2 false skips, 3 false retrieves |
 | Lessons | all 23 runnable lessons produce every step they promise (a test enforces it) |
-| Unit and end-to-end tests | 81 passing |
+| Unit and end-to-end tests | 82 passing |
 
 The `automation` suite covers workflows, scheduled tasks, the shell and the browser: a workflow's hard-coded send
 is refused after it read the web, a scheduled run cannot send or run commands, a turn that read a file cannot
@@ -341,7 +362,7 @@ trifecta"*. More in [docs/claude-code.md](docs/claude-code.md).
 
 | Part | How it is verified |
 |---|---|
-| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 81 automated tests and the 69-case eval suite, on every push, on Python 3.11 and 3.13 |
+| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 82 automated tests and the 69-case eval suite, on every push, on Python 3.11 and 3.13 |
 | Browser agent | Against real headless Chrome on a bundled four-page site: reading, clicking, filling in and submitting a form, screenshots, and refusal of local and private addresses, including a page's own sub-requests. Not run against arbitrary live websites |
 | Shell tool | Real commands: the opt-in switch, approval, scrubbed environment, timeout, denial in tainted and unattended turns. The sandbox was `none` on the machine the evals ran on (no bubblewrap); the macOS `sandbox-exec` profile is probed at run time and has not been exercised in CI |
 | Chat gateways | Each protocol against a stand-in: a fake Bot API (Telegram), a local WebSocket server playing Discord's gateway and Slack's Socket Mode, real signed and forged HTTP deliveries (WhatsApp). **Not run against the live services** |
@@ -390,8 +411,8 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              81 tests
-docs/               architecture, automations, gateways, replay, evals, tools, offline, claude-code, security,
+tests/              82 tests
+docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports
 ```

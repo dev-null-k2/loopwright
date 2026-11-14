@@ -25,10 +25,24 @@ Live and recorded runs are therefore the same code path. There is no separate re
 | Scrub | drag the strip | One cell per step, coloured by subsystem; hatched cells are warnings, refusals or errors; short cells are worker steps |
 | Speed | 0.4x to 4x | Remembered between visits |
 | Hide worker steps | checkbox | Shows a subagent run the way the orchestrator saw it |
-| Show every box | checkbox | Off by default: boxes this run never touched are dimmed |
+| Simple / Detailed | switch | Two drawings of the same system: eighteen boxes with related parts grouped, or one box per mechanism (twenty-eight) |
+| Steps | button | Opens the list of every step and the data behind the current one |
 
-Three more ways to move: click a row in the step list, click a row in the list of actions under a chat reply, or
-click a "Show step N" link in a lesson.
+Four more ways to move: click a card under a chat reply, click a box on the architecture (each click goes to that
+box's next step), click a row in the step list, or click a "Show step N" link in a lesson.
+
+## The screen
+
+Two panes by default: the conversation on the left, the architecture on the right with one plain sentence under
+it saying what the highlighted box just did. Under every reply is a card for each thing the agent did: the kind
+of step, its name, what went in and what came out. A third pane with the full data of a step (the exact prompt,
+the search ranks, the tool's raw output) opens only when you ask for it.
+
+Boxes a run never touched are dimmed. The dashed Guardrails box is a layer, not a stop on the route: it lights
+when a check runs, and the dot keeps travelling between the real stops on either side of it.
+
+On a phone the same page shows one pane at a time (Chat, Architecture, Steps), and the architecture pans to
+follow the active box. Turn the phone sideways to see all of it. See [mobile.md](mobile.md).
 
 If a turn stops for your approval, the player jumps to that step and waits there.
 

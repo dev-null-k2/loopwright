@@ -60,7 +60,7 @@ async function boot() {
   defaults = health.options;
   lab = { ...defaults, ...store.get("lab", {}) };
 
-  board = createBoard($("board"), book.stages, pickNode);
+  makeBoard(store.get("map", "simple"));
   player = new Player(onPlayerChange);
   learn = createLearn(book, { tryPrompt, openSource });
   evals = createEvals({ replayEval, replayCompare, options: () => ({ provider: $("provider").value.split("|")[0] }) });
@@ -69,7 +69,7 @@ async function boot() {
   activity = createActivity({ replayRun });
   toolsView = createTools();
 
-  drawLegend(); drawProviders(); drawLab(); drawSuggestions(); drawChat(); drawLessons(); bindTransport(); bindChrome(); loadHistory();
+  drawProviders(); drawLab(); drawSuggestions(); drawChat(); drawLessons(); bindTransport(); bindChrome(); loadHistory();
   $("static-note").hidden = !api.static;
   if (api.static) {
     $("chat-input").placeholder = "Pick a recorded prompt, or type one";
@@ -113,8 +113,11 @@ function bindChrome() {
   $("new-chat").addEventListener("click", () => { leaveClassroom(); session = newSession(); messages = []; drawChat(); player.load([], {}, { autoplay: false }); $("history").value = ""; });
   $("history").addEventListener("change", () => $("history").value && openSession($("history").value));
   $("leave-classroom").addEventListener("click", () => { leaveClassroom(); setLeftMode("chat"); });
-  $("show-all").checked = store.get("showAll", false);
-  $("show-all").addEventListener("change", () => { store.set("showAll", $("show-all").checked); player.seek(player.index); });
+  for (const b of document.querySelectorAll("#map-mode button")) b.addEventListener("click", () => makeBoard(b.dataset.map));
+  for (const b of document.querySelectorAll("#pane-switch button")) b.addEventListener("click", () => setPane(b.dataset.pane));
+  $("details-toggle").addEventListener("click", () => setDetails(!$("view-cockpit").classList.contains("details-open")));
+  $("details-close").addEventListener("click", () => setDetails(false));
+  setDetails(store.get("details", false) && window.innerWidth > 1180);
 }
 
 function setLeftMode(mode) {
@@ -131,9 +134,27 @@ function leaveClassroom() {
   messages = []; session = newSession(); drawChat(); loadHistory();
 }
 
-function drawLegend() {
-  const names = [["gateway", "Gateway"], ["harness", "Harness"], ["loop", "Loop"], ["memory", "Memory"], ["safety", "Safety"], ["ops", "LLM-Ops"]];
-  put($("legend"), names.map(([key, label]) => h("span", {}, h("i", { style: `background:var(--${key})` }), label)));
+// Two drawings of the same system: a simple one to learn from, and one box per mechanism.
+function makeBoard(name) {
+  store.set("map", name);
+  board = createBoard($("board"), book.stages, pickNode, name);
+  for (const b of document.querySelectorAll("#map-mode button")) b.classList.toggle("on", b.dataset.map === board.name);
+  if (player) player.seek(player.index);
+}
+
+// The step list and the full detail of one step live in a panel that stays out of the way until asked for.
+function setDetails(open) {
+  $("view-cockpit").classList.toggle("details-open", open);
+  $("details-toggle").setAttribute("aria-expanded", String(open));
+  for (const b of document.querySelectorAll("#pane-switch button")) b.classList.toggle("on", open ? b.dataset.pane === "steps" : b.dataset.pane === $("view-cockpit").dataset.pane);
+  store.set("details", open);
+}
+
+// On a phone one pane shows at a time.
+function setPane(pane) {
+  if (pane === "steps") return setDetails(true);
+  $("view-cockpit").dataset.pane = pane;
+  setDetails(false);
 }
 
 function drawProviders() {
@@ -203,49 +224,71 @@ function oneLine(output) {
   return JSON.stringify(d).slice(0, 110);
 }
 
+// What the agent did, as one card per meaningful step: the kind of step, its name, what went in, what came out.
+const KINDS = { memory: ["Memory", "memory"], skill: ["Skill", "memory"], plan: ["Plan", "loop"], tool: ["Tool", "harness"],
+                approval: ["Approval", "safety"], guard: ["Guardrail", "safety"], worker: ["Worker", "loop"], workflow: ["Workflow", "loop"],
+                model: ["Model", "loop"], clock: ["Clock", "gateway"], context: ["Context", "harness"] };
+
 function trailRows(events) {
   const rows = [];
   for (const e of events) {
     if (e.span !== "main") continue;
     const d = e.data || {};
-    const add = (cls, what, sum, extra = {}) => rows.push({ e, cls, what, sum, ...extra });
-    if (e.kind === "memory.gate") add(d.retrieve ? "" : "skip", d.retrieve ? "Looked in memory" : "Skipped memory", d.reason);
-    else if (e.kind === "memory.search" && d.hits?.length) add("", "Recalled", d.hits.map((x) => x.text).join("; "));
-    else if (e.kind === "skills.match" && d.loaded?.length) add("", "Loaded skill", d.loaded.map((x) => x.name).join(", "));
-    else if (e.kind === "plan.made") add("", "Planned", d.plan.replace(/\n/g, " "));
-    else if (e.kind === "tool.run") add("", d.tool, oneLine(d.output), { args: d.args, output: d.output });
-    else if (e.kind === "tool.error") add("bad", d.tool, `failed: ${d.error}`, { args: d.args ?? {}, output: d.error });
-    else if (e.kind === "toolgate.refuse") add("bad", d.tool, `refused: ${d.reason}`, { args: d.args ?? {}, output: d.reason });
-    else if (e.kind === "human.decision") add(d.approved ? "" : "bad", "Approval", `${d.approved ? "approved" : "declined"} by ${d.by}`);
-    else if (e.kind === "guard.tool_result") add(e.status === "warn" ? "warn" : "", "Fenced as untrusted", d.findings?.length ? `injection suspected: ${d.findings[0].label}` : d.source);
-    else if (e.kind === "schedule.fire") add("warn", "Started by the clock", `task #${d.task_id} (${d.schedule}); nobody to approve, so outside effects are denied`);
-    else if (e.kind === "workflow.start") add("", "Workflow", `${d.name}: ${d.nodes.length} steps in ${d.waves.length} round(s)`);
-    else if (e.kind === "workflow.route") add("", "Route", `chose ${d.chose} (${d.by === "model" ? "a model picked" : "rules in code"})`);
-    else if (e.kind === "workflow.node" && d.status !== "skipped" && d.kind !== "tool") add(d.status === "done" ? "" : "bad", `Step ${d.id}`, `${d.kind}: ${String(d.output || "").replace(/\s+/g, " ").slice(0, 90)}`);
-    else if (e.kind === "browser.return") add("", "Browser worker", `${d.steps} action(s), ended on ${d.final_url}`);
-    else if (e.kind === "model.retry") add("warn", "Model retry", d.error);
-    else if (e.kind === "model.fallback") add("warn", "Fell back", `to ${d.to}`);
-    else if (e.kind === "critic.review") add(d.passed ? "" : "warn", "Critic", d.passed ? "draft passed" : d.feedback);
-    else if (e.kind === "consolidate.resolve" && d.action !== "NOOP") add("", "Memory kept", `${d.action}: ${d.text}`);
-    else if (e.kind === "context.compact") add("warn", "Compacted history", `${d.before_tokens} to ${d.after_tokens} tokens`);
-    else if (e.kind === "loop.stop" && d.reason !== "answered") add("warn", "Loop cut off", d.reason.replace("_", " "));
+    const add = (kind, cls, what, sum, extra = {}) => rows.push({ e, kind, cls, what, sum, ...extra });
+    if (e.kind === "memory.gate") add("memory", d.retrieve ? "" : "skip", d.retrieve ? "Searched long-term memory" : "Skipped the memory search", d.reason);
+    else if (e.kind === "memory.search" && d.hits?.length) add("memory", "", "Recalled", d.hits.map((x) => x.text).join("; "));
+    else if (e.kind === "skills.match" && d.loaded?.length) add("skill", "", "Loaded a skill", d.loaded.map((x) => x.name).join(", "));
+    else if (e.kind === "plan.made") add("plan", "", "Planned first", d.plan.replace(/\n/g, " "));
+    else if (e.kind === "tool.run") add("tool", "", d.tool, oneLine(d.output), { args: d.args, output: d.output });
+    else if (e.kind === "tool.error") add("tool", "bad", d.tool, `failed: ${d.error}`, { args: d.args ?? {}, output: d.error });
+    else if (e.kind === "toolgate.refuse") add("tool", "bad", d.tool, `refused: ${d.reason}`, { args: d.args ?? {}, output: d.reason });
+    else if (e.kind === "human.decision") add("approval", d.approved ? "" : "bad", d.approved ? "Approved" : "Declined", `by ${d.by}`);
+    else if (e.kind === "guard.tool_result") add("guard", e.status === "warn" ? "warn" : "", "Fenced as untrusted", d.findings?.length ? `injection suspected: ${d.findings[0].label}` : d.source);
+    else if (e.kind === "guard.input" && e.status === "warn") add("guard", "warn", "Masked a secret", "something shaped like a credential was removed from the message");
+    else if (e.kind === "guard.output" && e.status === "warn") add("guard", "warn", "Output check", d.empty_reply_replaced ? "the model returned nothing" : `${d.findings?.length || 0} finding(s)`);
+    else if (e.kind === "schedule.fire") add("clock", "warn", "Started by the clock", `task #${d.task_id} (${d.schedule}); nobody to approve, so outside effects are denied`);
+    else if (e.kind === "workflow.start") add("workflow", "", d.name, `${d.nodes.length} fixed steps in ${d.waves.length} round(s)`);
+    else if (e.kind === "workflow.route") add("workflow", "", `Route ${d.id}`, `chose ${d.chose} (${d.by === "model" ? "a model picked" : "rules in code"})`);
+    else if (e.kind === "workflow.node" && d.status !== "skipped" && d.kind !== "tool") add("workflow", d.status === "done" ? "" : "bad", `Step ${d.id}`, `${d.kind}: ${String(d.output || "").replace(/\s+/g, " ").slice(0, 90)}`);
+    else if (e.kind === "browser.return") add("worker", "", "Browser worker", `${d.steps} action(s), ended on ${d.final_url}`);
+    else if (e.kind === "subagent.return" && d.summary) add("worker", "", "Worker reported", String(d.summary).replace(/\s+/g, " ").slice(0, 110));
+    else if (e.kind === "model.retry") add("model", "warn", "Retried", d.error);
+    else if (e.kind === "model.fallback") add("model", "warn", "Fell back", `to ${d.to}`);
+    else if (e.kind === "critic.review") add("model", d.passed ? "" : "warn", "Critic", d.passed ? "draft passed" : d.feedback);
+    else if (e.kind === "consolidate.resolve" && d.action !== "NOOP") add("memory", "", "Kept in memory", `${d.action}: ${d.text}`);
+    else if (e.kind === "context.compact") add("context", "warn", "Compacted history", `${d.before_tokens} to ${d.after_tokens} tokens`);
+    else if (e.kind === "loop.stop" && d.reason !== "answered") add("model", "warn", "Loop cut off", d.reason.replace("_", " "));
   }
   return rows;
 }
 
+const showArgs = (args) => Object.entries(args || {}).map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : JSON.stringify(v)}`).join(", ");
+
 function trailNode(m, upTo) {
   const rows = trailRows(upTo == null ? m.events : m.events.filter((e) => e.seq <= upTo));
   if (!rows.length) return null;
-  return h("ul", { class: "trail", "aria-label": "What the agent did" }, rows.map((r) => h("li", { class: r.cls },
-    h("div", { class: "row", title: "Show this step on the board", onclick: () => jumpTo(m, r.e.seq) },
-      h("span", { class: "dot" }), h("span", { class: "what" }, r.what), h("span", { class: "sum" }, r.sum)),
-    r.args ? h("details", {}, h("summary", {}, "Arguments and raw output"),
-      h("pre", {}, `${r.what}(${JSON.stringify(r.args, null, 1)})\n\n${r.output}`)) : null)));
+  const tools = rows.filter((r) => r.kind === "tool").length;
+  return h("div", { class: "trail-wrap" },
+    h("div", { class: "trail-head" }, h("b", {}, "What it did"),
+      h("span", {}, `${rows.length} step${rows.length === 1 ? "" : "s"}${tools ? `, ${tools} tool call${tools === 1 ? "" : "s"}` : ""}. Click one to see it on the architecture.`)),
+    h("ul", { class: "trail", "aria-label": "What the agent did" }, rows.map((r) => {
+      const [name, pillar] = KINDS[r.kind];
+      return h("li", { class: `${r.cls} k-${r.kind}`, style: `--c:var(--${pillar})` },
+        h("div", { class: "row", role: "button", tabindex: 0, title: "Show this step on the architecture", onclick: () => jumpTo(m, r.e.seq),
+                   onkeydown: (ev) => { if (ev.key === "Enter") jumpTo(m, r.e.seq); } },
+          h("span", { class: "kind" }, name),
+          h("span", { class: "what" }, r.what, r.args ? h("code", {}, `(${showArgs(r.args)})`) : null),
+          h("span", { class: "sum" }, r.kind === "tool" ? ["returned ", r.sum] : r.sum),
+          r.cls === "bad" || r.cls === "warn" ? h("span", { class: "state" }, r.cls === "bad" ? "stopped" : "note") : null),
+        r.args ? h("details", {}, h("summary", {}, "Arguments and raw output"),
+          h("pre", {}, `${r.what}(${JSON.stringify(r.args, null, 1)})\n\n${r.output}`)) : null);
+    })));
 }
 
 function jumpTo(m, seq) {
   if (player.meta.owner !== m && player.meta.turn !== m) loadRun(m.events, { title: m.prompt, turn: m }, false);
   player.seekToSeq(seq);
+  setDetails(true);
 }
 
 // ------------------------------------------------------------------ chat
@@ -260,7 +303,8 @@ function drawChat() {
   if (!messages.length) {
     put(log, h("div", { class: "empty-chat" },
       h("h2", {}, "Ask it something and watch it work"),
-      h("p", {}, "Each step the agent takes lights up a box on the board, at a pace you can follow. Under every reply is the list of what it did: memory, skills, and each tool call with its arguments and output."),
+      h("p", {}, "Under every reply you get a card for each thing the agent did: what it looked up in memory, every tool it called with the arguments and the result, anything that was checked or refused."),
+      h("p", { style: "margin-top:8px" }, "The architecture lights up one step at a time, at a pace you can follow, and you can replay any answer."),
       h("p", { style: "margin-top:8px" }, "New here? Open Lessons above for a guided path through every part.")));
     return;
   }
@@ -465,7 +509,7 @@ function finishLesson() {
 
 // ------------------------------------------------------------------ player <-> page
 function onPlayerChange(state) {
-  board.show(state.events, state.index, { animate: state.animate, speed: state.speed, focus: !$("show-all").checked });
+  board.show(state.events, state.index, { animate: state.animate, speed: state.speed });
   renderInspector($("inspector"), state, book, { openConcept, openSource });
   drawStrip(state);
   drawTimeline(state);
@@ -473,16 +517,18 @@ function onPlayerChange(state) {
   const stage = e ? book.stages[e.stage] : null;
   $("caption").style.setProperty("--c", stage ? pillarVar(stage.pillar) : "var(--line)");
   put($("caption"), e
-    ? [h("b", {}, `${state.index + 1}. ${e.title.toLowerCase().startsWith(stage.label.toLowerCase().split(" ")[0]) ? "" : `${stage.label}: `}${e.title}`), h("span", {}, e.detail)]
+    ? [h("b", {}, `${state.index + 1}. ${e.title.toLowerCase().startsWith(stage.label.toLowerCase().split(" ")[0]) ? "" : `${stage.label}: `}${e.title}`), h("span", {}, e.detail),
+       h("button", { class: "linkish more", onclick: () => setDetails(true) }, "See the data behind this step")]
     : [h("b", {}, state.events.length ? "Press play to walk through this run" : "Nothing is running"),
-       h("span", {}, state.events.length ? "Or step through it one event at a time with the arrow keys." : "Send a message, or open Lessons on the left. This line always says, in plain words, what the highlighted box just did.")]);
+       h("span", {}, state.events.length ? "Or step through it one event at a time with the arrow keys." : "Send a message, or open Lessons. This line always says, in plain words, what the highlighted box just did. Click any box to learn what it is for.")]);
   put($("where"),
     e ? `Step ${state.index + 1} of ${state.events.length}` : state.events.length ? `${state.events.length} steps ready` : state.live ? "Waiting for the first step" : "No run loaded",
     state.waiting ? h("small", {}, "waiting for the agent...") : null);
   $("t-play").setAttribute("aria-label", state.playing ? "Pause" : "Play");
   $("t-play-icon").innerHTML = state.playing ? '<path d="M6 4v12M14 4v12"/>' : '<path d="M6 4l10 6-10 6z"/>';
-  $("board-title").textContent = state.meta.title ? `${state.meta.live ? "" : "Replay: "}${state.meta.title}` : "Send a message to light up the board";
+  $("board-title").textContent = state.meta.title ? `${state.meta.live ? "" : "Replay: "}${state.meta.title}` : "Send a message to light up the architecture";
   $("step-count").textContent = state.events.length ? `${state.events.length} recorded` : "";
+  $("details-toggle").textContent = state.events.length ? `Steps (${state.events.length})` : "Steps";
   const owner = state.meta.owner;
   if (owner && !owner.revealed) {
     if (e) { owner.status = `Step ${state.index + 1}: ${e.title}`; owner.render(e.seq); }
@@ -570,10 +616,27 @@ async function replayCompare(slug, id, title) {
 // ------------------------------------------------------------------ handbook hooks
 function openConcept(id) { location.hash = `#learn/${id}`; }
 
-function pickNode(id) {
-  const cards = book.concepts.filter((c) => c.node === id && c.runs !== false);
-  const card = cards.find((c) => (c.kinds || []).length) || cards[0];
-  if (card) openConcept(card.id);
+// Clicking a box: jump to what it did in this run if it did anything, and say what the box is for.
+function pickNode(stageIds, label) {
+  setDetails(true);
+  const events = player.events;
+  const mine = events.map((e, i) => [e, i]).filter(([e]) => stageIds.includes(e.stage));
+  if (mine.length) {
+    const next = mine.find(([, i]) => i > player.index) || mine[0];        // each click moves to this box's next step
+    player.pause();
+    player.seek(next[1], true);
+    return;
+  }
+  const cards = stageIds.flatMap((id) => book.concepts.filter((c) => c.node === id && c.runs !== false));
+  cards.sort((a, b) => (b.kinds || []).length - (a.kinds || []).length);
+  put($("inspector"),
+    h("h2", {}, label),
+    h("p", { class: "hint" }, events.length ? "This part was not used in the run on screen. Here is what it is for." : "Nothing has run yet. Here is what this part of an agent is for."),
+    cards.slice(0, 4).map((c) => h("div", { class: "concept", style: `--c:${pillarVar(c.pillar)}` },
+      h("strong", {}, c.term), h("p", {}, c.one_liner), h("p", {}, h("b", {}, "Why it exists. "), c.why),
+      h("div", { class: "links" },
+        h("button", { class: "linkish", onclick: () => openConcept(c.id) }, "Read the full card"),
+        c.try ? h("button", { class: "linkish", onclick: () => tryPrompt(c.try) }, `Try: ${c.try.slice(0, 44)}`) : null))));
 }
 
 async function openSource(path) {

@@ -86,7 +86,12 @@ a { color: inherit; }
 /* ------------------------------------------------------------ layout */
 main { flex: 1; min-height: 0; }
 .view { height: 100%; }
-.cockpit { display: grid; grid-template-columns: minmax(270px, 320px) minmax(0, 1fr) minmax(300px, 370px); }
+/* Two panes by default: the conversation and the architecture. The step list and the
+   full detail of one step open as a third pane only when asked for. */
+.cockpit { display: grid; grid-template-columns: minmax(340px, 30%) minmax(0, 1fr); }
+.cockpit.details-open { grid-template-columns: minmax(280px, 22%) minmax(0, 1fr) minmax(310px, 24%); }
+.cockpit:not(.details-open) > .inspect { display: none; }
+.panes { display: none; }
 .col { min-height: 0; display: flex; flex-direction: column; }
 .col + .col { border-left: 1px solid var(--line); }
 
@@ -114,21 +119,27 @@ main { flex: 1; min-height: 0; }
 .lesson ol li { margin-bottom: 6px; }
 .lesson ol li.dim { color: var(--ink-3); }
 .lesson .take { border-left: 3px solid var(--memory); padding-left: 10px; color: var(--ink); }
-.trail { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r); font-size: 14px; overflow: hidden; }
-.trail li { border-top: 1px solid var(--line-2); }
-.trail li:first-child { border-top: 0; }
-.trail .row { display: grid; grid-template-columns: 10px auto 1fr; gap: 8px; align-items: baseline; padding: 5px 9px; cursor: pointer; }
+.trail-head { display: flex; gap: 8px; align-items: baseline; margin: 10px 0 5px; font-size: 13.5px; color: var(--ink-3); }
+.trail-head b { font: 600 14.5px var(--sign); color: var(--ink); white-space: nowrap; }
+.trail { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 14px; }
+.trail li { border: 1px solid var(--line); border-left: 4px solid var(--c, var(--line)); border-radius: var(--r); background: var(--panel); overflow: hidden; }
+.trail li.skip { border-left-color: var(--skip); } .trail li.bad { border-left-color: var(--blocked); background: color-mix(in srgb, var(--blocked) 5%, var(--panel)); }
+.trail .row { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; gap: 1px 10px; align-items: baseline; padding: 6px 10px; cursor: pointer; }
 .trail .row:hover { background: var(--surface); }
-.trail .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); align-self: center; }
-.trail .warn .dot { background: var(--warn); } .trail .bad .dot { background: var(--blocked); } .trail .skip .dot { background: var(--skip); }
-.trail .what { font-weight: 600; white-space: nowrap; }
-.trail .sum { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trail details { padding: 0 9px 7px 27px; }
+.trail .kind { grid-row: 1 / span 2; font: 600 12.5px var(--sign); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line)); border-radius: 99px; padding: 0 8px; justify-self: start; align-self: start; margin-top: 2px; }
+.trail li.skip .kind { color: var(--skip); border-color: var(--line); } .trail li.bad .kind { color: var(--blocked); border-color: var(--blocked); }
+.trail .what { font-weight: 600; overflow-wrap: anywhere; }
+.trail .what code { font-weight: 400; font-size: 12.5px; color: var(--ink-2); margin-left: 1px; }
+.trail .sum { grid-column: 2 / span 2; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.trail .state { grid-row: 1; grid-column: 3; font-size: 12px; font-weight: 600; color: var(--warn); }
+.trail li.bad .state { color: var(--blocked); }
+.trail details { padding: 0 10px 7px 96px; }
 .trail details summary { cursor: pointer; color: var(--ink-3); font-size: 13px; }
 .trail details pre { margin: 4px 0 0; background: var(--sunk); border-radius: 4px; padding: 6px 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
 .caption { margin: 0 14px 10px; padding: 9px 14px; background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--c, var(--line)); border-radius: var(--r); min-height: 62px; flex: none; }
 .caption b { font: 600 17px/1.25 var(--sign); display: block; }
 .caption span { color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.caption .more { font-size: 13.5px; margin-top: 2px; }
 .node.unused { opacity: .32; }
 .subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 18px 0 14px; }
 .subtabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; padding: 6px 12px; color: var(--ink-2); font-weight: 500; }
@@ -165,16 +176,22 @@ main { flex: 1; min-height: 0; }
 
 /* ------------------------------------------------------------ board */
 .board { background: var(--surface); }
-.board-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 12px 18px 0; }
-.board-head h1 { font: 600 18px/1.25 var(--sign); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px 2px; }
+.board-head h1 { font: 600 18px/1.25 var(--sign); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.board-head .seg.small { flex: none; } .seg.small button { padding: 3px 12px; font-size: 13.5px; }
+.board-head #details-toggle { flex: none; font-size: 13.5px; padding: 4px 12px; border: 1px solid var(--line); background: var(--panel); white-space: nowrap; }
+.cockpit.details-open #details-toggle { background: var(--ink); color: var(--panel); border-color: var(--ink); }
 .legend { display: flex; gap: 12px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 .board-head .check { font-size: 13.5px; }
-.board-svg { flex: 1; min-height: 0; padding: 4px 10px; }
+.board-svg { flex: 1; min-height: 0; padding: 4px 10px; overflow: auto; }
 .board-svg svg { width: 100%; height: 100%; display: block; }
 
 .zone { fill: none; stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 5 5; }
 .zone-label { font: 600 14.5px var(--sign); fill: var(--ink-3); letter-spacing: .03em; }
+.zone.inner { stroke: color-mix(in srgb, var(--loop) 55%, var(--line)); stroke-dasharray: none; fill: color-mix(in srgb, var(--loop) 4%, transparent); }
+.zone-label.inner { font-size: 13px; fill: var(--loop); letter-spacing: 0; }
+.arrowhead { fill: var(--ink-3); }
 .edge { fill: none; stroke: var(--line); stroke-width: 1.4; }
 .edge.used { stroke: var(--ink-3); }
 .edge.live { stroke: var(--c, var(--loop)); stroke-width: 2.6; }
@@ -194,6 +211,10 @@ main { flex: 1; min-height: 0; }
 .node.on text { fill: #fff; } .node.on .sub { fill: rgba(255,255,255,.82); }
 [data-theme=dark] .node.on text { fill: #0a1226; } [data-theme=dark] .node.on .sub { fill: rgba(10,18,38,.75); }
 .node.with rect.box { stroke: var(--c); stroke-width: 2.4; stroke-dasharray: 4 3; }
+.map-simple .node text { font-size: 17.5px; } .map-simple .node .sub { font-size: 13.5px; }
+.node.small text { font-size: 14.5px; } .map-simple .node.small .sub { font-size: 12px; }
+.node.small rect.box { stroke-dasharray: none; }
+.node.ambient rect.box { stroke-dasharray: 6 3; }
 .node .count { font: 600 13px var(--ui); fill: var(--c); }
 .node.on .count { fill: #fff; } [data-theme=dark] .node.on .count { fill: #0a1226; }
 .flag circle { stroke: var(--panel); stroke-width: 2; }
@@ -217,6 +238,8 @@ main { flex: 1; min-height: 0; }
 
 /* ------------------------------------------------------------ inspector + timeline */
 .inspect { background: var(--panel); }
+.details-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--line-2); flex: none; }
+.details-head h2 { font: 600 15px var(--sign); } .details-head button { font-size: 13.5px; padding: 3px 10px; }
 .inspector { flex: 0 1 58%; overflow-y: auto; padding: 14px 16px 16px; border-bottom: 1px solid var(--line); }
 .inspector h2 { font: 600 18px/1.25 var(--sign); margin: 2px 0 8px; }
 .inspector h3 { font-size: 14px; color: var(--ink-2); margin: 14px 0 5px; font-weight: 600; }
@@ -327,20 +350,62 @@ dialog.source::backdrop { background: rgba(10, 18, 38, .55); }
 dialog.source header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
 dialog.source pre { margin: 0; padding: 14px 18px 30px; font-size: 13px; line-height: 1.5; white-space: pre; overflow: auto; height: calc(100% - 52px); tab-size: 4; }
 
+/* Medium screens: the details pane slides over the architecture instead of squeezing it. */
 @media (max-width: 1180px) {
-  .cockpit { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 42%); }
-  .inspect { grid-column: 1 / -1; border-left: 0 !important; border-top: 1px solid var(--line); flex-direction: row; }
-  .inspector { flex: 1; border-bottom: 0; border-right: 1px solid var(--line); }
-  .inspect .timeline-head { display: none; } .timeline { flex: 0 0 340px; padding-top: 8px; }
+  .cockpit, .cockpit.details-open { grid-template-columns: minmax(300px, 36%) minmax(0, 1fr); }
+  .cockpit.details-open > .inspect { position: fixed; z-index: 20; right: 0; top: 52px; bottom: 0; width: min(420px, 100vw); border-left: 1px solid var(--line); box-shadow: -18px 0 40px rgba(10, 18, 38, .18); }
 }
-@media (max-width: 760px) {
-  body { height: auto; } main { min-height: 0; }
-  .bar { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px 16px; }
-  .cockpit, .learn { display: block; } .col + .col { border-left: 0; border-top: 1px solid var(--line); }
-  .chat-log { max-height: 46vh; } .board-svg { height: 62vw; min-height: 300px; }
-  .inspect { flex-direction: column; } .timeline { flex: none; max-height: 40vh; }
-  .learn-side { max-height: 48vh; border-right: 0; border-bottom: 1px solid var(--line); } .learn-detail { padding: 20px 18px 40px; }
-  .page { padding: 18px 14px 40px; } .legend { display: none; }
+
+/* Phones. One pane at a time, chosen with the switch under the top bar. The page is the
+   height of the screen, so the message box is always in reach. */
+@media (max-width: 820px), (max-height: 520px) and (orientation: landscape) {
+  html, body { height: 100dvh; }
+  .bar { flex-wrap: wrap; height: auto; padding: 6px 10px 0; gap: 4px 10px; }
+  .mark span { font-size: 17px; }
+  .bar-right { gap: 6px; } .bar-right .field span { display: none; } .bar-right select { max-width: 132px; font-size: 13.5px; padding: 4px 6px; }
+  .bar-right button { padding: 4px 8px; font-size: 13.5px; } #static-note { display: none; }
+  .tabs { order: 3; width: 100%; height: 36px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs a { padding: 0 10px; white-space: nowrap; font-size: 14.5px; }
+  .lab { max-height: 60dvh; overflow-y: auto; } .lab-head { flex-wrap: wrap; }
+
+  .cockpit, .cockpit.details-open { display: flex; flex-direction: column; }
+  .panes { display: flex; flex: none; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .panes button { flex: 1; border: 0; border-radius: 0; border-bottom: 3px solid transparent; background: transparent; padding: 8px 4px 6px; font-weight: 500; color: var(--ink-2); }
+  .panes button.on { color: var(--ink); border-bottom-color: var(--loop); }
+  .cockpit > .col { flex: 1; min-height: 0; border-left: 0 !important; }
+  .cockpit[data-pane=chat] > .board, .cockpit[data-pane=board] > .chat { display: none; }
+  .cockpit.details-open > .chat, .cockpit.details-open > .board { display: none; }
+  .cockpit.details-open > .inspect { position: static; width: auto; box-shadow: none; border: 0; }
+  .details-head { display: none; }
+
+  .chat-head { padding: 8px 10px; } .chat-head button.ghost, .chat-head select { max-width: 84px; }
+  .chat-log { padding: 12px 12px 4px; } .suggest { padding: 6px 12px 0; max-height: 84px; }
+  .composer { padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); } .composer textarea { font-size: 16px; }   /* 16px stops iOS zooming in */
+  .lessons { max-height: 52%; } .lesson .inside { padding-left: 14px; }
+  .trail .row { grid-template-columns: 70px minmax(0, 1fr) auto; } .trail details { padding-left: 10px; }
+
+  .board-head { padding: 8px 12px 0; flex-wrap: wrap; } .board-head h1 { flex-basis: 100%; font-size: 16px; }
+  .board-head #details-toggle { display: none; }
+  .board-svg { padding: 4px 6px; -webkit-overflow-scrolling: touch; }
+  .board-svg svg { width: 790px; height: auto; min-height: 100%; }      /* readable size; the view pans to follow the active box */
+  .board-svg svg.map-detailed { width: 860px; }
+  .caption { margin: 0 8px 8px; min-height: 0; } .caption b { font-size: 15.5px; }
+  .transport { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); } .transport-row { gap: 8px; flex-wrap: wrap; }
+  .transport .check, .transport .field span { display: none; } .where { font-size: 14px; } .buttons button { width: 40px; height: 38px; }
+
+  .learn { display: flex; flex-direction: column; }
+  .learn-side { max-height: 44dvh; border-right: 0; border-bottom: 1px solid var(--line); } .learn-detail { padding: 18px 16px 40px; }
+  .learn-detail h1 { font-size: 27px; }
+  .page { padding: 16px 12px 40px; } .page h1 { font-size: 24px; } .page-head { flex-direction: column; gap: 10px; }
+  .page table.grid { display: block; overflow-x: auto; white-space: normal; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  dialog.source { width: 100vw; height: 100dvh; max-width: none; max-height: none; }
+}
+/* A phone held sideways: the whole architecture fits the width, and scrolls down. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .board-svg svg, .board-svg svg.map-detailed { width: 100%; height: auto; min-height: 0; }
+  .caption span { -webkit-line-clamp: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .node rect { transition: none; } }
 

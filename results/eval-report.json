@@ -1,6 +1,6 @@
 {
-  "generated": "2026-11-13T19:42:51",
-  "version": "0.2.1",
+  "generated": "2026-11-13T20:11:31",
+  "version": "0.3.0",
   "model": "scripted-v1 (rule-based; these are evals of the harness, not of an LLM)",
   "suites": {
     "core": {
@@ -132,7 +132,7 @@
           "tokens_in": 7135,
           "turns": 1,
           "tokens_out": 36,
-          "duration_ms": 6,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -175,7 +175,7 @@
           "tokens_in": 4724,
           "turns": 1,
           "tokens_out": 14,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "clock"
@@ -267,7 +267,7 @@
           "tokens_in": 5639,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 45,
+          "duration_ms": 47,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -309,7 +309,7 @@
           "tokens_in": 5158,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 7,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -351,7 +351,7 @@
           "tokens_in": 5158,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -398,7 +398,7 @@
           "tokens_in": 4720,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -450,7 +450,7 @@
           "tokens_in": 7013,
           "turns": 1,
           "tokens_out": 477,
-          "duration_ms": 11,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "delegate"
@@ -497,7 +497,7 @@
           "tokens_in": 5795,
           "turns": 1,
           "tokens_out": 71,
-          "duration_ms": 4,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -633,7 +633,7 @@
           "tokens_in": 5572,
           "turns": 1,
           "tokens_out": 274,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "web_search"
@@ -680,7 +680,7 @@
           "tokens_in": 10379,
           "turns": 2,
           "tokens_out": 158,
-          "duration_ms": 10,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "create_skill",
@@ -728,7 +728,7 @@
           "tokens_in": 9956,
           "turns": 2,
           "tokens_out": 89,
-          "duration_ms": 11,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -880,7 +880,7 @@
           "tokens_in": 14926,
           "turns": 3,
           "tokens_out": 133,
-          "duration_ms": 24,
+          "duration_ms": 16,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -924,7 +924,7 @@
           "tokens_in": 9565,
           "turns": 2,
           "tokens_out": 52,
-          "duration_ms": 11,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -1019,7 +1019,7 @@
           "tokens_in": 10593,
           "turns": 3,
           "tokens_out": 294,
-          "duration_ms": 13,
+          "duration_ms": 14,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -1149,7 +1149,7 @@
           "tokens_in": 11159,
           "turns": 2,
           "tokens_out": 385,
-          "duration_ms": 22,
+          "duration_ms": 21,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge",
@@ -1197,7 +1197,7 @@
           "tokens_in": 9551,
           "turns": 2,
           "tokens_out": 59,
-          "duration_ms": 11,
+          "duration_ms": 13,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -1344,7 +1344,7 @@
           "tokens_in": 5229,
           "turns": 1,
           "tokens_out": 66,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "read_file"
@@ -1396,7 +1396,7 @@
           "tokens_in": 4751,
           "turns": 1,
           "tokens_out": 40,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -1574,7 +1574,7 @@
           "tokens_in": 4760,
           "turns": 1,
           "tokens_out": 52,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1988,7 +1988,7 @@
           "tokens_in": 4726,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2211,7 +2211,7 @@
           "tokens_in": 4726,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 26,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2286,7 +2286,7 @@
           "tokens_in": 7144,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 5,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2336,7 +2336,7 @@
           "tokens_in": 7812,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 7,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2375,7 +2375,7 @@
           "tokens_in": 7812,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 7,
+          "duration_ms": 12,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2509,7 +2509,7 @@
           "tokens_in": 7147,
           "turns": 1,
           "tokens_out": 50,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2557,7 +2557,7 @@
           "tokens_in": 2747,
           "turns": 1,
           "tokens_out": 38,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2639,7 +2639,7 @@
           "tokens_in": 6343,
           "turns": 1,
           "tokens_out": 59,
-          "duration_ms": 9,
+          "duration_ms": 11,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -2774,7 +2774,7 @@
           "tokens_in": 4720,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2812,12 +2812,12 @@
             {
               "check": "tool_called: list_events",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
+              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
             },
             {
               "check": "tool_called: search_notes",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
+              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
             },
             {
               "check": "reply_contains: Design review",
@@ -2841,12 +2841,12 @@
           "tokens_in": 377,
           "turns": 1,
           "tokens_out": 62,
-          "duration_ms": 8,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "list_events",
-            "search_notes",
-            "search_knowledge"
+            "search_knowledge",
+            "search_notes"
           ],
           "model": "scripted-v1",
           "provider": "scripted",
@@ -2945,7 +2945,7 @@
           "tokens_in": 249,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "save_note"
@@ -3002,7 +3002,7 @@
           "tokens_in": 529,
           "turns": 1,
           "tokens_out": 233,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "web_search",
@@ -3098,7 +3098,7 @@
           "tokens_in": 4759,
           "turns": 1,
           "tokens_out": 38,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3150,7 +3150,7 @@
           "tokens_in": 4809,
           "turns": 1,
           "tokens_out": 85,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3197,7 +3197,7 @@
           "tokens_in": 4741,
           "turns": 1,
           "tokens_out": 29,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "list_events"
@@ -3244,7 +3244,7 @@
           "tokens_in": 4747,
           "turns": 1,
           "tokens_out": 41,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -3291,7 +3291,7 @@
           "tokens_in": 7321,
           "turns": 1,
           "tokens_out": 80,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -3399,7 +3399,7 @@
           "tokens_in": 5066,
           "turns": 1,
           "tokens_out": 66,
-          "duration_ms": 8,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3446,7 +3446,7 @@
           "tokens_in": 7612,
           "turns": 1,
           "tokens_out": 68,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -3489,7 +3489,7 @@
           "tokens_in": 4942,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3546,7 +3546,7 @@
           "tokens_in": 6902,
           "turns": 1,
           "tokens_out": 155,
-          "duration_ms": 1640,
+          "duration_ms": 1568,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3588,7 +3588,7 @@
           "tokens_in": 7211,
           "turns": 1,
           "tokens_out": 164,
-          "duration_ms": 1691,
+          "duration_ms": 1586,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3635,7 +3635,7 @@
           "tokens_in": 4787,
           "turns": 1,
           "tokens_out": 45,
-          "duration_ms": 7,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3682,7 +3682,7 @@
           "tokens_in": 6006,
           "turns": 1,
           "tokens_out": 167,
-          "duration_ms": 806,
+          "duration_ms": 778,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3724,7 +3724,7 @@
           "tokens_in": 5815,
           "turns": 1,
           "tokens_out": 106,
-          "duration_ms": 394,
+          "duration_ms": 360,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4044,5 +4044,5 @@
       "gate_false_skip_rate_max": 0.2
     }
   },
-  "seconds": 31.78
+  "seconds": 31.21
 }

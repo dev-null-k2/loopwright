@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+A simpler cockpit, and a phone.
+
+- **One clear architecture.** The default drawing is now eighteen boxes in three bands: the turn left to right
+  along the top (You, Gateway, Context, Model and Tools in a loop, Reply), memory below it, LLM-Ops at the bottom.
+  Related mechanisms share a box and guardrails are drawn as a layer. A switch shows the previous drawing, one box
+  per mechanism.
+- **Two panes instead of three.** Conversation and architecture. The step list and the full data of a step open
+  as a third pane only when asked for: from a step card, a box, the caption, or the Steps button.
+- **Step cards under every reply.** One card per thing the agent did, with the kind of step, its name, the
+  arguments that went in and the result that came out.
+- **Clicking a box** explains what that part is for and steps through what it did in the run on screen.
+- **Phones.** One pane at a time with a switch; the architecture pans to follow the active box. `loopwright serve
+  --lan` makes the cockpit reachable from a phone on the same Wi-Fi with an access key. The public demo is
+  published from a `gh-pages` branch.
+
 ## 0.2.1
 
 Found by the first runs on a real machine.

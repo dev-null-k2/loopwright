@@ -2,7 +2,8 @@
 <html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#15233d">
   <title>Loopwright</title>
   <meta name="description" content="An AI agent you can watch work: every step lights up on the architecture and can be replayed.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M14 4a10 10 0 1 0 9.4 6.6' fill='none' stroke='%232456d6' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='14' r='3.4' fill='%232456d6'/%3E%3C/svg%3E">
@@ -42,7 +43,12 @@
 
   <main>
     <!-- ============================================================ COCKPIT -->
-    <section id="view-cockpit" class="view cockpit">
+    <section id="view-cockpit" class="view cockpit" data-pane="chat">
+      <div class="panes" id="pane-switch" role="tablist" aria-label="Cockpit panes">
+        <button data-pane="chat" class="on">Chat</button>
+        <button data-pane="board">Architecture</button>
+        <button data-pane="steps">Steps</button>
+      </div>
       <div class="col chat">
         <div class="chat-head">
           <div class="seg" id="left-mode">
@@ -58,7 +64,7 @@
           <div id="chat-log" class="chat-log" aria-live="polite"></div>
           <div id="suggest" class="suggest"></div>
           <form id="chat-form" class="composer">
-            <textarea id="chat-input" rows="2" placeholder="Ask anything, then watch it flow" aria-label="Message"></textarea>
+            <textarea id="chat-input" rows="2" placeholder="Ask anything, then watch how it is answered" aria-label="Message"></textarea>
             <button type="submit" id="send">Send</button>
           </form>
         </div>
@@ -66,9 +72,12 @@
 
       <div class="col board">
         <div class="board-head">
-          <h1 id="board-title">Send a message to light up the board</h1>
-          <div class="legend" id="legend"></div>
-          <label class="check"><input type="checkbox" id="show-all"> <span>Show every box</span></label>
+          <h1 id="board-title">Send a message to light up the architecture</h1>
+          <div class="seg small" id="map-mode" title="Simple: related parts share a box. Detailed: one box for every mechanism.">
+            <button data-map="simple" class="on">Simple</button>
+            <button data-map="detailed">Detailed</button>
+          </div>
+          <button id="details-toggle" class="ghost" aria-expanded="false" aria-controls="details">Steps</button>
         </div>
         <div id="board" class="board-svg"></div>
         <div id="caption" class="caption"></div>
@@ -98,9 +107,10 @@
         </div>
       </div>
 
-      <div class="col inspect">
+      <div class="col inspect" id="details">
+        <div class="details-head"><h2>Step details</h2><button id="details-close" class="ghost" aria-label="Close step details">Close</button></div>
         <div id="inspector" class="inspector"></div>
-        <div class="timeline-head"><h2>Steps</h2><span id="step-count"></span></div>
+        <div class="timeline-head"><h2>Every step of this run</h2><span id="step-count"></span></div>
         <ol id="timeline" class="timeline"></ol>
       </div>
     </section>

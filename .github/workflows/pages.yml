@@ -1,0 +1,29 @@
+name: Publish demo
+
+# Copies docs/ (the recorded demo and the guides) to the gh-pages branch, which
+# GitHub Pages serves at https://dev-null-k2.github.io/loopwright/
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish docs/ to gh-pages
+        run: |
+          author="$(git log -1 --format='%an')"
+          email="$(git log -1 --format='%ae')"
+          cd docs
+          touch .nojekyll
+          git init -q -b gh-pages
+          git -c user.name="$author" -c user.email="$email" add -A
+          git -c user.name="$author" -c user.email="$email" commit -q -m "Publish the demo from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" gh-pages

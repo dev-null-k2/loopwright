@@ -124,7 +124,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     from loopwright.server import serve
-    serve(port=args.port, open_browser=not args.no_open)
+    serve(port=args.port, open_browser=not args.no_open, lan=args.lan)
     return 0
 
 
@@ -526,6 +526,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("serve", help="open the web cockpit")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--no-open", action="store_true", help="do not open a browser tab")
+    p.add_argument("--lan", action="store_true", help="also reachable from your phone on the same Wi-Fi, with an access key")
     p.set_defaults(fn=cmd_serve)
 
     p = sub.add_parser("runs", help="list past turns")

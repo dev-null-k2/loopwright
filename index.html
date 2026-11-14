@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#15233d">
+  <title>Loopwright</title>
+  <meta name="description" content="An AI agent you can watch work: every step lights up on the architecture and can be replayed.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M14 4a10 10 0 1 0 9.4 6.6' fill='none' stroke='%232456d6' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='14' r='3.4' fill='%232456d6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="mark" href="#cockpit" aria-label="Loopwright cockpit">
+      <svg viewBox="0 0 28 28" width="24" height="24" aria-hidden="true"><path d="M14 4a10 10 0 1 0 9.4 6.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M19 3.4 24.2 5l-1.6 5.2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14" cy="14" r="3.1" fill="currentColor"/></svg>
+      <span>Loopwright</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#cockpit" data-tab="cockpit">Cockpit</a>
+      <a href="#learn" data-tab="learn">Learn</a>
+      <a href="#evals" data-tab="evals">Evals</a>
+      <a href="#memory" data-tab="memory">Memory</a>
+      <a href="#tools" data-tab="tools">Tools</a>
+      <a href="#automations" data-tab="automations">Automations</a>
+      <a href="#activity" data-tab="activity">Activity</a>
+    </nav>
+    <div class="bar-right">
+      <span id="static-note" class="pill warn" hidden>Recorded demo</span>
+      <label class="field"><span>Model</span><select id="provider" aria-label="Model provider"></select></label>
+      <button id="lab-toggle" class="ghost" aria-expanded="false" aria-controls="lab">Lab</button>
+      <button id="theme-toggle" class="ghost" aria-label="Switch between light and dark">Dark</button>
+    </div>
+  </header>
+
+  <aside id="lab" class="lab" hidden>
+    <div class="lab-head">
+      <h2>Lab</h2>
+      <p>Switch a mechanism off or inject a failure, then send a message and watch what changes.</p>
+      <button id="lab-reset" class="ghost">Reset to defaults</button>
+    </div>
+    <div class="lab-grid" id="lab-grid"></div>
+  </aside>
+
+  <main>
+    <!-- ============================================================ COCKPIT -->
+    <section id="view-cockpit" class="view cockpit" data-pane="chat">
+      <div class="panes" id="pane-switch" role="tablist" aria-label="Cockpit panes">
+        <button data-pane="chat" class="on">Chat</button>
+        <button data-pane="board">Architecture</button>
+        <button data-pane="steps">Steps</button>
+      </div>
+      <div class="col chat">
+        <div class="chat-head">
+          <div class="seg" id="left-mode">
+            <button data-mode="chat" class="on">Chat</button>
+            <button data-mode="lessons">Lessons <span id="lesson-progress"></span></button>
+          </div>
+          <button id="new-chat" class="ghost" title="Start a new conversation">New chat</button>
+          <select id="history" aria-label="Earlier conversations"><option value="">History</option></select>
+        </div>
+        <div id="classroom-note" class="classroom" hidden>Classroom: a scratch copy of the agent, wiped before each lesson. Your own memory is untouched. <button class="linkish" id="leave-classroom">Back to my agent</button></div>
+        <div id="lessons" class="lessons" hidden></div>
+        <div id="chat-pane" class="chat-pane">
+          <div id="chat-log" class="chat-log" aria-live="polite"></div>
+          <div id="suggest" class="suggest"></div>
+          <form id="chat-form" class="composer">
+            <textarea id="chat-input" rows="2" placeholder="Ask anything, then watch how it is answered" aria-label="Message"></textarea>
+            <button type="submit" id="send">Send</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="col board">
+        <div class="board-head">
+          <h1 id="board-title">Send a message to light up the architecture</h1>
+          <div class="seg small" id="map-mode" title="Simple: related parts share a box. Detailed: one box for every mechanism.">
+            <button data-map="simple" class="on">Simple</button>
+            <button data-map="detailed">Detailed</button>
+          </div>
+          <button id="details-toggle" class="ghost" aria-expanded="false" aria-controls="details">Steps</button>
+        </div>
+        <div id="board" class="board-svg"></div>
+        <div id="caption" class="caption"></div>
+        <div class="transport" id="transport">
+          <div class="strip" id="strip" role="slider" aria-label="Step" tabindex="0" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></div>
+          <div class="transport-row">
+            <div class="buttons">
+              <button id="t-start" title="Back to the start (Home)" aria-label="Back to the start">
+                <svg viewBox="0 0 20 20"><path d="M5 4v12M16 4 8 10l8 6z"/></svg></button>
+              <button id="t-back" title="Previous step (Left arrow)" aria-label="Previous step">
+                <svg viewBox="0 0 20 20"><path d="M13 4 6 10l7 6z"/></svg></button>
+              <button id="t-play" class="primary" title="Play or pause (Space)" aria-label="Play">
+                <svg viewBox="0 0 20 20" id="t-play-icon"><path d="M6 4l10 6-10 6z"/></svg></button>
+              <button id="t-next" title="Next step (Right arrow)" aria-label="Next step">
+                <svg viewBox="0 0 20 20"><path d="M7 4l7 6-7 6z"/></svg></button>
+              <button id="t-end" title="Jump to the end (End)" aria-label="Jump to the end">
+                <svg viewBox="0 0 20 20"><path d="M15 4v12M4 4l8 6-8 6z"/></svg></button>
+            </div>
+            <div class="where" id="where">No run loaded</div>
+            <label class="field"><span>Speed</span>
+              <select id="speed" aria-label="Playback speed">
+                <option value="0.4">0.4x</option><option value="0.7">0.7x</option><option value="1" selected>1x</option>
+                <option value="2">2x</option><option value="4">4x</option>
+              </select></label>
+            <label class="check"><input type="checkbox" id="only-main"> <span>Hide worker steps</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="col inspect" id="details">
+        <div class="details-head"><h2>Step details</h2><button id="details-close" class="ghost" aria-label="Close step details">Close</button></div>
+        <div id="inspector" class="inspector"></div>
+        <div class="timeline-head"><h2>Every step of this run</h2><span id="step-count"></span></div>
+        <ol id="timeline" class="timeline"></ol>
+      </div>
+    </section>
+
+    <!-- ============================================================ LEARN -->
+    <section id="view-learn" class="view learn" hidden>
+      <div class="learn-side">
+        <div class="seg" role="tablist">
+          <button data-mode="glossary" class="on">Handbook</button>
+          <button data-mode="interview">Interview practice</button>
+          <button data-mode="cards">Flashcards</button>
+        </div>
+        <input id="learn-search" type="search" placeholder="Search 69 terms" aria-label="Search the handbook">
+        <div id="learn-list" class="learn-list"></div>
+      </div>
+      <article id="learn-detail" class="learn-detail"></article>
+    </section>
+
+    <!-- ============================================================ EVALS -->
+    <section id="view-evals" class="view page" hidden><div id="evals-body"></div></section>
+    <!-- ============================================================ MEMORY -->
+    <section id="view-memory" class="view page" hidden><div id="memory-body"></div></section>
+    <!-- ============================================================ RUNS -->
+    <section id="view-tools" class="view page" hidden><div id="tools-body"></div></section>
+    <section id="view-automations" class="view page" hidden><div id="automations-body"></div></section>
+    <section id="view-activity" class="view page" hidden><div id="runs-body"></div></section>
+  </main>
+
+  <dialog id="source-dialog" class="source">
+    <header><strong id="source-path"></strong><button id="source-close" class="ghost">Close</button></header>
+    <pre id="source-text"></pre>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

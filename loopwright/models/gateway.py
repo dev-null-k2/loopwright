@@ -50,7 +50,9 @@ def available_providers() -> dict[str, dict[str, Any]]:
     return {
         "scripted": {"ok": True, "note": "built in: offline, deterministic, rule-based"},
         "local": {"ok": bool(server and server["models"]), "models": server["models"] if server else [],
-                  "note": (f"{server['name']} at {server['url']}: " + (", ".join(server["models"][:6]) or "no models downloaded yet"))
+                  "preferred": server["preferred"] if server else "",
+                  "note": (f"{server['name']} at {server['url']}: " + (", ".join(server["models"][:6]) or "no models downloaded yet")
+                           + (f". Uses {server['preferred']} unless you name one ({server['why']})" if server["preferred"] else ""))
                   if server else "no local server found. Start Ollama, LM Studio or llama.cpp to run fully offline"},
         "claude-code": {"ok": bool(cli), "note": f"uses your Claude subscription via {cli}" if cli
                         else "install Claude Code and sign in to use your subscription"},

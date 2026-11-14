@@ -9,7 +9,7 @@ which is nearly every local runner:
     vLLM, Jan, LocalAI, ...                 set LOOPWRIGHT_LOCAL_URL
 
 Loopwright finds a running server by itself, lists the models it has, and
-uses LOOPWRIGHT_MODEL or the first one. Download the model before you lose
+uses LOOPWRIGHT_MODEL or picks one for you (see WHICH MODEL below). Download the model before you lose
 the network; after that nothing here needs it.
 
 TOOL CALLING ON SMALL MODELS is the part worth reading. Hosted models have a
@@ -55,9 +55,56 @@ def _get(url: str, timeout: float = 0.6) -> dict[str, Any]:
         return json.loads(response.read().decode())
 
 
+# WHICH MODEL. A machine often has several models downloaded, and they are not
+# interchangeable: an agent needs one that can call tools. A vision model or a
+# small code-completion model listed first would fail every task. So the pick
+# is ranked, not "the first one":
+#   1. ask the server what each model can do (Ollama answers this at /api/show
+#      with a list such as ["completion", "tools"]) and prefer "tools"
+#   2. where the server cannot say, go by the model's family name
+#   3. ties keep the server's own order
+# `loopwright doctor` shows the pick. Name a model yourself to override it.
+TOOL_FAMILIES = ("qwen2.5", "qwen3", "llama3.1", "llama3.2", "llama3.3", "llama4", "mistral", "mixtral", "hermes",
+                 "command-r", "firefunction", "granite", "gpt-oss", "nemotron", "devstral", "magistral", "cogito")
+NOT_AGENTS = ("minicpm-v", "llava", "bakllava", "moondream", "vision", "embed", "ocr", "whisper", "rerank", "guard")
+_caps: dict[str, list[str] | None] = {}     # model -> capabilities; None = the server could not say
+
+
+def _capabilities(base: str, model: str) -> list[str] | None:
+    if model not in _caps:
+        try:
+            request = urllib.request.Request(f"{base}/api/show", data=json.dumps({"model": model}).encode(),
+                                             headers={"content-type": "application/json"})
+            with urllib.request.urlopen(request, timeout=1.5) as response:
+                found = json.loads(response.read().decode()).get("capabilities")
+            _caps[model] = [str(c) for c in found] if isinstance(found, list) else None
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            _caps[model] = None
+    return _caps[model]
+
+
+def rank(base: str, models: list[str]) -> tuple[str, str]:
+    """-> (the model to use, why). Empty strings when there are no models."""
+    best, best_score, why = "", -10 ** 6, ""
+    for index, model in enumerate(models[:24]):
+        caps, low = _capabilities(base, model), model.lower()
+        if caps is not None:
+            score = (100 if "tools" in caps else 0) + (0 if "completion" in caps else -200)
+            reason = "the server says it supports tool calling" if "tools" in caps else "no model here reports tool calling"
+        else:
+            score = 50 if any(f in low for f in TOOL_FAMILIES) else 0
+            reason = "its family is known to call tools" if score else "nothing better was found"
+        if any(marker in low for marker in NOT_AGENTS):
+            score -= 150
+        score -= index / 100                                   # ties: the server's own order
+        if score > best_score:
+            best, best_score, why = model, score, reason
+    return best, why
+
+
 def detect(refresh: bool = False) -> dict[str, Any] | None:
-    """-> {"name", "url", "models"} for the first local server that answers,
-    or None. Cached for 20 seconds so the cockpit can ask often."""
+    """-> {"name", "url", "models", "preferred", "why"} for the first local server that
+    answers, or None. Cached for 20 seconds so the cockpit can ask often."""
     if not refresh and time.time() - _found["at"] < 20:
         return _found["value"]
     custom = os.environ.get("LOOPWRIGHT_LOCAL_URL", "").rstrip("/")
@@ -68,7 +115,9 @@ def detect(refresh: bool = False) -> dict[str, Any] | None:
             models = [m.get("id", "") for m in _get(f"{base}/v1/models").get("data", [])]
         except (urllib.error.URLError, TimeoutError, OSError, ValueError):
             continue
-        value = {"name": name, "url": base, "models": [m for m in models if m and "embed" not in m.lower()]}
+        models = [m for m in models if m and "embed" not in m.lower()]
+        preferred, why = rank(base, models)
+        value = {"name": name, "url": base, "models": models, "preferred": preferred, "why": why}
         break
     _found.update(at=time.time(), value=value)
     return value
@@ -91,7 +140,7 @@ class LocalProvider:
             if not server["models"]:
                 raise FatalModelError(f"{server['name']} is running but has no models. Download one first, "
                                       "for example `ollama pull qwen2.5:7b`")
-            self.model = server["models"][0]
+            self.model = server["preferred"]
         return server
 
     def complete(self, system: str, messages: list[Message], tools: list[dict[str, Any]],

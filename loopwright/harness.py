@@ -101,6 +101,7 @@ class _Turn:
     resumed_from: int = 0
     channel: str = "local"             # which gateway the message came in by
     trigger: dict[str, Any] | None = None      # set when a scheduled task started this turn
+    empty_reply: bool = False
     workers: int = 0
 
 
@@ -335,14 +336,19 @@ class Agent:
         t.reply = revised.text or t.reply
 
     def _guard_reply(self, t: _Turn) -> None:
+        if not t.reply.strip():                 # a weak model can end the loop with nothing; say so instead of sending a blank
+            t.reply = ("The model returned an empty reply. Ask again, or switch to a stronger model: small local models "
+                       "sometimes stop without answering.")
+            t.empty_reply = True
         if t.options.guardrails:
             guarded = guardrails.guard_output(t.reply, t.tools.cited)
             t.rec.emit("guard.output", "guard_out", "Output checked" + ("" if guarded.clean else f": {len(guarded.findings)} finding(s)"),
                        "The last check before the reply leaves. Secrets are masked, and every handbook citation "
                        "is compared with the passages this turn actually retrieved: a citation to something "
                        "never read is a fabricated one.",
-                       src="model", status="ok" if guarded.clean else "warn",
-                       data={"findings": guarded.to_json(), "citations_available": sorted(t.tools.cited)})
+                       src="model", status="ok" if guarded.clean and not t.empty_reply else "warn",
+                       data={"findings": guarded.to_json(), "citations_available": sorted(t.tools.cited),
+                             "empty_reply_replaced": t.empty_reply})
             t.reply = guarded.text
         else:
             t.rec.emit("guard.output", "guard_out", "Output guard is off", "Guardrails are switched off for this turn.",

@@ -15,6 +15,7 @@ import ast
 import datetime as dt
 import html
 import ipaddress
+import json
 import math
 import operator
 import re
@@ -202,10 +203,14 @@ def send_message(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
 def _demo_page(url: str) -> str:
     name = re.sub(r"[^a-z0-9\-]", "", url.split("://", 1)[1].strip("/").lower())
     path = PACKAGE_DIR / "fixtures" / f"{name}.txt"
-    if not path.is_file():
-        available = ", ".join(sorted(f"demo://{p.stem}" for p in (PACKAGE_DIR / "fixtures").glob("*.txt")))
-        raise ToolError(f"no such demo page. Available: {available}")
-    return path.read_text(encoding="utf-8")
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+    index = json.loads((PACKAGE_DIR / "fixtures" / "web_index.json").read_text(encoding="utf-8"))
+    for page in index:                                  # every result the demo search returns can also be opened
+        if page["url"] == f"demo://{name}":
+            return f"{page['title']}\n\n{page['text']}"
+    available = ", ".join(sorted({f"demo://{p.stem}" for p in (PACKAGE_DIR / "fixtures").glob("*.txt")} | {p["url"] for p in index}))
+    raise ToolError(f"no such demo page. Available: {available}")
 
 
 def _assert_public(host: str) -> None:

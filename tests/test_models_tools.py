@@ -226,3 +226,27 @@ def test_mcp_server_speaks_the_protocol_over_stdio():
     assert {t["name"] for t in replies[2]["result"]["tools"]} >= {"loopwright_ask", "loopwright_explain", "loopwright_trace"}
     assert "2 + 2 = **4**" in replies[3]["result"]["content"][0]["text"] and "[tools] Ran calculator" in replies[3]["result"]["content"][0]["text"]
     assert replies[4]["error"]["code"] == -32602 and replies[5]["error"]["code"] == -32601 and replies[None]["error"]["code"] == -32700
+
+
+def test_an_empty_reply_is_replaced_and_unreadable_replies_fail_the_selftest_check(fake_agent, agent, opts):
+    from loopwright.evals.graders import GRADERS
+    blank_agent, _ = fake_agent("")                                   # a weak model that stops without saying anything
+    blank = blank_agent.run_turn("hi", options=Options(provider="fake", fast=True))
+    guard = next(e for e in blank.events if e.kind == "guard.output")
+    assert "empty reply" in blank.reply and guard.status == "warn" and guard.data["empty_reply_replaced"] is True
+    readable = GRADERS["reply_readable"]
+    good = agent.run_turn("What is 6 * 7?", options=opts)
+    assert readable(good, agent, True)[0]
+    for leaked in ('```json {"thought": "x"}', "<tool_calls><create_event/></tool_calls>", "<answer>nine</answer>", "   "):
+        good.reply = leaked
+        assert not readable(good, agent, True)[0], leaked
+
+
+def test_every_result_of_the_demo_search_can_be_opened(agent, opts):
+    import json as _json
+
+    from loopwright.config import PACKAGE_DIR
+    for page in _json.loads((PACKAGE_DIR / "fixtures" / "web_index.json").read_text()):
+        result = agent.run_turn(f"fetch {page['url']}", session=page["url"], options=opts)
+        assert [t["ok"] for t in result.tool_log if t["name"] == "fetch_url"] == [True], page["url"]
+    assert "no such demo page" in agent.run_turn("fetch demo://nothing-here", options=opts).reply

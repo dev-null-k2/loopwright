@@ -21,6 +21,8 @@ class Stub(BaseHTTPRequestHandler):
     chatty-model    accepts tools but writes the call as JSON in its text
     plain-model     its server rejects any request that carries tools"""
     requests: list = []
+    listed: list = ["native-model", "nomic-embed-text", "chatty-model", "plain-model"]
+    caps: dict | None = None        # model -> capabilities, as Ollama's /api/show reports them; None = not an Ollama server
 
     def log_message(self, *args):
         pass
@@ -34,10 +36,12 @@ class Stub(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_GET(self):
-        self._send(200, {"data": [{"id": "native-model"}, {"id": "nomic-embed-text"}, {"id": "chatty-model"}, {"id": "plain-model"}]})
+        self._send(200, {"data": [{"id": name} for name in Stub.listed]})
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+        if self.path == "/api/show":
+            return self._send(200, {"capabilities": Stub.caps[body["model"]]}) if Stub.caps else self._send(404, {"error": "not found"})
         Stub.requests.append(body)
         model, text = body["model"], json.dumps(body["messages"])
         done = '"role": "tool"' in text or "<tool_result" in text
@@ -60,7 +64,9 @@ def server(monkeypatch):
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     monkeypatch.setenv("LOOPWRIGHT_LOCAL_URL", f"http://127.0.0.1:{httpd.server_address[1]}/v1")
     local._found.update(at=0.0, value=None)
-    Stub.requests = []
+    local._caps.clear()
+    Stub.requests, Stub.caps = [], None
+    Stub.listed = ["native-model", "nomic-embed-text", "chatty-model", "plain-model"]
     yield httpd
     httpd.shutdown()
 
@@ -116,3 +122,25 @@ def test_when_the_network_model_is_unreachable_the_local_model_answers(server, t
     assert [e.kind for e in gateway.rec.events][:3] == ["model.retry", "model.exhausted", "model.fallback"]
     built = ModelGateway(Options(provider="anthropic", fast=True), Recorder())
     assert [p.name for p in built.chain] == ["anthropic", "local", "scripted"]             # the default chain includes it too
+
+
+def test_the_model_picked_is_one_that_can_call_tools_not_the_first_one_listed(server, capsys):
+    # the list a real machine reported: a vision model first, then models with and without tool calling
+    Stub.listed = ["minicpm-v:latest", "llama3:latest", "qwen2.5-coder:14b", "deepseek-coder:6.7b", "qwen2.5-coder:7b"]
+    Stub.caps = {"minicpm-v:latest": ["completion", "vision"], "llama3:latest": ["completion"],
+                 "qwen2.5-coder:14b": ["completion", "tools", "insert"], "deepseek-coder:6.7b": ["completion"],
+                 "qwen2.5-coder:7b": ["completion", "tools", "insert"]}
+    found = local.detect(refresh=True)
+    assert found["preferred"] == "qwen2.5-coder:14b" and "tool calling" in found["why"]
+    assert "Uses qwen2.5-coder:14b unless you name one" in available_providers()["local"]["note"]
+    provider = local.LocalProvider()
+    provider._server()
+    assert provider.model == "qwen2.5-coder:14b"
+    assert local.LocalProvider("llama3:latest")._wanted == "llama3:latest"            # naming one always wins
+
+    Stub.caps = None                                 # a server that cannot say (LM Studio, llama.cpp): go by family name
+    local._caps.clear()
+    assert local.detect(refresh=True)["preferred"] == "qwen2.5-coder:14b"
+    Stub.listed = ["llava:13b", "some-unknown-model"]
+    local._caps.clear()
+    assert local.detect(refresh=True)["preferred"] == "some-unknown-model"            # anything before a vision model

@@ -31,7 +31,7 @@ loopwright selftest --provider local
 | llama.cpp | `http://127.0.0.1:8080` | `llama-server -m model.gguf` |
 | anything else (vLLM, Jan, LocalAI, a box on your LAN) | set `LOOPWRIGHT_LOCAL_URL=http://host:port` | |
 
-`LOOPWRIGHT_MODEL` picks the model; otherwise the first one the server lists is used.
+`LOOPWRIGHT_MODEL` (or `--model`, or the Model list in the cockpit) picks the model. Otherwise Loopwright picks one that can call tools: it asks the server what each model can do (Ollama reports this), falls back to the model's family name, and never prefers a vision or embedding model. `loopwright doctor` shows the pick.
 
 **It is also the automatic fallback.** If your normal provider is Claude Code or an API and the network drops,
 the model gateway retries, then falls back to a local model if one is running, then to the scripted model. You see

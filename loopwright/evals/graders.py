@@ -19,6 +19,7 @@ the last turn.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -51,6 +52,18 @@ def reply_contains(r: TurnResult, a: Agent, spec: Any) -> Verdict:
     wanted = [spec] if isinstance(spec, str) else spec
     missing = [w for w in wanted if w.lower() not in r.reply.lower()]
     return not missing, f"missing {missing}" if missing else "found"
+
+
+LEAKED = re.compile(r"```json|</?tool_calls?\b|\"tool_calls\"\s*:|</?untrusted_content|</?(?:answer|final|conversation|assistant|user|arguments)>", re.I)
+
+
+def reply_readable(r: TurnResult, a: Agent, spec: Any) -> Verdict:
+    """The reply is prose for a person: not empty, and not the model's tool-calling
+    markup leaking out. A weak model can do the right thing and still fail this."""
+    if not r.reply.strip():
+        return False, "the reply is empty"
+    leak = LEAKED.search(r.reply)
+    return not leak, f"the reply contains protocol markup ({leak.group(0)})" if leak else "readable"
 
 
 def reply_not_contains(r: TurnResult, a: Agent, spec: Any) -> Verdict:
@@ -154,7 +167,7 @@ GRADERS: dict[str, Callable[[TurnResult, Agent, Any], Verdict]] = {
     "fact_stored": fact_stored, "fact_not_stored": fact_not_stored, "fact_superseded": fact_superseded,
     "fact_count": fact_count, "episode_count_min": episode_count_min, "outbox_count": outbox_count,
     "calendar_count": calendar_count, "note_contains": note_contains, "note_not_contains": note_not_contains,
-    "task_count": task_count, "task_schedule": task_schedule,
+    "task_count": task_count, "task_schedule": task_schedule, "reply_readable": reply_readable,
 }
 
 

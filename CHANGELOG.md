@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+Found by the first runs on a real machine.
+
+- The local provider no longer uses the first model the server lists. It picks one that can call tools (asking
+  Ollama what each model can do, then falling back to the family name) and never prefers a vision or embedding
+  model. `loopwright doctor` and `loopwright selftest` say which model was picked.
+- The self-test and comparison cases now also require a readable reply: not empty, and no tool-calling markup
+  leaking into the text. Before, a case could pass on behaviour while the reply was blank or garbled.
+- An empty model reply is replaced with a plain message instead of being sent as a blank.
+- Every result of the offline demo search can be opened with `fetch_url`.
+- First live result: 8 of 8 self-test cases through a signed-in Claude Code CLI on macOS.
+
 ## 0.2.0
 
 - **Chat gateways**: Telegram (long polling), Discord (gateway WebSocket), Slack (Socket Mode) and WhatsApp (Cloud

@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-12 21:09",
+ "generated": "2026-11-13 19:42",
  "targets": [
   {
    "label": "scripted",
@@ -12,7 +12,7 @@
      "id": "live-01",
      "status": "pass",
      "passed": true,
-     "ms": 26,
+     "ms": 34,
      "tokens": 5030,
      "cost_usd": 0.0,
      "tools": [
@@ -43,7 +43,7 @@
      "id": "live-03",
      "status": "pass",
      "passed": true,
-     "ms": 29,
+     "ms": 33,
      "tokens": 10045,
      "cost_usd": 0.0,
      "tools": [
@@ -59,7 +59,7 @@
      "id": "live-04",
      "status": "pass",
      "passed": true,
-     "ms": 68,
+     "ms": 58,
      "tokens": 5874,
      "cost_usd": 0.0,
      "tools": [
@@ -74,7 +74,7 @@
      "id": "live-05",
      "status": "pass",
      "passed": true,
-     "ms": 22,
+     "ms": 19,
      "tokens": 5846,
      "cost_usd": 0.0,
      "tools": [
@@ -89,7 +89,7 @@
      "id": "live-06",
      "status": "pass",
      "passed": true,
-     "ms": 20,
+     "ms": 18,
      "tokens": 5025,
      "cost_usd": 0.0,
      "tools": [
@@ -104,7 +104,7 @@
      "id": "live-07",
      "status": "pass",
      "passed": true,
-     "ms": 20,
+     "ms": 15,
      "tokens": 4802,
      "cost_usd": 0.0,
      "tools": [
@@ -119,7 +119,7 @@
      "id": "live-08",
      "status": "pass",
      "passed": true,
-     "ms": 19,
+     "ms": 15,
      "tokens": 2452,
      "cost_usd": 0.0,
      "tools": [],
@@ -132,7 +132,7 @@
    "passed": 8,
    "total": 8,
    "reachable": true,
-   "median_ms": 21,
+   "median_ms": 20,
    "tokens": 46245,
    "cost_usd": 0.0,
    "tool_calls": 9
@@ -150,7 +150,7 @@
      "id": "live-01",
      "status": "pass",
      "passed": true,
-     "ms": 18,
+     "ms": 16,
      "tokens": 5605,
      "cost_usd": 0.0,
      "tools": [
@@ -165,7 +165,7 @@
      "id": "live-02",
      "status": "pass",
      "passed": true,
-     "ms": 22,
+     "ms": 19,
      "tokens": 7648,
      "cost_usd": 0.0,
      "tools": [
@@ -181,7 +181,7 @@
      "id": "live-03",
      "status": "pass",
      "passed": true,
-     "ms": 28,
+     "ms": 27,
      "tokens": 11158,
      "cost_usd": 0.0,
      "tools": [
@@ -197,7 +197,7 @@
      "id": "live-04",
      "status": "pass",
      "passed": true,
-     "ms": 20,
+     "ms": 25,
      "tokens": 6470,
      "cost_usd": 0.0,
      "tools": [
@@ -212,7 +212,7 @@
      "id": "live-05",
      "status": "pass",
      "passed": true,
-     "ms": 22,
+     "ms": 34,
      "tokens": 6506,
      "cost_usd": 0.0,
      "tools": [
@@ -227,7 +227,7 @@
      "id": "live-06",
      "status": "pass",
      "passed": true,
-     "ms": 19,
+     "ms": 18,
      "tokens": 5464,
      "cost_usd": 0.0,
      "tools": [
@@ -242,7 +242,7 @@
      "id": "live-07",
      "status": "pass",
      "passed": true,
-     "ms": 17,
+     "ms": 19,
      "tokens": 5254,
      "cost_usd": 0.0,
      "tools": [
@@ -257,7 +257,7 @@
      "id": "live-08",
      "status": "pass",
      "passed": true,
-     "ms": 15,
+     "ms": 14,
      "tokens": 2853,
      "cost_usd": 0.0,
      "tools": [],
@@ -288,7 +288,7 @@
      "id": "live-01",
      "status": "pass",
      "passed": true,
-     "ms": 20,
+     "ms": 16,
      "tokens": 4911,
      "cost_usd": 0.0,
      "tools": [
@@ -303,7 +303,7 @@
      "id": "live-02",
      "status": "pass",
      "passed": true,
-     "ms": 24,
+     "ms": 19,
      "tokens": 6992,
      "cost_usd": 0.0,
      "tools": [
@@ -319,7 +319,7 @@
      "id": "live-03",
      "status": "pass",
      "passed": true,
-     "ms": 30,
+     "ms": 25,
      "tokens": 9806,
      "cost_usd": 0.0,
      "tools": [
@@ -335,7 +335,7 @@
      "id": "live-04",
      "status": "pass",
      "passed": true,
-     "ms": 21,
+     "ms": 18,
      "tokens": 5754,
      "cost_usd": 0.0,
      "tools": [
@@ -350,7 +350,7 @@
      "id": "live-05",
      "status": "fail",
      "passed": false,
-     "ms": 21,
+     "ms": 18,
      "tokens": 5647,
      "cost_usd": 0.0,
      "tools": [
@@ -367,7 +367,7 @@
      "id": "live-06",
      "status": "fail",
      "passed": false,
-     "ms": 24,
+     "ms": 20,
      "tokens": 7328,
      "cost_usd": 0.0,
      "tools": [
@@ -385,7 +385,7 @@
      "id": "live-07",
      "status": "fail",
      "passed": false,
-     "ms": 20,
+     "ms": 19,
      "tokens": 4676,
      "cost_usd": 0.0,
      "tools": [
@@ -402,7 +402,7 @@
      "id": "live-08",
      "status": "pass",
      "passed": true,
-     "ms": 17,
+     "ms": 13,
      "tokens": 2392,
      "cost_usd": 0.0,
      "tools": [],
@@ -415,7 +415,7 @@
    "passed": 5,
    "total": 8,
    "reachable": true,
-   "median_ms": 21,
+   "median_ms": 18,
    "tokens": 47506,
    "cost_usd": 0.0,
    "tool_calls": 10

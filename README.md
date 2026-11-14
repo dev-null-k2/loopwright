@@ -219,7 +219,7 @@ answer. Reliability cases run three trials with failures injected at different p
 | Handbook retrieval, 44 labelled questions, recall@1 / @3 | BM25 84% / 100% · dense 73% / 91% · hybrid 84% / 98% |
 | Retrieval gate (rules), 30 labelled messages | 83% accurate; 2 false skips, 3 false retrieves |
 | Lessons | all 23 runnable lessons produce every step they promise (a test enforces it) |
-| Unit and end-to-end tests | 78 passing |
+| Unit and end-to-end tests | 81 passing |
 
 The `automation` suite covers workflows, scheduled tasks, the shell and the browser: a workflow's hard-coded send
 is refused after it read the web, a scheduled run cannot send or run commands, a turn that read a file cannot
@@ -341,14 +341,14 @@ trifecta"*. More in [docs/claude-code.md](docs/claude-code.md).
 
 | Part | How it is verified |
 |---|---|
-| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 78 automated tests and the 69-case eval suite, on every push, on Python 3.11 and 3.13 |
+| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 81 automated tests and the 69-case eval suite, on every push, on Python 3.11 and 3.13 |
 | Browser agent | Against real headless Chrome on a bundled four-page site: reading, clicking, filling in and submitting a form, screenshots, and refusal of local and private addresses, including a page's own sub-requests. Not run against arbitrary live websites |
 | Shell tool | Real commands: the opt-in switch, approval, scrubbed environment, timeout, denial in tainted and unattended turns. The sandbox was `none` on the machine the evals ran on (no bubblewrap); the macOS `sandbox-exec` profile is probed at run time and has not been exercised in CI |
 | Chat gateways | Each protocol against a stand-in: a fake Bot API (Telegram), a local WebSocket server playing Discord's gateway and Slack's Socket Mode, real signed and forged HTTP deliveries (WhatsApp). **Not run against the live services** |
 | OpenTelemetry export | The span structure and attribute names, and a real HTTP POST to a local collector stub. Not checked against a specific backend |
 | Local open-source models | Full turns over real HTTP against a stub server that behaves like three kinds of local model (native tool calling, tool calls written as text, tools refused), plus the offline fallback. Not run against every runner and model; `loopwright selftest --provider local` checks yours |
 | The cockpit | Driven in headless Chrome for every flow in the screenshots; scripts are syntax-checked in CI |
-| Claude Code provider | The adapter and a full turn through the harness are tested against a stubbed `claude` that returns the CLI's real JSON shape. Check your own install with `loopwright selftest --provider claude-code` |
+| Claude Code provider | The adapter and a full turn through the harness are tested against a stubbed `claude` that returns the CLI's real JSON shape. Check your own install with `loopwright selftest --provider claude-code`. **Run live once**: 8 of 8 self-test cases passed through a signed-in Claude Code CLI on macOS (13 Nov 2026), a single trial |
 | Anthropic and OpenAI-compatible providers | Request and response translation tested with a fake transport. Not called live in CI |
 | Web search | The demo backend end to end; the DuckDuckGo parser, Tavily, Brave and Claude Code backends against fixed response shapes. Not called live in CI |
 
@@ -390,7 +390,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              78 tests
+tests/              81 tests
 docs/               architecture, automations, gateways, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports

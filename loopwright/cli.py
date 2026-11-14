@@ -328,7 +328,14 @@ def cmd_selftest(args: argparse.Namespace) -> int:
     from loopwright.evals.runner import load_cases, run_case
     from loopwright.models.gateway import pick_provider
     provider = pick_provider(args.provider or "auto")
-    print(f"Self-test on {provider}{' (' + args.model + ')' if args.model else ''}. Each question runs in a fresh, temporary state folder.\n")
+    model = args.model
+    if provider == "local" and not model:
+        from loopwright.models import local
+        found = local.detect(refresh=True)
+        model = found["preferred"] if found else ""
+        if model:
+            print(f"No model named, so the local pick is {model} ({found['why']}). Choose another with --model.")
+    print(f"Self-test on {provider}{' (' + model + ')' if model else ''}. Each question runs in a fresh, temporary state folder.\n")
     passed = 0
     cases = load_cases("live")
     for case in cases:
@@ -350,7 +357,7 @@ def cmd_selftest(args: argparse.Namespace) -> int:
             print(f"\nStopping: {provider} cannot be reached, so the remaining questions would fail the same way. "
                   "Run `loopwright doctor` to see what is set up.")
             return 1
-    print(f"\n{passed}/{len(cases)} passed on {provider}.")
+    print(f"\n{passed}/{len(cases)} passed on {provider}{' (' + model + ')' if model else ''}.")
     return 0 if passed == len(cases) else 1
 
 

@@ -138,13 +138,13 @@ function drawLegend() {
 
 function drawProviders() {
   const select = $("provider");
-  const localModel = health.providers.local?.models?.[0];
+  const localModel = health.providers.local?.preferred || health.providers.local?.models?.[0];     // the one that can call tools
   const label = { scripted: "Scripted (offline)", local: `Local model${localModel ? `: ${localModel}` : ""}`, "claude-code": "Claude Code subscription", anthropic: "Anthropic API", openai: "OpenAI-compatible" };
   put(select, h("option", { value: "auto" }, `Auto: ${label[health.default_provider]}`),
     Object.entries(health.providers).map(([name, p]) => h("option", { value: name, disabled: !p.ok, title: p.note }, label[name] + (p.ok ? "" : " (not set up)"))));
   select.value = lab.provider && health.providers[lab.provider]?.ok ? lab.provider : "auto";
   // a local server can hold several models: one entry each
-  for (const m of (health.providers.local?.models || []).slice(1, 12)) select.append(h("option", { value: `local|${m}` }, `Local model: ${m}`));
+  for (const m of (health.providers.local?.models || []).filter((name) => name !== localModel).slice(0, 12)) select.append(h("option", { value: `local|${m}` }, `Local model: ${m}`));
   select.addEventListener("change", () => { lab.provider = select.value; saveLab(); });
 }
 

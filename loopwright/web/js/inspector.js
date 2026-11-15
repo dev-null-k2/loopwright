@@ -11,6 +11,13 @@ import { h, put, pretty, fmt, pillarVar } from "./util.js";
 const SECTION_COLOURS = ["var(--loop)", "var(--harness)", "var(--memory)", "var(--ops)", "var(--safety)", "var(--gateway)",
                          "color-mix(in srgb, var(--loop) 55%, var(--panel))", "color-mix(in srgb, var(--memory) 55%, var(--panel))"];
 
+// A screenshot the browser agent took. From another computer it is fetched with the key first.
+function shot(name, alt) {
+  const img = h("img", { class: "shot", alt, onerror: (e) => e.target.remove() });
+  api.shot(name).then((src) => { img.src = src; }).catch(() => img.remove());
+  return img;
+}
+
 function checklist(checks) {
   return h("ul", { class: "checks" }, checks.map((c) =>
     h("li", { class: c.pass ? "" : "no" }, h("span", {}, c.check, c.note ? h("small", {}, `  ${c.note}`) : null))));
@@ -79,7 +86,7 @@ function body(event) {
   if (event.kind === "model.call") return modelCall(d);
   if (event.kind === "browser.action") {
     return [
-      d.shot ? h("img", { class: "shot", src: api.shotUrl(d.shot), alt: `Screenshot of ${d.title || d.url}`, onerror: (e) => e.target.remove() }) : null,
+      d.shot ? shot(d.shot, `Screenshot of ${d.title || d.url}`) : null,
       h("p", { class: "hint" }, "Above: what the browser showed (kept for you). Below: what the model was given instead."),
       h("dl", { class: "kv" }, h("dt", {}, "Action"), h("dd", {}, d.action), h("dt", {}, "Page"), h("dd", {}, d.title), h("dt", {}, "Address"), h("dd", {}, d.url)),
       h("h3", {}, `Numbered elements the model can act on (${d.elements.length})`), h("pre", { class: "data" }, d.elements.join("\n") || "(none)"),

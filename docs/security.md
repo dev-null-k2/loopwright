@@ -64,6 +64,30 @@ A server on localhost can be reached by any web page you visit. [`server.py`](..
 `127.0.0.1` only, rejects requests whose `Host` is not localhost (DNS rebinding), rejects state-changing requests
 whose `Origin` is another site (CSRF), and serves source files only from inside the package.
 
+### When you share it: `--lan`, `--tunnel`, `--public-url`
+
+These make the cockpit reachable from another device, and with it your agent's memory and tools. What stands
+between them and anyone else is one access key, printed in the link at start-up.
+
+- Every request that is not from this machine must carry the key: as a cookie set by the first visit to the
+  computer's own address, or as a header when the public page is the screen. A wrong key gets a 403 after a
+  one-second delay.
+- A request that arrives through a tunnel is never treated as local, even when the tunnel connects from
+  `127.0.0.1` and rewrites the `Host` header: the forwarding headers a tunnel adds mark it as outside.
+- **The public page** (the project's GitHub Pages copy, or yours with `--page`) is the one other origin allowed
+  to call the server, and only while a key exists. Its requests must carry the key in a header; a cookie from
+  that origin is refused, because a header is something no other site can make your browser send.
+- The connect link carries the computer's address and the key after the `#`, which browsers do not send to the
+  site hosting the page. The page then keeps them in that browser's local storage until you disconnect. Any
+  script served from the same origin as the page could read them there, so the allowed page should be one you
+  trust: the default is this project's, and a fork should point `--page` at its own.
+- A quick tunnel's address is public and guessable only by chance; the key is 64 random bits. Stop the server
+  when you are done, and treat the link as a password.
+- The tunnel provider carries your traffic. With `--tunnel` that is Cloudflare, over HTTPS to its edge and then
+  to `cloudflared` on your computer.
+
+None of this has been reviewed by anyone outside the project.
+
 ## Secrets
 
 Anything shaped like a credential in your message is masked before it reaches the trace, the model or memory, and

@@ -25,7 +25,7 @@
       <a href="#activity" data-tab="activity">Activity</a>
     </nav>
     <div class="bar-right">
-      <span id="static-note" class="pill warn" hidden>Recorded demo</span>
+      <button id="connection" class="pill" hidden></button>
       <label class="field"><span>Model</span><select id="provider" aria-label="Model provider"></select></label>
       <button id="lab-toggle" class="ghost" aria-expanded="false" aria-controls="lab">Lab</button>
       <button id="theme-toggle" class="ghost" aria-label="Switch between light and dark">Dark</button>
@@ -143,6 +143,8 @@
     <header><strong id="source-path"></strong><button id="source-close" class="ghost">Close</button></header>
     <pre id="source-text"></pre>
   </dialog>
+
+  <dialog id="connect-dialog" class="connect" aria-labelledby="connect-title"><div id="connect-body"></div></dialog>
 
   <script type="module" src="js/main.js"></script>
 </body>

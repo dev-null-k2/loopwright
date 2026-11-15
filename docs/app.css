@@ -71,6 +71,14 @@ a { color: inherit; }
 .check { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 14px; white-space: nowrap; }
 .pill { font-size: 13px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
 .pill.warn { border-color: var(--warn); color: var(--warn); }
+/* where the agent is: the recording, or a computer this page is the screen for */
+.connection { display: inline-flex; align-items: center; gap: 6px; background: none; cursor: pointer; font: inherit; font-size: 13.5px; padding: 3px 11px; color: var(--ink); }
+.connection b { font-weight: 600; } .connection span { color: var(--ink-2); }
+.connection .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.connection.demo { border-color: var(--focus); } .connection.demo .dot { background: var(--focus); }
+.connection.lost { border-color: var(--warn); } .connection.lost .dot { background: var(--warn); }
+.connection.remote .dot { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+.connection:hover { background: var(--sunk); }
 
 /* ------------------------------------------------------------ lab drawer */
 .lab { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 18px 16px; flex: none; }
@@ -344,6 +352,20 @@ table.grid tr.clickable { cursor: pointer; } table.grid tr.clickable:hover td { 
 .progress { color: var(--ink-2); margin-top: 8px; min-height: 22px; }
 .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px; }
 
+/* ------------------------------------------------------------ connect dialog */
+dialog.connect { width: min(540px, 94vw); padding: 0 24px 22px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); }
+dialog.connect::backdrop { background: rgba(10, 18, 38, .55); }
+.connect-top { display: flex; justify-content: flex-end; padding-top: 12px; margin-right: -10px; }
+dialog.connect h2 { font-size: 22px; margin: 0 0 10px; line-height: 1.2; }
+dialog.connect p { margin: 0 0 12px; line-height: 1.5; max-width: 60ch; }
+dialog.connect code { font-size: 14px; background: var(--sunk); padding: 2px 7px; border-radius: 4px; overflow-wrap: anywhere; }
+.connect-steps { margin: 4px 0 14px; padding-left: 22px; display: grid; gap: 12px; line-height: 1.5; }
+.connect-steps li > code { display: block; width: fit-content; margin-top: 6px; padding: 6px 10px; }
+.connect-paste { display: flex; gap: 8px; margin-top: 8px; }
+.connect-paste input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.connect-error { color: var(--warn); font-size: 14px; margin-top: 8px !important; }
+.connect-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
 /* ------------------------------------------------------------ source dialog */
 dialog.source { width: min(980px, 92vw); height: 86vh; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
 dialog.source::backdrop { background: rgba(10, 18, 38, .55); }
@@ -363,7 +385,12 @@ dialog.source pre { margin: 0; padding: 14px 18px 30px; font-size: 13px; line-he
   .bar { flex-wrap: wrap; height: auto; padding: 6px 10px 0; gap: 4px 10px; }
   .mark span { font-size: 17px; }
   .bar-right { gap: 6px; } .bar-right .field span { display: none; } .bar-right select { max-width: 132px; font-size: 13.5px; padding: 4px 6px; }
-  .bar-right button { padding: 4px 8px; font-size: 13.5px; } #static-note { display: none; }
+  .bar-right button { padding: 4px 8px; font-size: 13.5px; }
+  .connection span { display: none; }
+  body[data-mode="demo"] .bar-right .field, body[data-mode="lost"] .bar-right .field { display: none; }   /* the model cannot be changed in a recording */
+  body[data-mode="remote"] .connection b { display: none; } body[data-mode="remote"] .connection { padding: 8px; }
+  body[data-mode="remote"] .bar-right select { max-width: 100px; }
+  dialog.connect { width: 100vw; max-width: none; margin: auto 0 0; border-radius: 14px 14px 0 0; border-width: 1px 0 0; padding: 0 18px calc(18px + env(safe-area-inset-bottom)); max-height: 92dvh; }
   .tabs { order: 3; width: 100%; height: 36px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .tabs::-webkit-scrollbar { display: none; }
   .tabs a { padding: 0 10px; white-space: nowrap; font-size: 14.5px; }

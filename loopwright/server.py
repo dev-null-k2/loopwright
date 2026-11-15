@@ -23,6 +23,13 @@ a phone. The agent keeps running on this machine; the phone is only a screen.
 Because the agent can read your memory and run tools, every request from
 another device must carry an access key: the link printed at start-up contains
 it, the first visit stores it in a cookie, and anything without it gets a 403.
+
+`loopwright serve --tunnel` (or `--public-url`) gives it a public HTTPS address,
+and lets one more client in: the public cockpit page (PUBLIC_PAGE, a static
+site). Opened with a connect link, that page talks to this server from another
+origin. It is allowed only while a key exists, only from that one origin, and
+only when each request carries the key in a header, so no other site can ride
+along on it.
 """
 
 from __future__ import annotations
@@ -40,9 +47,9 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
-from loopwright import __version__, otel, scheduler, workflows
+from loopwright import __version__, otel, qr, scheduler, tunnel, workflows
 from loopwright.config import PACKAGE_DIR, Options, home_dir
 from loopwright.context import IDENTITY, load_identity
 from loopwright.evals import compare as eval_compare
@@ -60,6 +67,8 @@ from loopwright.tools.plugins import OPT_IN, add_mcp_server, read_mcp_config, re
 WEB = PACKAGE_DIR / "web"
 APPROVAL_TIMEOUT_S = 180
 SOURCE_SUFFIXES = {".py", ".md", ".toml", ".js", ".jsonl", ".txt"}
+PUBLIC_PAGE = "https://dev-null-k2.github.io/loopwright/"       # the static cockpit; LOOPWRIGHT_PAGE points at your own copy
+FORWARDED = ("X-Forwarded-For", "X-Forwarded-Host", "X-Real-Ip", "Forwarded", "Cf-Connecting-Ip")
 
 
 def handbook() -> dict[str, Any]:
@@ -228,7 +237,22 @@ def lan_address() -> str:
         probe.close()
 
 
-def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHandler]:
+def page_origin(page: str) -> str:
+    url = urlparse(page)
+    return f"{url.scheme}://{url.netloc}"
+
+
+def phone_link(page: str, address: str, key: str) -> str:
+    """The public page, told where this server is. The address and key sit after the #, which
+    a browser never sends to the site that hosts the page."""
+    return f"{page}#connect={quote(address.rstrip('/'), safe=':/')}&key={key}"
+
+
+def _same(given: str, key: str) -> bool:
+    return bool(key) and hmac.compare_digest(given.encode("utf-8", "replace"), key.encode())
+
+
+def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = ()) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = f"loopwright/{__version__}"
 
@@ -237,22 +261,37 @@ def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHan
 
         # ------------------------------------------------ plumbing
         def _local(self) -> bool:
+            """Asked for by this machine itself, and not through a tunnel that happens to end here."""
             host = (self.headers.get("Host") or "").split(":")[0]
+            if any(self.headers.get(name) for name in FORWARDED):
+                return False
             return host in ("127.0.0.1", "localhost", "[::1]") and self.client_address[0] in ("127.0.0.1", "::1")
+
+        def _page(self) -> str:
+            """The public cockpit page calling from its own origin. Only while a key exists."""
+            origin = self.headers.get("Origin") or ""
+            return origin if access_key and origin in pages else ""
+
+        def _key_header(self) -> bool:
+            return _same(self.headers.get("X-Loopwright-Key") or "", access_key)
 
         def _has_key(self) -> bool:
             cookies = dict(pair.strip().split("=", 1) for pair in (self.headers.get("Cookie") or "").split(";") if "=" in pair)
-            return bool(access_key) and hmac.compare_digest(cookies.get("lw_key", ""), access_key)
+            return _same(cookies.get("lw_key", ""), access_key) or self._key_header()
 
         def _host_ok(self) -> bool:
-            """Local requests need the right Host header. Requests from another device (only
-            possible with --lan) need the access key instead."""
+            """Local requests need the right Host header. Requests from another device, or from
+            the public page, need the access key instead."""
+            if self._page():
+                return self._key_header()
             return self._local() or self._has_key()
 
         def _origin_ok(self) -> bool:
             origin = self.headers.get("Origin")
             if not origin:
                 return True
+            if self._page():
+                return self._key_header()        # a header a foreign site cannot set, unlike a cookie
             if urlparse(origin).hostname in ("127.0.0.1", "localhost", "::1"):
                 return True
             return self._has_key() and urlparse(origin).netloc == (self.headers.get("Host") or "")
@@ -271,6 +310,29 @@ def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHan
             self.send_header("Set-Cookie", f"lw_key={access_key}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000")
             self.end_headers()
             return True
+
+        def end_headers(self) -> None:
+            page = self._page()
+            if page:                              # lets the public page read the answer
+                self.send_header("Access-Control-Allow-Origin", page)
+                self.send_header("Vary", "Origin")
+            super().end_headers()
+
+        def do_OPTIONS(self) -> None:
+            """The browser's question before a cross-origin request: may this page call you?"""
+            self.send_response(204 if self._page() else 403)
+            if self._page():
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE")
+                self.send_header("Access-Control-Allow-Headers", "content-type, x-loopwright-key")
+                self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def _refuse(self) -> None:
+            if self._page() or self.headers.get("X-Loopwright-Key"):
+                time.sleep(1)                     # make guessing slow
+                return self._json({"error": "wrong or expired key: open the newest link your computer printed"}, 403)
+            self._json({"error": "this cockpit is private: open the link with its key, from `loopwright serve --lan` or `--tunnel`"}, 403)
 
         def _json(self, data: Any, status: int = 200) -> None:
             body = json.dumps(data, ensure_ascii=False, default=str).encode()
@@ -311,7 +373,7 @@ def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHan
             if not self._local() and self._sign_in(url):
                 return
             if not self._host_ok():
-                return self._json({"error": "this cockpit is private: open the link with its key, from `loopwright serve --lan`"}, 403)
+                return self._refuse()
             path = url.path
             app = root_app.use(parse_qs(url.query).get("space", ["main"])[0])
             if path == "/api/health":
@@ -396,7 +458,7 @@ def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHan
         # ------------------------------------------------ POST / DELETE
         def do_POST(self) -> None:
             if not self._host_ok() or not self._origin_ok():
-                return self._json({"error": "cross-site request refused"}, 403)
+                return self._refuse() if self._page() else self._json({"error": "cross-site request refused"}, 403)
             path = urlparse(self.path).path
             body = self._body()
             app = root_app.use(str(body.get("space", "main")))
@@ -477,7 +539,7 @@ def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHan
 
         def do_DELETE(self) -> None:
             if not self._host_ok() or not self._origin_ok():
-                return self._json({"error": "cross-site request refused"}, 403)
+                return self._refuse() if self._page() else self._json({"error": "cross-site request refused"}, 403)
             url = urlparse(self.path)
             path = url.path
             app = root_app.use(parse_qs(url.query).get("space", ["main"])[0])
@@ -541,10 +603,15 @@ def make_handler(root_app: App, access_key: str = "") -> type[BaseHTTPRequestHan
     return Handler
 
 
-def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True, lan: bool = False) -> None:
+def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True, lan: bool = False,
+          tunnel_out: bool = False, public_url: str = "", page: str = "", key: str = "", show_qr: bool | None = None) -> None:
     app = App(home)
-    key = secrets.token_hex(5) if lan else ""
-    server = ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", port), make_handler(app, key))
+    shared = lan or tunnel_out or bool(public_url)
+    key = (key or os.environ.get("LOOPWRIGHT_KEY") or secrets.token_hex(8)) if shared else ""
+    if shared and len(key) < 12:
+        raise SystemExit("the access key must be at least 12 characters: it is all that protects your agent")
+    page = (page or os.environ.get("LOOPWRIGHT_PAGE") or PUBLIC_PAGE).rstrip("/") + "/"
+    server = ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", port), make_handler(app, key, (page_origin(page),)))
     server.daemon_threads = True
     url = f"http://127.0.0.1:{port}"
     provider = pick_provider("auto")
@@ -552,12 +619,36 @@ def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True,
     print(f"model               {provider}  ({available_providers()[provider]['note']})")
     print(f"state               {app.root}")
     print(f"scheduled tasks     {len(app.agent.store.tasks())} (checked every 20s while this runs)")
+
+    tube = None
+    if tunnel_out and not public_url:
+        print("\nstarting a tunnel   (cloudflared, a new public address each time)")
+        try:
+            tube = tunnel.start(port)
+            public_url = tube.url
+        except tunnel.TunnelError as error:
+            print(f"no tunnel           {error}")
+    scan = ""
+    if public_url:
+        scan = phone_link(page, public_url, key)
+        print(f"\nOn your phone       {scan}")
+        print("                    Works from anywhere. The page is the public cockpit; it talks to this computer,")
+        print("                    where the agent and the model (Claude Code, a local model) run.")
+        print(f"                    The same thing without the public page: {public_url.rstrip('/')}/?key={key}")
     if lan:
-        print(f"\nOn your phone       http://{lan_address()}:{port}/?key={key}")
-        print("                    Same Wi-Fi as this computer. The agent runs here; the phone is a screen.")
-        print("                    Anyone with this link can use your agent and its tools until you stop it.")
-        print("                    From anywhere: point a tunnel at this port and add ?key=" + key + " to its address")
-        print(f"                    (for example: cloudflared tunnel --url http://localhost:{port}).")
+        direct = f"http://{lan_address()}:{port}/?key={key}"
+        scan = scan or direct
+        print(f"\n{'Same Wi-Fi' if public_url else 'On your phone'}       {direct}")
+        if not public_url:
+            print("                    Same Wi-Fi as this computer. The agent runs here; the phone is a screen.")
+            print("                    From anywhere, and from the public page: loopwright serve --tunnel")
+    if shared:
+        print("                    Anyone with a link above can use your agent and its tools until you stop it.")
+        if scan and (show_qr if show_qr is not None else os.isatty(1)):
+            try:
+                print("\n" + qr.render(scan) + "\n                    Scan with the phone's camera.")
+            except ValueError:
+                pass                                # a link too long to draw; the text above still works
     clock = scheduler.Scheduler(app.agent)
     clock.start()                               # scheduled tasks run for as long as the cockpit is up
     print("Ctrl+C to stop")
@@ -569,7 +660,9 @@ def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True,
         print("\nstopped")
     finally:
         server.server_close()
+        if tube:
+            tube.close()
 
 
 # kept importable for tests and the demo builder
-__all__ = ["App", "ModelGateway", "handbook", "make_handler", "serve"]
+__all__ = ["App", "ModelGateway", "handbook", "make_handler", "phone_link", "serve"]

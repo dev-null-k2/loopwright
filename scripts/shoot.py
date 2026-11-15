@@ -71,6 +71,10 @@ async def main() -> None:
         await page.click("#pane-switch button[data-pane=board]")
         await page.wait_for_timeout(900)
         await page.screenshot(path=f"{OUT}/phone-board.png")
+        await page.click("#pane-switch button[data-pane=chat]")
+        await page.click("#connection")                                                   # how the public page becomes the screen for your own agent
+        await page.wait_for_timeout(400)
+        await page.screenshot(path=f"{OUT}/phone-connect.png")
         await phone.close()
 
         page = await page_for("light")

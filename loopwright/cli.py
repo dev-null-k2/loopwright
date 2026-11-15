@@ -2,7 +2,7 @@
 
     loopwright                 chat in the terminal, printing each step as it happens
     loopwright ask "..."       one question, one answer
-    loopwright serve           the web cockpit on http://127.0.0.1:8765
+    loopwright serve           the web cockpit on http://127.0.0.1:8765 (--tunnel or --lan: from your phone)
     loopwright replay [id]     play a past turn back, step by step
     loopwright runs            list past turns
     loopwright resume <id>     continue a turn that died, from its last checkpoint
@@ -124,7 +124,8 @@ def cmd_ask(args: argparse.Namespace) -> int:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     from loopwright.server import serve
-    serve(port=args.port, open_browser=not args.no_open, lan=args.lan)
+    serve(port=args.port, open_browser=not args.no_open, lan=args.lan, tunnel_out=args.tunnel, public_url=args.public_url,
+          page=args.page, show_qr=False if args.no_qr else None)
     return 0
 
 
@@ -527,6 +528,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--no-open", action="store_true", help="do not open a browser tab")
     p.add_argument("--lan", action="store_true", help="also reachable from your phone on the same Wi-Fi, with an access key")
+    p.add_argument("--tunnel", action="store_true", help="reachable from anywhere: starts cloudflared and prints a link (and a QR code) for your phone")
+    p.add_argument("--public-url", default="", metavar="URL", help="the https address of a tunnel you started yourself (ngrok, Tailscale Funnel, ...)")
+    p.add_argument("--page", default="", metavar="URL", help="the public cockpit page the phone link opens (default: the project's; or set LOOPWRIGHT_PAGE)")
+    p.add_argument("--no-qr", action="store_true", help="do not draw the QR code")
     p.set_defaults(fn=cmd_serve)
 
     p = sub.add_parser("runs", help="list past turns")

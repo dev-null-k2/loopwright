@@ -72,13 +72,16 @@ is the same thing in your browser.
 
 ### On a phone
 
-<picture><img alt="The cockpit on a phone, chat pane: a reply followed by step cards for a skipped memory search and two tool calls, calculator and save_note, each with arguments and result." src="docs/media/phone-chat.png" width="32%"></picture>
-<picture><img alt="The same run on a phone, steps pane: the data behind the calculator call." src="docs/media/phone-steps.png" width="32%"></picture>
-<picture><img alt="The same run on a phone, architecture pane, panned to the active box." src="docs/media/phone-board.png" width="32%"></picture>
+<picture><img alt="The cockpit on a phone, chat pane: a reply followed by step cards for a skipped memory search and two tool calls, calculator and save_note, each with arguments and result." src="docs/media/phone-chat.png" width="24%"></picture>
+<picture><img alt="The same run on a phone, steps pane: the data behind the calculator call." src="docs/media/phone-steps.png" width="24%"></picture>
+<picture><img alt="The same run on a phone, architecture pane, panned to the active box." src="docs/media/phone-board.png" width="24%"></picture>
+<picture><img alt="The public page on a phone with the Connect dialog open: start Loopwright with a tunnel on your computer, then open or paste the link it prints." src="docs/media/phone-connect.png" width="24%"></picture>
 
 The cockpit is a web page, so a phone needs only a link. The [public demo](https://dev-null-k2.github.io/loopwright/)
-replays recorded runs. To use your own agent from a phone, `loopwright serve --lan` prints a link with an access
-key; the model (Claude Code or a local one) keeps running on your computer. [docs/mobile.md](docs/mobile.md).
+replays recorded runs. To use your own agent on that same page, from anywhere, run `loopwright serve --tunnel` on
+your computer and scan the QR code it prints: the page connects to your computer, where the agent and the model
+(Claude Code or a local one) keep running. At home, `loopwright serve --lan` does it without a tunnel.
+[docs/mobile.md](docs/mobile.md).
 
 ### The detail is one click away
 
@@ -146,7 +149,8 @@ loopwright workflow morning-brief                                      # a fixed
 loopwright tasks add "weekdays 08:00" "What is on my calendar today?"  # a turn a clock starts
 loopwright compare --targets scripted local claude-code                # the same questions through each model
 loopwright telegram                                                    # or discord, slack, whatsapp
-loopwright serve --lan                                                 # use the cockpit from your phone
+loopwright serve --tunnel                                              # use it from your phone, anywhere (prints a link and a QR code)
+loopwright serve --lan                                                 # the same on your home Wi-Fi, no tunnel
 ```
 
 Things to try, in order: *"Remember that Alex prefers morning meetings"*, then **New chat**, then
@@ -411,7 +415,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              82 tests
+tests/              92 tests
 docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports

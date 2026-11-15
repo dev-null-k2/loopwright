@@ -1,21 +1,65 @@
 // One place that talks to the server, so the rest of the cockpit does not care
-// whether it is running against a live Loopwright or as the static demo.
+// where the agent is.
 //
-// Live:   /api/* on the local server, with turns streamed as Server-Sent Events.
-// Static: no server (GitHub Pages). Everything comes from demo/data.json, which
-//         scripts/build_demo.py records from real runs of the scripted model.
+// Live:    /api/* on the server that also serves this page, with turns streamed
+//          as Server-Sent Events.
+// Remote:  this page is the public copy (GitHub Pages) and was opened with a
+//          connect link from `loopwright serve --tunnel`. The same /api/* calls go
+//          to that computer, each carrying the access key in a header.
+// Static:  no server at all. Everything comes from demo/data.json, which
+//          scripts/build_demo.py records from real runs of the scripted model.
 
 let demo = null;
+let remote = null;            // { url: "https://…/", key, space } when this page drives an agent on another computer
+
+const SAVED = "loopwright.connection";
+const saved = {
+  get() { try { return JSON.parse(localStorage.getItem(SAVED)); } catch { return null; } },
+  set(value) { try { value ? localStorage.setItem(SAVED, JSON.stringify(value)) : localStorage.removeItem(SAVED); } catch { /* private mode */ } },
+};
+
+// A connect link in any of the forms a person might paste:
+//   https://<page>/#connect=https://<computer>&key=<key>     what `loopwright serve --tunnel` prints
+//   https://<computer>/?key=<key>                             the computer's own address
+export function parseLink(text) {
+  const raw = String(text || "").trim();
+  try {
+    const hash = raw.includes("#") ? new URLSearchParams(raw.slice(raw.indexOf("#") + 1)) : null;
+    if (hash && hash.get("connect")) {
+      const url = new URL(hash.get("connect"));
+      return ["http:", "https:"].includes(url.protocol) && hash.get("key") ? { url: url.origin + "/", key: hash.get("key") } : null;
+    }
+    const url = new URL(raw);
+    const key = url.searchParams.get("key");
+    return ["http:", "https:"].includes(url.protocol) && key ? { url: url.origin + "/", key } : null;
+  } catch { return null; }
+}
+
+// An http address on the home network, called from this https page. Chrome allows that once
+// the person grants "local network access", if the request says where it is going.
+function addressSpace(url) {
+  const { protocol, hostname } = new URL(url);
+  if (protocol !== "http:" || location.protocol !== "https:") return null;
+  if (hostname === "localhost" || hostname.startsWith("127.")) return "loopback";
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname) || hostname.endsWith(".local") ? "local" : null;
+}
+
+function request(path, init = {}) {
+  if (!remote) return fetch(path, init);
+  const options = { ...init, headers: { ...(init.headers || {}), "x-loopwright-key": remote.key } };
+  if (remote.space) options.targetAddressSpace = remote.space;
+  return fetch(remote.url + path, options);
+}
 
 async function getJSON(url, init) {
-  const response = await fetch(url, init);
-  if (!response.ok) throw new Error(`${url}: ${response.status}`);
+  const response = await request(url, init);
+  if (!response.ok) throw Object.assign(new Error(`${url}: ${response.status}`), { status: response.status });
   return response.json();
 }
 
 async function stream(url, body, onMessage) {
-  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  if (!response.ok || !response.body) throw new Error(`${url}: ${response.status}`);
+  const response = await request(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!response.ok || !response.body) throw Object.assign(new Error(`${url}: ${response.status}`), { status: response.status });
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -53,16 +97,44 @@ export const api = {
   space: "main",            // "main" is your agent; "classroom" is the scratch copy lessons run in
   q() { return this.space === "main" ? "" : "?space=classroom"; },
 
+  remote: null,             // the address of the computer this page is driving, when it is
+  unreachable: null,        // { url, why } when a saved computer did not answer and the demo is showing instead
+
   async init() {
-    try {
-      const health = await getJSON("api/health");
-      return health;
-    } catch {
-      demo = await getJSON("demo/data.json");
-      this.static = true;
-      return demo.health;
+    const link = parseLink(location.href);                      // arrived by a connect link
+    if (link && link.url !== location.origin + "/") {
+      saved.set(link);
+      history.replaceState(null, "", location.pathname + location.search + "#cockpit");   // keep the key out of the address bar
     }
+    try {
+      return await getJSON("api/health");                       // this page's own server
+    } catch { /* a static copy of the page: no server behind it */ }
+    const target = saved.get();
+    if (target) {
+      remote = { ...target, space: addressSpace(target.url) };
+      try {
+        const health = await getJSON("api/health", { signal: AbortSignal.timeout(12000) });
+        this.remote = target.url;
+        return health;
+      } catch (error) {
+        remote = null;
+        this.unreachable = { url: target.url, why: error.status === 403 ? "key" : addressSpace(target.url) ? "blocked" : "offline" };
+      }
+    }
+    demo = await (await fetch("demo/data.json")).json();
+    this.static = true;
+    return demo.health;
   },
+
+  // Point this page at a computer (a pasted connect link), or back at the recorded demo.
+  connect(text) {
+    const link = parseLink(text);
+    if (!link) return false;
+    saved.set(link);
+    location.reload();
+    return true;
+  },
+  disconnect() { saved.set(null); location.reload(); },
 
   handbook: () => (demo ? demo.handbook : getJSON("api/handbook")),
   memory() { return demo ? demo.memory : getJSON(`api/memory${this.q()}`); },
@@ -93,7 +165,7 @@ export const api = {
       const recorded = lesson && demo.runs.find((r) => r.lesson === lesson && r.turn.message === message);
       const { run, exact } = recorded ? { run: recorded, exact: true } : closestRun(message);
       for (const event of run.events) onEvent(event);
-      const note = exact ? "" : `This page is a recorded demo, so it cannot run new requests. Showing the closest recorded run: "${run.turn.message}". Install Loopwright to ask anything.\n\n`;
+      const note = exact ? "" : `This page is a recorded demo, so it cannot run new requests. Showing the closest recorded run: "${run.turn.message}". To ask anything, connect your computer (the button at the top).\n\n`;
       return { ...run.end, reply: note + run.end.reply, turn_id: run.turn.turn_id, recorded: true };
     }
     let result = null;
@@ -109,7 +181,14 @@ export const api = {
   resetMemory() { return post("api/memory/reset", { confirm: "reset", space: this.space }); },
 
   // screenshots the browser agent saved, one per action
-  shotUrl(name) { return demo ? `demo/shots/${name}` : `api/shots/${name}${this.q()}`; },
+  // (from another computer the picture needs the key, so it is fetched and handed over as a blob)
+  async shot(name) {
+    if (demo) return `demo/shots/${name}`;
+    if (!remote) return `api/shots/${name}${this.q()}`;
+    const response = await request(`api/shots/${name}${this.q()}`);
+    if (!response.ok) throw new Error("no screenshot");
+    return URL.createObjectURL(await response.blob());
+  },
 
   // automations: scheduled tasks, workflows, chat apps
   automations() { return demo ? demo.automations : getJSON(`api/automations${this.q()}`); },

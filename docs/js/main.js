@@ -70,7 +70,7 @@ async function boot() {
   toolsView = createTools();
 
   drawProviders(); drawLab(); drawSuggestions(); drawChat(); drawLessons(); bindTransport(); bindChrome(); loadHistory();
-  $("static-note").hidden = !api.static;
+  drawConnection();
   if (api.static) {
     $("chat-input").placeholder = "Pick a recorded prompt, or type one";
     $("provider").disabled = true;
@@ -80,6 +80,66 @@ async function boot() {
   window.addEventListener("hashchange", route);
   route();
   if (!store.get("seen", false)) { setLeftMode("lessons"); openLesson = book.lessons[0].id; drawLessons(); }   // a first visit starts on the guided path
+}
+
+// ------------------------------------------------------------------ where the agent is
+// The public copy of this page has no agent behind it. It can replay the recording, or be the
+// screen for Loopwright running on a computer of yours (see `loopwright serve --tunnel`).
+function drawConnection() {
+  const mode = api.remote ? "remote" : api.unreachable ? "lost" : api.static ? "demo" : "local";
+  document.body.dataset.mode = mode;
+  const button = $("connection");
+  button.hidden = mode === "local";
+  if (mode === "local") return;
+  const label = { demo: ["Connect", " your computer"], lost: ["Reconnect", " your computer"], remote: ["Live", " on your computer"] }[mode];
+  put(button, h("i", { class: "dot" }), h("b", {}, label[0]), h("span", {}, label[1]));
+  button.className = `pill connection ${mode}`;
+  button.setAttribute("aria-label", { demo: "Connect your computer to run the agent live", lost: "Your computer did not answer. Reconnect", remote: "Connected to your computer" }[mode]);
+  button.onclick = () => openConnection(mode);
+  if (mode === "lost") openConnection(mode);
+}
+
+function openConnection(mode) {
+  const dialog = $("connect-dialog");
+  const close = h("button", { class: "ghost", onclick: () => dialog.close() }, "Close");
+  const error = h("p", { class: "connect-error", role: "alert", hidden: true }, "That is not a Loopwright link. It ends in #connect=…&key=…, and the computer prints it when Loopwright starts.");
+  const input = h("input", { type: "text", inputmode: "url", autocomplete: "off", autocapitalize: "off", spellcheck: "false", placeholder: "Paste the link from your computer", "aria-label": "Link from your computer" });
+  const paste = h("form", { class: "connect-paste", onsubmit: (e) => { e.preventDefault(); error.hidden = api.connect(input.value); } },
+    input, h("button", { type: "submit", class: "primary" }, "Connect"));
+  const start = h("ol", { class: "connect-steps" },
+    h("li", {}, "On your computer, start Loopwright with a public address:", h("code", {}, "loopwright serve --tunnel")),
+    h("li", {}, "It prints a link and a QR code. Open the link on this device, or scan the code. You can also paste the link here:", paste, error));
+  const where = (api.remote || api.unreachable?.url || "").replace(/\/$/, "");
+  const body = {
+    demo: () => [
+      h("h2", { id: "connect-title" }, "Run your own agent from this page"),
+      h("p", {}, "This page is a recording, so it can only replay. To ask anything, let it be the screen for Loopwright on your computer. The agent, its memory and the model (Claude Code, or a local model) stay there."),
+      start,
+      h("p", { class: "hint" }, "Claude Code signs in on the computer, once, by running claude there. This page has no Claude sign-in: Anthropic does not let other sites offer one."),
+    ],
+    lost: () => [
+      h("h2", { id: "connect-title" }, "Your computer did not answer"),
+      h("p", {}, {
+        key: "The key in the saved link is out of date. Loopwright makes a new key every time it starts, so open the newest link it printed.",
+        blocked: `The browser would not call ${where}, an address on your home network. Allow local network access for this site if it asks. Otherwise open the computer's own link (it starts with http:// and ends in ?key=…), or start Loopwright with --tunnel.`,
+        offline: `Nothing answered at ${where}. Check that Loopwright is still running there. A tunnel gets a new address every time it starts, so use the newest link.`,
+      }[api.unreachable.why]),
+      h("p", {}, "Until then this page shows the recorded demo."),
+      start,
+      h("div", { class: "connect-actions" },
+        h("button", { class: "primary", onclick: () => location.reload() }, "Try again"),
+        h("button", { class: "ghost", onclick: () => api.disconnect() }, "Forget this computer")),
+    ],
+    remote: () => [
+      h("h2", { id: "connect-title" }, "Connected to your computer"),
+      h("p", {}, "What you send here runs there, with its models, memory and tools. Pick the model in the top bar."),
+      h("p", {}, h("code", {}, where)),
+      h("p", { class: "hint" }, "This browser remembers the link until you disconnect. Anyone holding the link can use your agent while Loopwright is running."),
+      h("div", { class: "connect-actions" }, h("button", { onclick: () => api.disconnect() }, "Disconnect")),
+    ],
+  }[mode]();
+  put($("connect-body"), h("div", { class: "connect-top" }, close), body);
+  if (!dialog.open) dialog.showModal();
 }
 
 // ------------------------------------------------------------------ routing

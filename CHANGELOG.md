@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0
+
+Your own agent on the public page.
+
+- **`loopwright serve --tunnel`.** Starts a Cloudflare quick tunnel and prints a link and a QR code. The link opens
+  the public cockpit page connected to your computer: the phone is the screen, and the agent, its memory and the
+  model (Claude Code, a local model) stay on the computer. `--public-url` does the same for a tunnel you run
+  yourself, `LOOPWRIGHT_KEY` fixes the key, and `--page` points the link at your own copy of the page.
+- **A Connect button on the public page.** It explains the two steps, accepts a pasted link, remembers the
+  connection in the browser, and says which of three things went wrong when the computer does not answer.
+- **The server lets one outside page in.** Only while a key exists, only from the public page's origin, and only
+  when each request carries the key in a header; a cookie is not accepted from another origin. A request that
+  arrives through a tunnel is never treated as local, even if the tunnel rewrites the Host header.
+- A QR code is drawn in the terminal for `--lan` too. The key is longer (16 hex characters).
+- There is no Claude sign-in on the page, by design: Anthropic does not allow other sites to offer one. Claude
+  Code signs in on your computer.
+
 ## 0.3.0
 
 A simpler cockpit, and a phone.

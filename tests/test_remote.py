@@ -14,9 +14,14 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from loopwright import qr, tunnel
-from loopwright.server import App, make_handler, page_origin, phone_link
+from loopwright.server import App, kept_key, make_handler, page_origin, phone_link
 
 PAGE = "https://dev-null-k2.github.io"
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
 KEY = "0123456789abcdef"
 
 
@@ -59,6 +64,93 @@ def test_the_public_page_can_drive_the_agent_with_the_key(computer):
     messages = [json.loads(chunk[6:]) for chunk in body.split("\n\n") if chunk.startswith("data: ")]
     assert messages[-1]["type"] == "done" and "36" in messages[-1]["reply"]
     assert any(m["type"] == "event" and m["kind"] == "tool.run" for m in messages)          # the steps come along, live
+
+
+def collect(computer, job, headers, on_message=None, limit=60):
+    """Poll a job the way the page does, until it says done."""
+    messages, after = [], 0
+    for _ in range(limit):
+        status, _, body = computer(f"/api/jobs/{job}?after={after}", headers)
+        assert status == 200
+        batch = json.loads(body)
+        for message in batch["messages"]:
+            messages.append(message)
+            if on_message:
+                on_message(message)
+        after = batch["next"]
+        if batch["done"]:
+            return messages
+    raise AssertionError("the job never finished")
+
+
+def test_a_turn_can_be_collected_by_polling_when_a_proxy_holds_streams_back(computer):
+    """Cloudflare's quick tunnels do not pass Server-Sent Events, and a locked phone drops them. The same turn
+    runs as a job instead; the page asks for its messages, and asking again after a gap loses nothing."""
+    page = {"Origin": PAGE, "X-Loopwright-Key": KEY}
+    status, _, body = computer("/api/chat", page, {"message": "What is 12% of 300?", "session": "p", "poll": True,
+                                                   "options": {"provider": "scripted", "fast": True}})
+    assert status == 200
+    job = json.loads(body)["job"]
+    messages = collect(computer, job, page)
+    assert messages[-1]["type"] == "done" and "36" in messages[-1]["reply"]
+    assert any(m["type"] == "event" and m["kind"] == "tool.run" for m in messages)
+    again = json.loads(computer(f"/api/jobs/{job}?after=0", page)[2])                        # a page that reconnects gets it all again
+    assert again["done"] and len(again["messages"]) == len(messages)
+    assert computer("/api/jobs/nope?after=0", page)[0] == 404
+    assert computer(f"/api/jobs/{job}?after=0", {"Origin": PAGE})[0] == 403                   # the key is needed here too
+
+
+def test_an_approval_is_asked_and_answered_while_polling(computer):
+    page = {"Origin": PAGE, "X-Loopwright-Key": KEY}
+    job = json.loads(computer("/api/chat", page, {"message": "send Alex: lunch at noon?", "session": "a", "poll": True,
+                                                  "options": {"provider": "scripted", "fast": True}})[2])["job"]
+
+    def approve(message):
+        if message.get("kind") == "human.request":
+            assert json.loads(computer("/api/approve", page, {"call_id": message["data"]["call_id"], "approved": True})[2])["ok"]
+
+    messages = collect(computer, job, page, approve)
+    kinds = [m.get("kind") for m in messages]
+    assert "human.request" in kinds and "human.decision" in kinds and "Sent to Alex" in messages[-1]["reply"]
+
+
+def test_the_server_is_reachable_under_its_own_public_address(tmp_path, monkeypatch):
+    """Behind a forwarder (a codespace's port, a tunnel) the Host header need not match the address in the browser.
+    Told its public address, the server accepts its own page from there, with the key."""
+    monkeypatch.setenv("LOOPWRIGHT_PROVIDER", "scripted")
+    public = "https://fuzzy-space-waffle-8765.app.github.dev"
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(tmp_path / "home"), KEY, (), (public,)))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+    def call(path, headers, body=None):
+        request = urllib.request.Request(f"http://127.0.0.1:{httpd.server_address[1]}{path}", data=json.dumps(body).encode() if body else None,
+                                         headers={"Host": "localhost:8765", "X-Forwarded-Host": "fuzzy-space-waffle-8765.app.github.dev",
+                                                  "content-type": "application/json", **headers})
+        try:
+            with opener.open(request, timeout=20) as response:
+                return response.status, dict(response.headers)
+        except urllib.error.HTTPError as exc:
+            return exc.code, dict(exc.headers)
+
+    try:
+        assert call("/api/health", {})[0] == 403                                             # forwarded, so the key is needed
+        status, headers = call(f"/?key={KEY}", {})
+        assert status == 303 and "SameSite=Lax" in headers["Set-Cookie"]                     # Lax: a link tapped on another site still signs in
+        signed = {"Cookie": f"lw_key={KEY}"}
+        assert call("/api/health", signed)[0] == 200
+        note = {"turn_id": "t", "rating": "up"}
+        assert call("/api/feedback", {**signed, "Origin": public}, note)[0] != 403           # its own page, despite the Host header
+        assert call("/api/feedback", {**signed, "Origin": "https://evil.example"}, note)[0] == 403
+        assert call("/api/feedback", {"Origin": public}, note)[0] == 403
+    finally:
+        httpd.shutdown()
+
+
+def test_a_kept_key_is_the_same_on_every_start(tmp_path):
+    first = kept_key(tmp_path / "home")
+    assert len(first) >= 24 and kept_key(tmp_path / "home") == first
+    assert (tmp_path / "home" / "access_key").stat().st_mode & 0o077 == 0                    # readable only by its owner
 
 
 def test_without_the_key_the_public_page_gets_nothing(computer):

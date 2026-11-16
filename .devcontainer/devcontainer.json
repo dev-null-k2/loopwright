@@ -1,0 +1,14 @@
+// Loopwright in a GitHub Codespace: your agent on a machine in the cloud, for when your own computer is off.
+// Create a codespace from this repository and everything below runs by itself. See docs/cloud.md.
+{
+  "name": "Loopwright",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+
+  // The cockpit. Forwarded privately: only you, signed in to GitHub, can open its address.
+  "forwardPorts": [8765],
+  "portsAttributes": { "8765": { "label": "Loopwright cockpit", "onAutoForward": "silent" } },
+
+  "postCreateCommand": "bash deploy/codespace.sh setup",     // once: install Loopwright, Claude Code, a browser
+  "postStartCommand": "bash deploy/codespace.sh start",      // every start: run the cockpit
+  "postAttachCommand": "bash deploy/codespace.sh watch"      // when you open the editor: show the links and the request log
+}

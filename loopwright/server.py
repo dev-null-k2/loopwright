@@ -30,6 +30,12 @@ site). Opened with a connect link, that page talks to this server from another
 origin. It is allowed only while a key exists, only from that one origin, and
 only when each request carries the key in a header, so no other site can ride
 along on it.
+
+Long answers are normally streamed (Server-Sent Events). Some things between a
+phone and this server hold a stream back until it ends, Cloudflare's quick
+tunnels among them, and a phone that locks its screen drops it. So every
+streaming endpoint can also be asked to run as a job: the work carries on in
+the background and the page collects its messages with ordinary short requests.
 """
 
 from __future__ import annotations
@@ -39,6 +45,7 @@ import hmac
 import json
 import mimetypes
 import os
+import re
 import secrets
 import socket
 import threading
@@ -55,7 +62,7 @@ from loopwright.context import IDENTITY, load_identity
 from loopwright.evals import compare as eval_compare
 from loopwright.evals import mine as eval_mine
 from loopwright.evals import runner as eval_runner
-from loopwright.events import STAGES, Event, list_traces, read_trace, trace_dir
+from loopwright.events import STAGES, list_traces, read_trace, trace_dir
 from loopwright.gateways.chat import CHANNELS
 from loopwright.harness import Agent
 from loopwright.learn import PILLARS, load_concepts, load_interview, load_lessons
@@ -68,6 +75,8 @@ WEB = PACKAGE_DIR / "web"
 APPROVAL_TIMEOUT_S = 180
 SOURCE_SUFFIXES = {".py", ".md", ".toml", ".js", ".jsonl", ".txt"}
 PUBLIC_PAGE = "https://dev-null-k2.github.io/loopwright/"       # the static cockpit; LOOPWRIGHT_PAGE points at your own copy
+JOB_WAIT_S = 20.0            # how long one poll waits for the next message
+JOB_KEEP_S = 600.0           # how long a finished job's messages stay collectable
 FORWARDED = ("X-Forwarded-For", "X-Forwarded-Host", "X-Real-Ip", "Forwarded", "Cf-Connecting-Ip")
 
 
@@ -78,12 +87,40 @@ def handbook() -> dict[str, Any]:
             "kinds": {kind: c["id"] for c in concepts for kind in c.get("kinds", [])}}
 
 
+class Job:
+    """One piece of streamed work (a turn, an eval run) whose messages are collected by polling."""
+
+    def __init__(self) -> None:
+        self.id = secrets.token_hex(8)
+        self.messages: list[dict[str, Any]] = []
+        self.done = False
+        self.changed = threading.Condition()
+        self.ended = 0.0
+
+    def send(self, message: dict[str, Any]) -> None:
+        with self.changed:
+            self.messages.append(message)
+            self.changed.notify_all()
+
+    def finish(self) -> None:
+        with self.changed:
+            self.done, self.ended = True, time.monotonic()
+            self.changed.notify_all()
+
+    def read(self, after: int, wait: float = JOB_WAIT_S) -> dict[str, Any]:
+        """Messages from number `after` on. Waits a while for the next one, so polling is not a busy loop."""
+        with self.changed:
+            self.changed.wait_for(lambda: len(self.messages) > after or self.done, timeout=wait)
+            return {"messages": self.messages[after:], "next": len(self.messages), "done": self.done}
+
+
 class App:
     def __init__(self, home: Path | None = None):
         self.root = Path(home) if home else home_dir()
         self._agents: dict[str, Agent] = {"main": Agent(self.root)}
         self.space = "main"                                 # which agent the current request is about
         self._pending: dict[str, dict[str, Any]] = {}      # call_id -> {"event": threading.Event, "approved": bool}
+        self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
 
     # ---- spaces: "main" is your agent; "classroom" is a scratch copy the lessons run in,
@@ -130,6 +167,28 @@ class App:
         slot["approved"] = approved
         slot["event"].set()
         return True
+
+    # ---- jobs: streamed work that the page collects by polling
+    def start_job(self, work: Any) -> Job:
+        job = Job()
+        with self._lock:
+            now = time.monotonic()
+            for old in [j for j in self._jobs.values() if j.done and now - j.ended > JOB_KEEP_S]:
+                del self._jobs[old.id]
+            self._jobs[job.id] = job
+
+        def run() -> None:
+            try:
+                work(job.send)
+            finally:
+                job.finish()
+
+        threading.Thread(target=run, daemon=True, name=f"job-{job.id}").start()
+        return job
+
+    def job(self, job_id: str) -> Job | None:
+        with self._lock:
+            return self._jobs.get(job_id)
 
     def health(self) -> dict[str, Any]:
         return {"version": __version__, "providers": available_providers(), "default_provider": pick_provider("auto"),
@@ -237,6 +296,17 @@ def lan_address() -> str:
         probe.close()
 
 
+def kept_key(home: Path) -> str:
+    """The same access key on every start, for a server whose link should not change. Readable only by you."""
+    file = Path(home) / "access_key"
+    if file.is_file() and len(file.read_text().strip()) >= 12:
+        return file.read_text().strip()
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.touch(mode=0o600)
+    file.write_text(secrets.token_hex(12))
+    return file.read_text()
+
+
 def page_origin(page: str) -> str:
     url = urlparse(page)
     return f"{url.scheme}://{url.netloc}"
@@ -252,12 +322,18 @@ def _same(given: str, key: str) -> bool:
     return bool(key) and hmac.compare_digest(given.encode("utf-8", "replace"), key.encode())
 
 
-def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = ()) -> type[BaseHTTPRequestHandler]:
+def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (), own: tuple[str, ...] = (),
+                 log_requests: bool = False) -> type[BaseHTTPRequestHandler]:
+    """`pages`: origins of the public cockpit page allowed to call in. `own`: this server's own public
+    origins (the address a tunnel or forwarder gives it), where the Host header may not match."""
     class Handler(BaseHTTPRequestHandler):
         server_version = f"loopwright/{__version__}"
 
-        def log_message(self, *args: Any) -> None:      # keep the terminal quiet
-            pass
+        def log_message(self, format: str, *args: Any) -> None:
+            """Quiet unless asked: one line per request, with the key never written down."""
+            if log_requests:
+                line = re.sub(r"key=[^&\s\"]+", "key=…", format % args)
+                print(f"{dt.datetime.now():%H:%M:%S}  {line}", flush=True)
 
         # ------------------------------------------------ plumbing
         def _local(self) -> bool:
@@ -294,20 +370,20 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
                 return self._key_header()        # a header a foreign site cannot set, unlike a cookie
             if urlparse(origin).hostname in ("127.0.0.1", "localhost", "::1"):
                 return True
-            return self._has_key() and urlparse(origin).netloc == (self.headers.get("Host") or "")
+            return self._has_key() and (origin in own or urlparse(origin).netloc == (self.headers.get("Host") or ""))
 
         def _sign_in(self, url) -> bool:
             """A first visit from another device: `/?key=...` stores the key in a cookie and reloads without it."""
             given = (parse_qs(url.query).get("key") or [""])[0]
             if not access_key or not given:
                 return False
-            if not hmac.compare_digest(given, access_key):
+            if not _same(given, access_key):
                 time.sleep(1)                     # make guessing slow
                 self._json({"error": "wrong key"}, 403)
                 return True
             self.send_response(303)
             self.send_header("Location", url.path or "/")
-            self.send_header("Set-Cookie", f"lw_key={access_key}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000")
+            self.send_header("Set-Cookie", f"lw_key={access_key}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000")
             self.end_headers()
             return True
 
@@ -360,6 +436,13 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
             self.send_header("X-Accel-Buffering", "no")
             self.end_headers()
 
+        def _stream(self, body: dict[str, Any], work: Any) -> None:
+            """Run `work(send)`. Streamed over this response, or as a job when the page asks to poll."""
+            if body.get("poll"):
+                return self._json({"job": root_app.start_job(work).id})
+            self._sse_start()
+            work(self._sse)
+
         def _sse(self, data: dict[str, Any]) -> None:
             try:
                 self.wfile.write(f"data: {json.dumps(data, ensure_ascii=False, default=str)}\n\n".encode())
@@ -376,6 +459,12 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
                 return self._refuse()
             path = url.path
             app = root_app.use(parse_qs(url.query).get("space", ["main"])[0])
+            if path.startswith("/api/jobs/"):
+                job = root_app.job(path.rsplit("/", 1)[-1])
+                if not job:
+                    return self._json({"error": "no such job"}, 404)
+                after = (parse_qs(url.query).get("after") or ["0"])[0]
+                return self._json(job.read(int(after) if after.isdigit() else 0))
             if path == "/api/health":
                 return self._json(app.health())
             if path == "/api/handbook":
@@ -470,7 +559,7 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
             if path == "/api/approve":
                 return self._json({"ok": root_app.answer_approval(str(body.get("call_id", "")), bool(body.get("approved")))})
             if path == "/api/evals/run":
-                return self._run_evals(app)
+                return self._run_evals(app, body)
             if path == "/api/compare":
                 return self._run_compare(app, body)
             if path == "/api/tasks":
@@ -564,19 +653,19 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
             if not message:
                 return self._json({"error": "empty message"}, 400)
             options = Options.from_dict(body.get("options") or {})
-            self._sse_start()
 
-            def sink(event: Event) -> None:
-                self._sse({"type": "event", **event.to_json()})
+            def work(send: Any) -> None:
+                try:
+                    result = app.agent.run_turn(message, session=str(body.get("session") or "default"), options=options,
+                                                sinks=[lambda event: send({"type": "event", **event.to_json()})],
+                                                approver=root_app.wait_for_approval, channel="web", origin="web:cockpit")
+                    send({"type": "done", "turn_id": result.turn_id, "reply": result.reply, "ok": result.ok,
+                          "receipt": result.receipt, "checks": result.checks})
+                except Exception as exc:          # never leave the browser hanging on a half-open stream
+                    send({"type": "done", "turn_id": "", "ok": False, "receipt": {}, "checks": [],
+                          "reply": f"The harness itself raised {type(exc).__name__}: {exc}"})
 
-            try:
-                result = app.agent.run_turn(message, session=str(body.get("session") or "default"), options=options,
-                                            sinks=[sink], approver=root_app.wait_for_approval, channel="web", origin="web:cockpit")
-                self._sse({"type": "done", "turn_id": result.turn_id, "reply": result.reply, "ok": result.ok,
-                           "receipt": result.receipt, "checks": result.checks})
-            except Exception as exc:          # never leave the browser hanging on a half-open stream
-                self._sse({"type": "done", "turn_id": "", "ok": False, "receipt": {}, "checks": [],
-                           "reply": f"The harness itself raised {type(exc).__name__}: {exc}"})
+            self._stream(body, work)
 
         def _run_compare(self, app: App, body: dict[str, Any]) -> None:
             try:
@@ -585,33 +674,42 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
                 return self._json({"error": str(exc)}, 400)
             if not targets:
                 return self._json({"error": "choose at least one model to compare"}, 400)
-            self._sse_start()
-            try:
-                report = eval_compare.run_compare(targets, app.root / "compare", on_progress=lambda p: self._sse({"type": "progress", **p}))
-                self._sse({"type": "done", "report": report})
-            except Exception as exc:
-                self._sse({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
 
-        def _run_evals(self, app: App) -> None:
-            self._sse_start()
-            try:
-                report = eval_runner.run_all(app.root / "evals", on_progress=lambda p: self._sse({"type": "progress", **p}))
-                self._sse({"type": "done", "report": report})
-            except Exception as exc:
-                self._sse({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
+            def work(send: Any) -> None:
+                try:
+                    report = eval_compare.run_compare(targets, app.root / "compare", on_progress=lambda p: send({"type": "progress", **p}))
+                    send({"type": "done", "report": report})
+                except Exception as exc:
+                    send({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
+
+            self._stream(body, work)
+
+        def _run_evals(self, app: App, body: dict[str, Any]) -> None:
+            def work(send: Any) -> None:
+                try:
+                    report = eval_runner.run_all(app.root / "evals", on_progress=lambda p: send({"type": "progress", **p}))
+                    send({"type": "done", "report": report})
+                except Exception as exc:
+                    send({"type": "error", "error": f"{type(exc).__name__}: {exc}"})
+
+            self._stream(body, work)
 
     return Handler
 
 
 def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True, lan: bool = False,
-          tunnel_out: bool = False, public_url: str = "", page: str = "", key: str = "", show_qr: bool | None = None) -> None:
+          tunnel_out: bool = False, public_url: str = "", page: str = "", key: str = "", show_qr: bool | None = None,
+          keep_key: bool = False, log_requests: bool = False) -> None:
     app = App(home)
     shared = lan or tunnel_out or bool(public_url)
-    key = (key or os.environ.get("LOOPWRIGHT_KEY") or secrets.token_hex(8)) if shared else ""
+    key = (key or os.environ.get("LOOPWRIGHT_KEY") or (kept_key(app.root) if keep_key else secrets.token_hex(8))) if shared else ""
     if shared and len(key) < 12:
         raise SystemExit("the access key must be at least 12 characters: it is all that protects your agent")
-    page = (page or os.environ.get("LOOPWRIGHT_PAGE") or PUBLIC_PAGE).rstrip("/") + "/"
-    server = ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", port), make_handler(app, key, (page_origin(page),)))
+    page = page or os.environ.get("LOOPWRIGHT_PAGE") or PUBLIC_PAGE
+    page = "" if page == "none" else page.rstrip("/") + "/"            # "none": no outside page is let in
+    public_url = public_url.rstrip("/")
+    handler = make_handler(app, key, (page_origin(page),) if page else (), (page_origin(public_url),) if public_url else (), log_requests)
+    server = ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", port), handler)
     server.daemon_threads = True
     url = f"http://127.0.0.1:{port}"
     provider = pick_provider("auto")
@@ -629,12 +727,16 @@ def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True,
         except tunnel.TunnelError as error:
             print(f"no tunnel           {error}")
     scan = ""
-    if public_url:
+    if public_url and page:
         scan = phone_link(page, public_url, key)
         print(f"\nOn your phone       {scan}")
         print("                    Works from anywhere. The page is the public cockpit; it talks to this computer,")
         print("                    where the agent and the model (Claude Code, a local model) run.")
-        print(f"                    The same thing without the public page: {public_url.rstrip('/')}/?key={key}")
+        print(f"                    The same thing without the public page: {public_url}/?key={key}")
+    elif public_url:
+        scan = f"{public_url}/?key={key}"
+        print(f"\nOn your phone       {scan}")
+        print("                    Works from anywhere. The agent and the model run on this machine.")
     if lan:
         direct = f"http://{lan_address()}:{port}/?key={key}"
         scan = scan or direct

@@ -81,7 +81,8 @@ The cockpit is a web page, so a phone needs only a link. The [public demo](https
 replays recorded runs. To use your own agent on that same page, from anywhere, run `loopwright serve --tunnel` on
 your computer and scan the QR code it prints: the page connects to your computer, where the agent and the model
 (Claude Code or a local one) keep running. At home, `loopwright serve --lan` does it without a tunnel.
-[docs/mobile.md](docs/mobile.md).
+[docs/mobile.md](docs/mobile.md). With your computer off, run the agent in a free GitHub Codespace instead: this
+repository sets one up by itself. [docs/cloud.md](docs/cloud.md).
 
 ### The detail is one click away
 
@@ -415,7 +416,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              92 tests
+tests/              96 tests
 docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports

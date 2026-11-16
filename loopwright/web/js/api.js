@@ -57,7 +57,39 @@ async function getJSON(url, init) {
   return response.json();
 }
 
+// Is there a tunnel or forwarder between this page and the server? Those may hold a stream back
+// until it ends (Cloudflare's quick tunnels do), and a phone drops streams when its screen locks.
+function proxied() {
+  if (remote) return true;
+  const host = location.hostname;
+  return !(host === "localhost" || host === "[::1]" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host.endsWith(".local"));
+}
+
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Long work (a turn, an eval run) arrives as a series of messages. Directly connected, the server
+// streams them down one response. Through a proxy, the work runs as a job on the server and this
+// page collects the messages with short requests, picking up where it left off after a dropped one.
 async function stream(url, body, onMessage) {
+  if (proxied()) {
+    const { job } = await getJSON(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, poll: true }) });
+    let next = 0;
+    let failures = 0;
+    for (;;) {
+      let batch;
+      try {
+        batch = await getJSON(`api/jobs/${job}?after=${next}`);
+        failures = 0;
+      } catch (error) {
+        if (error.status || ++failures > 20) throw error;      // the server said no, or it has been gone too long
+        await pause(1500);
+        continue;
+      }
+      batch.messages.forEach(onMessage);
+      next = batch.next;
+      if (batch.done) return;
+    }
+  }
   const response = await request(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   if (!response.ok || !response.body) throw Object.assign(new Error(`${url}: ${response.status}`), { status: response.status });
   const reader = response.body.getReader();

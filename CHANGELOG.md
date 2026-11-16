@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0
+
+Your agent in the cloud, for when your computer is off.
+
+- **A dev container for GitHub Codespaces.** Creating a codespace from the repository installs Loopwright, Claude
+  Code and a browser, starts the cockpit on every boot, and prints a link for your phone and a link that wakes
+  the codespace. `docs/cloud.md`.
+- **Turns no longer depend on a stream surviving the trip.** Cloudflare's quick tunnels do not pass Server-Sent
+  Events, and a locked phone drops them. Away from its own network the page now runs a turn (or an eval run, or a
+  comparison) as a job on the server and collects the messages with short requests, resuming after a gap.
+- `loopwright serve --keep-key` keeps one access key across restarts; `--public-url` now also tells the server
+  its own public origin, for forwarders that rewrite the Host header; `--page none` lets no outside page in;
+  `--log-requests` prints a line per request with the key masked.
+- The sign-in cookie is `SameSite=Lax`, so a link tapped on another site still signs in. Requests that change
+  anything are still checked against their origin.
+
 ## 0.4.0
 
 Your own agent on the public page.

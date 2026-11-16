@@ -8,6 +8,7 @@ want.
 | To look around and replay recorded runs | [dev-null-k2.github.io/loopwright](https://dev-null-k2.github.io/loopwright/) | nowhere: it is a recording |
 | To use your own agent, from anywhere | the link `loopwright serve --tunnel` prints (it opens that same public page, connected) | on your computer |
 | To use your own agent, at home | the link `loopwright serve --lan` prints | on your computer |
+| To use your own agent with your computer off | a GitHub Codespace: see [cloud.md](cloud.md) | on a machine in the cloud |
 
 A phone cannot run Claude Code or a multi-gigabyte local model in a browser tab, and GitHub Pages can only serve
 files. So for a live agent the model always runs on a computer of yours (with Claude Code, or Ollama and a local
@@ -82,6 +83,11 @@ The connection itself is covered by tests and by a browser run at phone size wit
 agent on another: connecting by link and by pasting, a live turn with its step cards, an approval, the memory
 view, a wrong key, and a computer that is off. The tunnel start-up was tested with a stand-in for `cloudflared`.
 It has not yet been run through a real Cloudflare tunnel or on a real phone.
+
+Cloudflare documents that quick tunnels do not pass Server-Sent Events, the kind of stream the cockpit normally
+uses for a turn. So whenever the page is not talking to a server on its own network, it does not stream: the
+turn runs as a job on the computer and the page collects its steps with short requests. That also means a turn
+is not lost when the phone locks its screen.
 
 ## Your own agent, on the same Wi-Fi
 

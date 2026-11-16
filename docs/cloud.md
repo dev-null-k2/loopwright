@@ -103,6 +103,8 @@ Chromium after an approval given from the page; the request log masked the key.
 The wake button and the page connecting by itself were run in a browser at phone size against a stand-in agent
 that was started after the tap.
 
-Not checked: Claude Code signed in there (that takes your account), the public mode on a real codespace (its
-port has not been opened), waking a sleeping codespace from a phone, and whether the request log really keeps
-it awake past 30 minutes of use.
+The public mode was then switched on for that codespace: the public cockpit page, opened with the one link at
+phone size, connected to it and ran a turn.
+
+Not checked: Claude Code signed in there (that takes your account), waking a sleeping codespace from a phone,
+and whether the request log really keeps it awake past 30 minutes of use.

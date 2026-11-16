@@ -60,6 +60,14 @@ case "${1:-}" in
     ;;
   watch)
     links
+    # the cockpit link as a QR code, when the terminal is wide enough to draw it unbroken
+    python3 - "$ADDRESS/?key=$(cat "$STATE/access_key" 2>/dev/null)" "$(tput cols 2>/dev/null || echo 0)" <<'PY' 2>/dev/null
+import sys
+from loopwright.qr import matrix, render
+link, columns = sys.argv[1], int(sys.argv[2])
+if len(matrix(link)) + 6 <= columns:
+    print(render(link) + "\n  Scan with the phone's camera to open the cockpit there.\n")
+PY
     echo "  Requests to the cockpit appear below. While this terminal shows activity, the codespace stays awake."
     echo
     tail -n 3 -F "$LOG" 2>/dev/null

@@ -17,7 +17,9 @@ browser for the browser agent, and the cockpit started on every boot.
 ### Create it
 
 1. On GitHub, open your copy of this repository, then **Code**, **Codespaces**, **Create codespace on main**.
-2. Wait for the set-up to finish (a few minutes the first time). The terminal then prints two links:
+2. Wait for the set-up to finish (about three minutes the first time). If the editor asks whether you trust the
+   authors of the files in this folder, say yes: it is your own repository, and the terminal needs it. The
+   terminal then prints two links, and the cockpit link again as a QR code if the terminal is wide enough:
 
    ```
    Cockpit, for your phone    https://<name>-8765.app.github.dev/?key=<key>
@@ -71,7 +73,10 @@ the internet and your agent.
 
 ## What has and has not been tested
 
-The dev container's script was run with a made-up codespace name, and the server's behaviour behind a forwarder
-(a rewritten Host header, forwarding headers, its own public origin) is covered by tests. Polling was run in a
-browser at phone size with the page and the agent on different origins, including an approval. What was checked
-on a real codespace is listed in the changelog entry for the release that added this page.
+Checked on a real codespace (2-core, created from this repository): the dev container built and set itself up in
+about three minutes; the cockpit answered at its forwarded address and refused requests without the key; a turn
+ran from a phone-sized browser and was collected by polling; the browser agent ran in the codespace's own
+Chromium after an approval given from the page; the request log masked the key.
+
+Not checked: Claude Code signed in there (that takes your account), waking a sleeping codespace from a phone,
+and whether the request log really keeps it awake past 30 minutes of use.

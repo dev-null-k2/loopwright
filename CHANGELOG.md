@@ -15,6 +15,9 @@ Your agent in the cloud, for when your computer is off.
   `--log-requests` prints a line per request with the key masked.
 - The sign-in cookie is `SameSite=Lax`, so a link tapped on another site still signs in. Requests that change
   anything are still checked against their origin.
+- Checked on a real codespace: set-up, the cockpit behind GitHub's port forwarding, a polled turn at phone size,
+  an approval, the browser agent. Not checked: Claude Code signed in there, waking from a phone, and whether
+  use keeps the codespace awake.
 
 ## 0.4.0
 

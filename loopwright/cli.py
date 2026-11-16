@@ -125,7 +125,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
 def cmd_serve(args: argparse.Namespace) -> int:
     from loopwright.server import serve
     serve(port=args.port, open_browser=not args.no_open, lan=args.lan, tunnel_out=args.tunnel, public_url=args.public_url,
-          page=args.page, show_qr=False if args.no_qr else None, keep_key=args.keep_key, log_requests=args.log_requests)
+          page=args.page, show_qr=False if args.no_qr else None, keep_key=args.keep_key, log_requests=args.log_requests, wake_url=args.wake_url)
     return 0
 
 
@@ -533,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--page", default="", metavar="URL", help="the public cockpit page the phone link opens (default: the project's; or set LOOPWRIGHT_PAGE; 'none' lets no outside page in)")
     p.add_argument("--no-qr", action="store_true", help="do not draw the QR code")
     p.add_argument("--log-requests", action="store_true", help="print one line per request")
+    p.add_argument("--wake-url", default="", metavar="URL", help="an address that starts this machine when it is asleep; the public page offers it as a Wake button")
     p.add_argument("--keep-key", action="store_true", help="use the same access key on every start (kept in ~/.loopwright/access_key), for a server")
     p.set_defaults(fn=cmd_serve)
 

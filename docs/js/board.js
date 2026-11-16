@@ -186,6 +186,15 @@ const el = (name, attrs = {}, text) => {
 const WORST = { ok: 0, skip: 0, warn: 1, blocked: 2, error: 3 };
 const FLAG = { warn: ["var(--warn)", "!"], blocked: ["var(--blocked)", "x"], error: ["var(--error)", "x"] };
 
+// Bring a box to the middle of the drawing's own scroll area. (scrollIntoView would also shift the
+// page itself whenever anything on it is wider than the screen.)
+function pan(container, box) {
+  if (container.scrollWidth <= container.clientWidth + 1 && container.scrollHeight <= container.clientHeight + 1) return;
+  const outer = container.getBoundingClientRect(), inner = box.getBoundingClientRect();
+  container.scrollTo({ left: container.scrollLeft + inner.left - outer.left - (outer.width - inner.width) / 2,
+                       top: container.scrollTop + inner.top - outer.top - (outer.height - inner.height) / 2, behavior: "smooth" });
+}
+
 export function createBoard(container, stages, onPick, mapName = "simple") {
   const map = MAPS[mapName] || SIMPLE;
   const box = Object.fromEntries(map.nodes.map((n) => [n.id, n]));
@@ -325,7 +334,7 @@ export function createBoard(container, stages, onPick, mapName = "simple") {
         node.flag.append(el("circle", { r: 8, fill: FLAG[worst[id]][0] }), el("text", { y: 4 }, FLAG[worst[id]][1]));
       }
     }
-    if (here && animate) nodes[here].g.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });   // a phone pans to follow
+    if (here && animate) pan(container, nodes[here].g);          // a phone pans to follow
     const trip = trips[index];
     if (!now || !trip) return;
     const [from, to] = trip, key = `${from}>${to}`;

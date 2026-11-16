@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1
+
+- **A foldable opened flat no longer breaks the cockpit.** Between 820 and 1000 px wide the two-pane layout did
+  not fit: the header overflowed and the page slid sideways as the architecture followed the active box. That
+  range now uses one pane with the whole architecture visible, and the board pans inside its own area instead
+  of scrolling the page.
+- On phones: suggestions sit in one row that scrolls sideways, tab rows fade at the edge instead of being cut,
+  and the tools table is one card per tool.
+- **One link for a codespace.** `bash deploy/codespace.sh public` makes the public cockpit page the single way
+  in, on any device. The page shows a Wake button when the machine is asleep and connects by itself once it
+  answers. `serve --wake-url` puts the wake address in the phone link. Off by default: it opens the port to the
+  internet with only the access key in front of it.
+
 ## 0.5.0
 
 Your agent in the cloud, for when your computer is off.

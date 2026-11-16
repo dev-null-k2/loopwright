@@ -91,12 +91,26 @@ function drawConnection() {
   const button = $("connection");
   button.hidden = mode === "local";
   if (mode === "local") return;
-  const label = { demo: ["Connect", " your computer"], lost: ["Reconnect", " your computer"], remote: ["Live", " on your computer"] }[mode];
+  const asleep = mode === "lost" && api.unreachable.wake && api.unreachable.why === "offline";
+  const label = { demo: ["Connect", " your computer"], lost: asleep ? ["Wake", " your agent"] : ["Reconnect", " your computer"], remote: ["Live", " on your computer"] }[mode];
   put(button, h("i", { class: "dot" }), h("b", {}, label[0]), h("span", {}, label[1]));
   button.className = `pill connection ${mode}`;
   button.setAttribute("aria-label", { demo: "Connect your computer to run the agent live", lost: "Your computer did not answer. Reconnect", remote: "Connected to your computer" }[mode]);
   button.onclick = () => openConnection(mode);
-  if (mode === "lost") openConnection(mode);
+  if (mode === "lost") { openConnection(mode); keepTrying(); }
+}
+
+// While the computer is not answering, keep asking. The moment it does, load the live cockpit.
+let trying = null;
+function keepTrying() {
+  if (trying) return;
+  let tries = 0;
+  trying = setInterval(async () => {
+    if (document.hidden) return;                       // not while the tab is in the background
+    if (await api.reachable()) return location.reload();
+    if (++tries > 150) { clearInterval(trying); trying = null; }
+  }, 4000);
+  document.addEventListener("visibilitychange", async () => { if (!document.hidden && trying && await api.reachable()) location.reload(); });
 }
 
 function openConnection(mode) {
@@ -110,6 +124,7 @@ function openConnection(mode) {
     h("li", {}, "On your computer, start Loopwright with a public address:", h("code", {}, "loopwright serve --tunnel")),
     h("li", {}, "It prints a link and a QR code. Open the link on this device, or scan the code. You can also paste the link here:", paste, error));
   const where = (api.remote || api.unreachable?.url || "").replace(/\/$/, "");
+  const status = h("p", { class: "connect-status", role: "status", hidden: true }, "Waiting for the agent to answer. Keep this tab open.");
   const body = {
     demo: () => [
       h("h2", { id: "connect-title" }, "Run your own agent from this page"),
@@ -117,19 +132,31 @@ function openConnection(mode) {
       start,
       h("p", { class: "hint" }, "Claude Code signs in on the computer, once, by running claude there. This page has no Claude sign-in: Anthropic does not let other sites offer one."),
     ],
-    lost: () => [
+    lost: () => (api.unreachable.wake && api.unreachable.why === "offline" ? [
+      h("h2", { id: "connect-title" }, "Your agent is asleep"),
+      h("p", {}, "It runs on a machine in the cloud that sleeps when nobody is using it. Waking it takes about a minute."),
+      h("div", { class: "connect-actions" },
+        h("button", { class: "primary big", onclick: (e) => {
+          window.open(api.unreachable.wake, "_blank", "noopener");
+          e.target.textContent = "Waking…";
+          status.hidden = false;
+        } }, "Wake it")),
+      status,
+      h("p", { class: "hint" }, "Waking opens the machine's own page in another tab, and asks you to sign in to GitHub if this device has not. Come back to this tab; it connects by itself as soon as the agent answers."),
+      h("div", { class: "connect-actions" }, h("button", { class: "ghost", onclick: () => api.disconnect() }, "Forget this agent")),
+    ] : [
       h("h2", { id: "connect-title" }, "Your computer did not answer"),
       h("p", {}, {
         key: "The key in the saved link is out of date. Loopwright makes a new key every time it starts, so open the newest link it printed.",
         blocked: `The browser would not call ${where}, an address on your home network. Allow local network access for this site if it asks. Otherwise open the computer's own link (it starts with http:// and ends in ?key=…), or start Loopwright with --tunnel.`,
         offline: `Nothing answered at ${where}. Check that Loopwright is still running there. A tunnel gets a new address every time it starts, so use the newest link.`,
       }[api.unreachable.why]),
-      h("p", {}, "Until then this page shows the recorded demo."),
+      h("p", {}, "Until then this page shows the recorded demo. It keeps trying, and connects by itself when the computer answers."),
       start,
       h("div", { class: "connect-actions" },
         h("button", { class: "primary", onclick: () => location.reload() }, "Try again"),
         h("button", { class: "ghost", onclick: () => api.disconnect() }, "Forget this computer")),
-    ],
+    ]),
     remote: () => [
       h("h2", { id: "connect-title" }, "Connected to your computer"),
       h("p", {}, "What you send here runs there, with its models, memory and tools. Pick the model in the top bar."),

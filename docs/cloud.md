@@ -31,12 +31,34 @@ browser for the browser agent, and the cockpit started on every boot.
 
 ### Use it from a phone
 
-Bookmark both links on the phone.
+There are two ways to reach the cockpit, and you choose with one command in the codespace's terminal.
 
-- **Cockpit**: your agent. The first visit asks you to sign in to GitHub, because the port is private to you,
-  and then stores the access key in a cookie.
+**Private (the default).** The port answers only to you, signed in to GitHub. Bookmark both links on the phone:
+
+- **Cockpit**: your agent. The first visit asks you to sign in to GitHub, and then stores the access key in a
+  cookie.
 - **Wake**: when the cockpit link shows an error, the codespace is asleep. Open the wake link, wait about a
   minute for the editor to appear, then open the cockpit link again.
+
+**One link, any device.** `bash deploy/codespace.sh public` opens the port to the internet, guarded by the
+access key alone, and prints a single link to the public cockpit page:
+
+```
+Your agent, on any device    https://dev-null-k2.github.io/loopwright/#connect=…&key=…&wake=…
+```
+
+Bookmark it, or scan the QR code. On any device it opens straight into your agent, with no GitHub sign-in,
+while the codespace is awake. When it is asleep the page says so and shows a **Wake it** button: that opens the
+codespace's own page in another tab (GitHub asks you to sign in if that device has not), and the cockpit tab
+connects by itself as soon as the agent answers. After the first visit the browser remembers the connection, so
+the plain public address is enough.
+
+What you give up: GitHub's sign-in no longer stands in front of the cockpit. Anyone who obtains that link can
+use your agent, with its tools and your Claude subscription, until you run `bash deploy/codespace.sh private`
+or delete `~/.loopwright/access_key` and restart. Treat the link as a password.
+
+A free codespace cannot be woken without a GitHub sign-in, so no free set-up removes that tap. A machine that is
+always on does: see *Any Linux server* below.
 
 ### What to expect
 
@@ -78,5 +100,9 @@ about three minutes; the cockpit answered at its forwarded address and refused r
 ran from a phone-sized browser and was collected by polling; the browser agent ran in the codespace's own
 Chromium after an approval given from the page; the request log masked the key.
 
-Not checked: Claude Code signed in there (that takes your account), waking a sleeping codespace from a phone,
-and whether the request log really keeps it awake past 30 minutes of use.
+The wake button and the page connecting by itself were run in a browser at phone size against a stand-in agent
+that was started after the tap.
+
+Not checked: Claude Code signed in there (that takes your account), the public mode on a real codespace (its
+port has not been opened), waking a sleeping codespace from a phone, and whether the request log really keeps
+it awake past 30 minutes of use.

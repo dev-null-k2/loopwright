@@ -312,10 +312,12 @@ def page_origin(page: str) -> str:
     return f"{url.scheme}://{url.netloc}"
 
 
-def phone_link(page: str, address: str, key: str) -> str:
+def phone_link(page: str, address: str, key: str, wake: str = "") -> str:
     """The public page, told where this server is. The address and key sit after the #, which
-    a browser never sends to the site that hosts the page."""
-    return f"{page}#connect={quote(address.rstrip('/'), safe=':/')}&key={key}"
+    a browser never sends to the site that hosts the page. `wake` is an address that starts the
+    machine when it is asleep (a codespace's own page); the public page offers it as a button."""
+    link = f"{page}#connect={quote(address.rstrip('/'), safe=':/')}&key={key}"
+    return link + (f"&wake={quote(wake, safe=':/')}" if wake else "")
 
 
 def _same(given: str, key: str) -> bool:
@@ -699,7 +701,7 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
 
 def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True, lan: bool = False,
           tunnel_out: bool = False, public_url: str = "", page: str = "", key: str = "", show_qr: bool | None = None,
-          keep_key: bool = False, log_requests: bool = False) -> None:
+          keep_key: bool = False, log_requests: bool = False, wake_url: str = "") -> None:
     app = App(home)
     shared = lan or tunnel_out or bool(public_url)
     key = (key or os.environ.get("LOOPWRIGHT_KEY") or (kept_key(app.root) if keep_key else secrets.token_hex(8))) if shared else ""
@@ -728,7 +730,7 @@ def serve(port: int = 8765, home: Path | None = None, open_browser: bool = True,
             print(f"no tunnel           {error}")
     scan = ""
     if public_url and page:
-        scan = phone_link(page, public_url, key)
+        scan = phone_link(page, public_url, key, wake_url)
         print(f"\nOn your phone       {scan}")
         print("                    Works from anywhere. The page is the public cockpit; it talks to this computer,")
         print("                    where the agent and the model (Claude Code, a local model) run.")

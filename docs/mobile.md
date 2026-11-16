@@ -124,6 +124,15 @@ where you will spend most of the time: every reply carries a card for each thing
 card opens that step. The architecture is drawn at a readable size and pans to follow the active box; turn the
 phone sideways to see all of it at once. Approvals appear in the chat as a card with two buttons.
 
+| Screen | What you get |
+|---|---|
+| A phone, up to about 700 px wide (a foldable's cover screen is about 410) | one pane; the architecture pans; suggestions, tabs and sub-tabs scroll sideways; the tools table becomes cards |
+| A foldable opened flat, or a small tablet (700 to 1000 px, roughly square) | one pane, but the whole architecture fits without panning, and text keeps a comfortable line length |
+| Wider than 1000 px | chat and architecture side by side; the step details open as a drawer |
+
+The foldable sizes were checked in a browser at the Motorola Razr Fold's two screens (about 411 by 850 closed
+and 850 by 836 open), not on the device.
+
 ## Running everything on Android
 
 Loopwright is plain Python with no dependencies, so it should run in Termux (`pkg install python git`, then the

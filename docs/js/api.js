@@ -27,7 +27,10 @@ export function parseLink(text) {
     const hash = raw.includes("#") ? new URLSearchParams(raw.slice(raw.indexOf("#") + 1)) : null;
     if (hash && hash.get("connect")) {
       const url = new URL(hash.get("connect"));
-      return ["http:", "https:"].includes(url.protocol) && hash.get("key") ? { url: url.origin + "/", key: hash.get("key") } : null;
+      if (!["http:", "https:"].includes(url.protocol) || !hash.get("key")) return null;
+      const link = { url: url.origin + "/", key: hash.get("key") };
+      try { if (new URL(hash.get("wake")).protocol === "https:") link.wake = hash.get("wake"); } catch { /* no wake address */ }
+      return link;
     }
     const url = new URL(raw);
     const key = url.searchParams.get("key");
@@ -150,7 +153,7 @@ export const api = {
         return health;
       } catch (error) {
         remote = null;
-        this.unreachable = { url: target.url, why: error.status === 403 ? "key" : addressSpace(target.url) ? "blocked" : "offline" };
+        this.unreachable = { url: target.url, wake: target.wake || "", why: error.status === 403 ? "key" : addressSpace(target.url) ? "blocked" : "offline" };
       }
     }
     demo = await (await fetch("demo/data.json")).json();
@@ -167,6 +170,15 @@ export const api = {
     return true;
   },
   disconnect() { saved.set(null); location.reload(); },
+  // Is the saved computer answering yet? Asked again and again while it wakes up.
+  async reachable() {
+    const target = saved.get();
+    if (!target) return false;
+    try {
+      const response = await fetch(target.url + "api/health", { headers: { "x-loopwright-key": target.key }, signal: AbortSignal.timeout(5000) });
+      return response.ok;
+    } catch { return false; }
+  },
 
   handbook: () => (demo ? demo.handbook : getJSON("api/handbook")),
   memory() { return demo ? demo.memory : getJSON(`api/memory${this.q()}`); },

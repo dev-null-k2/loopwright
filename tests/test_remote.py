@@ -204,6 +204,9 @@ def test_the_phone_link_keeps_the_address_and_key_out_of_the_request():
     assert link == f"https://dev-null-k2.github.io/loopwright/#connect=https://calm-river.trycloudflare.com&key={KEY}"
     assert link.index("#") < link.index("connect")                    # after the #: browsers never send that part to the host
     assert page_origin("https://dev-null-k2.github.io/loopwright/") == PAGE
+    # a machine that sleeps says how to wake it, and the public page turns that into a button
+    assert phone_link("https://dev-null-k2.github.io/loopwright/", "https://x-8765.app.github.dev", KEY, "https://x.github.dev") \
+        == f"https://dev-null-k2.github.io/loopwright/#connect=https://x-8765.app.github.dev&key={KEY}&wake=https://x.github.dev"
 
 
 def fake_cloudflared(tmp_path, script: str) -> str:

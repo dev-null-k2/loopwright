@@ -388,7 +388,7 @@ export function createTools() {
     put(root, spaceNote(),
       h("h1", {}, "Tools"),
       h("p", { class: "sub" }, "Everything the model can ask for. It sees each tool's name, description and argument schema, and nothing else. Every definition here is sent on every model call, so switching off what you do not use saves tokens as well as risk."),
-      h("table", { class: "grid" },
+      h("table", { class: "grid fit" },
         h("thead", {}, h("tr", {}, h("th", {}, "Tool"), h("th", {}, "What the model is told"), h("th", {}, "Reach"), h("th", {}, "From"), h("th", {}, ""))),
         h("tbody", {}, t.tools.map((x) => h("tr", {},
           h("td", {}, h("b", { class: x.enabled ? "" : "struck" }, x.name)),

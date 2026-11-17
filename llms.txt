@@ -10,8 +10,9 @@
 - [Events](docs/events.md): every event kind and the box it lands on
 
 ## Learn
-- [Handbook](docs/glossary.md): 91 agent-design terms
-- [Lessons](docs/lessons.md): 24 guided runs
+- [Handbook](docs/glossary.md): 95 agent-design terms
+- [Lessons](docs/lessons.md): 25 guided runs
+- [Exercises](docs/exercises.md): 12 small parts of an agent to write yourself, with a checker
 - [Interview practice](docs/interview-prep.md): 25 scenarios with answers
 - [Forward-deployed interview preparation](docs/fde-interviews.md): the loop round by round, mapped to this repository
 
@@ -28,6 +29,7 @@
 ## Code
 - [harness.py](loopwright/harness.py): run_turn, the fifteen steps
 - [loop.py](loopwright/loop.py): the loop
+- [models/streaming.py](loopwright/models/streaming.py): streaming the reply, and guarding it while it streams
 - [toolgate.py](loopwright/toolgate.py): permissions, budgets, approvals
 - [workflows.py](loopwright/workflows.py): the workflow graph engine
 - [scheduler.py](loopwright/scheduler.py): scheduled, unattended turns

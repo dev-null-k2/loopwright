@@ -159,6 +159,31 @@ def task_schedule(r: TurnResult, a: Agent, spec: Any) -> Verdict:
     return any(t["schedule"] == spec for t in tasks), f"schedules stored: {[t['schedule'] for t in tasks]}"
 
 
+def _screens(r: TurnResult) -> dict[int, str]:
+    """What the reader's screen held, per stream, after every streamed piece of a watched turn."""
+    screens: dict[int, str] = {}
+    for piece in r.watched:
+        screens[piece["stream"]] = piece["replace"] if "replace" in piece else screens.get(piece["stream"], "") + piece.get("text", "")
+    return screens
+
+
+def screen_ends_on_reply(r: TurnResult, a: Agent, spec: Any) -> Verdict:
+    """A streamed reply must add up: after the last piece, the screen holds exactly the reply."""
+    screens = _screens(r)
+    if not screens:
+        return not spec, "nothing was streamed"
+    last = screens[max(screens)]
+    return (last == r.reply) == bool(spec), f"{len(r.watched)} piece(s) in {len(screens)} stream(s); the last one " + (
+        "matches the reply" if last == r.reply else f"ends {last[-60:]!r}, the reply ends {r.reply[-60:]!r}")
+
+
+def screen_never_shows(r: TurnResult, a: Agent, spec: Any) -> Verdict:
+    """No streamed piece or correction ever contained these strings, not even for a moment."""
+    banned = [spec] if isinstance(spec, str) else spec
+    seen = [w for w in banned if any(w in piece.get("text", "") or w in piece.get("replace", "") for piece in r.watched)]
+    return not seen, f"shown: {seen}" if seen else f"absent from all {len(r.watched)} piece(s)"
+
+
 GRADERS: dict[str, Callable[[TurnResult, Agent, Any], Verdict]] = {
     "tool_called": tool_called, "tool_not_called": tool_not_called, "tool_args": tool_args,
     "reply_contains": reply_contains, "reply_not_contains": reply_not_contains,
@@ -168,6 +193,7 @@ GRADERS: dict[str, Callable[[TurnResult, Agent, Any], Verdict]] = {
     "fact_count": fact_count, "episode_count_min": episode_count_min, "outbox_count": outbox_count,
     "calendar_count": calendar_count, "note_contains": note_contains, "note_not_contains": note_not_contains,
     "task_count": task_count, "task_schedule": task_schedule, "reply_readable": reply_readable,
+    "screen_ends_on_reply": screen_ends_on_reply, "screen_never_shows": screen_never_shows,
 }
 
 

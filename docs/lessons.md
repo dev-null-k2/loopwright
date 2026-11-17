@@ -2,7 +2,7 @@
 
 # The guided path
 
-Twenty-four short lessons. Each runs one real turn and tells you which steps to stop on. In the cockpit they are under **Lessons**, run in a scratch copy of the agent (the classroom) so they never touch your own memory, and every *watch for* line becomes a link that jumps the board to that step.
+Twenty-five short lessons. Each runs one real turn and tells you which steps to stop on. In the cockpit they are under **Lessons**, run in a scratch copy of the agent (the classroom) so they never touch your own memory, and every *watch for* line becomes a link that jumps the board to that step.
 
 The same lessons work in the terminal: run the command, then `loopwright replay last`.
 
@@ -223,7 +223,23 @@ loopwright ask "What's 18% of 2450?" --steps --why --set chaos_model_failures=2
 
 Cards: [Retries with backoff](glossary.md#retry-backoff), [Model fallback](glossary.md#fallback), [Circuit breaker](glossary.md#circuit-breaker)
 
-## 14. Hitting a limit
+## 14. Watching the reply arrive
+
+See the answer appear while the model is still writing it, then switch streaming off and feel the difference.
+
+```bash
+loopwright ask "What is streaming?" --steps --why
+```
+
+- Watch for `model.stream`: The first words are already in the chat, and the model call is not finished yet. This moment is the time to first token.
+- Watch for `guard.output`: The whole reply is checked once it is complete. While it streamed, a lighter check masked secrets and kept the last few words back.
+- Watch for `cost.receipt`: Under the reply: the total time, and how long the first words took. Streaming changes the second number, not the first.
+
+**Takeaway.** Streaming does not make the model faster. It replaces a blank wait with words. Open the Lab, switch 'Stream the reply' off and run this again: same answer, same total time, and nothing to read until the end.
+
+Cards: [Streaming](glossary.md#streaming), [Output guardrails](glossary.md#output-guardrails), [Model gateway](glossary.md#model-gateway)
+
+## 15. Hitting a limit
 
 Give a two-step request to a loop that is only allowed one round.
 
@@ -238,7 +254,7 @@ loopwright ask "What's 12 * 7.5, and save that as a note" --steps --why --set ma
 
 Cards: [Stop conditions](glossary.md#stop-conditions), [Budgets and loop detection](glossary.md#budgets), [Online evals](glossary.md#online-evals)
 
-## 15. Planning first
+## 16. Planning first
 
 Switch the orchestration pattern so the agent writes its steps before it acts.
 
@@ -253,7 +269,7 @@ loopwright ask "Book a meeting with Sam on Monday at 10am" --steps --why --set p
 
 Cards: [Plan-and-execute](glossary.md#plan-and-execute), [Workflow graphs](glossary.md#workflow-graph)
 
-## 16. A critic reviews the draft
+## 17. A critic reviews the draft
 
 Add a review pass that can send the answer back once.
 
@@ -268,7 +284,7 @@ loopwright ask "Compare the retrieval gate and compaction" --steps --why --set p
 
 Cards: [Evaluator-optimizer](glossary.md#evaluator-optimizer)
 
-## 17. Teaching it a procedure
+## 18. Teaching it a procedure
 
 Tell the agent how you want a kind of request handled and watch it write a skill.
 
@@ -282,7 +298,7 @@ loopwright ask "When I ask for a standup update, always give three bullets: done
 
 Cards: [Skills (procedural memory)](glossary.md#procedural-memory)
 
-## 18. A workflow: the code decides
+## 19. A workflow: the code decides
 
 Run the same kind of question through a fixed graph of steps instead of a free loop, and see who is making the decisions.
 
@@ -299,7 +315,7 @@ loopwright ask "/workflow triage: what is a harness?" --steps --why
 
 Cards: [Workflow versus agent](glossary.md#workflow-vs-agent), [Routing](glossary.md#routing), [Workflow graphs](glossary.md#workflow-graph)
 
-## 19. Steps in parallel
+## 20. Steps in parallel
 
 Three lookups that do not depend on each other run in the same round, then one model call writes them up.
 
@@ -322,7 +338,7 @@ loopwright ask "/workflow morning-brief" --steps --why
 
 Cards: [Parallelization](glossary.md#parallelization), [Workflow graphs](glossary.md#workflow-graph), [Prompt chaining](glossary.md#prompt-chaining)
 
-## 20. A browser agent
+## 21. A browser agent
 
 Hand a task to a worker that drives a real browser: open, look, click, look again.
 
@@ -340,7 +356,7 @@ loopwright ask "Use the browser: open demo://site, follow the Pricing link and t
 
 Cards: [Browser agent](glossary.md#browser-agent), [Page snapshots and numbered elements](glossary.md#page-snapshot), [Subagents](glossary.md#subagents)
 
-## 21. The shell tool
+## 22. The shell tool
 
 Let the model run a command, and see every control that stands around it.
 
@@ -357,7 +373,7 @@ loopwright ask "run `ls -la`" --steps --why --set approvals=ask
 
 Cards: [Code execution sandbox](glossary.md#code-sandbox), [Human in the loop](glossary.md#human-in-the-loop), [Least privilege and sandboxing](glossary.md#least-privilege)
 
-## 22. Scheduling a task
+## 23. Scheduling a task
 
 Ask for something to happen every weekday, and see why saving that request needs your approval.
 
@@ -373,7 +389,7 @@ loopwright ask "Every weekday at 8am, tell me what's on my calendar" --steps --w
 
 Cards: [Scheduled and proactive agents](glossary.md#scheduled-agents), [Standing instructions and persistence](glossary.md#standing-instructions), [Human in the loop](glossary.md#human-in-the-loop)
 
-## 23. A run with nobody watching
+## 24. A run with nobody watching
 
 Fire a scheduled task that tries to send a message, and watch the harness refuse because no person is there to approve.
 
@@ -392,7 +408,7 @@ loopwright ask "/task 1" --steps --why
 
 Cards: [Scheduled and proactive agents](glossary.md#scheduled-agents), [Least privilege and sandboxing](glossary.md#least-privilege), [Tool gate](glossary.md#tool-gate)
 
-## 24. Proving it works
+## 25. Proving it works
 
 Run the eval suite and read the ablation table.
 

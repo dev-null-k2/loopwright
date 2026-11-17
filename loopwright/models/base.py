@@ -11,10 +11,12 @@ it to its own wire format at the last moment:
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 Message = dict[str, Any]
+OnText = Callable[[str], None]      # called with each piece of reply text as the model writes it
 
 
 @dataclass
@@ -57,6 +59,11 @@ class FatalModelError(ModelError):
 
 
 class Provider(Protocol):
+    """A provider that can stream sets `streams = True` and accepts one more
+    keyword, `on_text`: when it is given, the provider asks its backend to
+    stream and calls it with each piece of reply text as it arrives. It still
+    returns the whole ModelResponse at the end, so the loop is the same either
+    way. A provider without `streams` is never passed `on_text`."""
     name: str
     model: str
 

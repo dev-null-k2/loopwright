@@ -12,6 +12,11 @@ codebase prints, logs or draws. That single choice buys three things:
 An event says where it happened (`stage`, a box on the architecture diagram),
 where the data came from (`src`, so the arrow between boxes can animate),
 and what it means in plain English (`detail`).
+
+One thing travels beside the events instead of as one: the pieces of a
+streamed reply. They go out on the recorder's live channel (`say`) to whoever
+is watching right now and are not recorded, because a reply can be a thousand
+pieces. The trace keeps one `model.stream` event for the stream as a whole.
 """
 
 from __future__ import annotations
@@ -82,6 +87,7 @@ class Event:
 
 
 Sink = Callable[[Event], None]
+Live = Callable[[dict[str, Any]], None]      # receives live-only messages (the pieces of a streamed reply)
 
 
 class Recorder:
@@ -89,9 +95,10 @@ class Recorder:
     (the trace file, the browser's event stream, the CLI printer)."""
 
     def __init__(self, turn_id: str | None = None, sinks: list[Sink] | None = None,
-                 span: str = "main", parent: Recorder | None = None):
+                 span: str = "main", parent: Recorder | None = None, live: list[Live] | None = None):
         self.turn_id = turn_id or new_id()
         self.sinks: list[Sink] = list(sinks or [])
+        self.live: list[Live] = parent.live if parent else list(live or [])
         self.span = span
         self._parent = parent
         # a subagent shares its parent's list, clock and lock, so its steps
@@ -128,6 +135,15 @@ class Recorder:
             except Exception:  # a broken sink must never break the turn
                 pass
         return event
+
+    def say(self, message: dict[str, Any]) -> None:
+        """Pass a live-only message to whoever is watching. Not an event: it is
+        not numbered, not kept and not in the trace."""
+        for listener in self.live:
+            try:
+                listener(message)
+            except Exception:  # a closed browser tab must never break the turn
+                pass
 
     def find(self, kind: str) -> list[Event]:
         return [e for e in self.events if e.kind == kind]

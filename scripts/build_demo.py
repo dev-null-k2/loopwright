@@ -59,7 +59,8 @@ COMPARE = ["scripted", "scripted+pattern=plan", "scripted+guardrails=false"]
 
 
 def record(agent: Agent, prompt: str, session: str, options: dict, **tags) -> dict:
-    result = agent.run_turn(prompt, session=session, options=Options.from_dict({**BASE, **options}))
+    # recorded as the cockpit would run it: with someone watching, so the reply is streamed and the trace says so
+    result = agent.run_turn(prompt, session=session, options=Options.from_dict({**BASE, **options}), live=[lambda piece: None])
     trace = read_trace(result.trace_path)
     trace["turn"]["started"] = NOW.isoformat(timespec="seconds")
     receipt = trace["end"]["receipt"]

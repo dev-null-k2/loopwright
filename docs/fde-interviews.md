@@ -41,7 +41,7 @@ AI-native companies. Loops differ; ask your recruiter which rounds yours has.
 
 **Week one: be able to explain every box.**
 
-1. Days 1 to 3: do all 24 lessons in order in the cockpit. After each, close it and say out loud what happened
+1. Days 1 to 3: do all 25 lessons in order in the cockpit. After each, close it and say out loud what happened
    and why that mechanism exists.
 2. Days 4 and 5: open the Lab and switch things off (memory, guardrails, retries). Predict what breaks before you
    send the message. The ablation table in the Evals tab shows the same thing as numbers.

@@ -55,7 +55,31 @@ class Stub(BaseHTTPRequestHandler):
             message = {"content": "18% of 2450 is 441."}
         else:
             message = {"content": json.dumps({"thought": "done", "final": "18% of 2450 is 441."})}
-        self._send(200, {"model": model, "choices": [{"message": message, "finish_reason": "stop"}], "usage": {"prompt_tokens": 40, "completion_tokens": 8}})
+        usage = {"prompt_tokens": 40, "completion_tokens": 8}
+        if not body.get("stream"):
+            return self._send(200, {"model": model, "choices": [{"message": message, "finish_reason": "stop"}], "usage": usage})
+        # the same answer, streamed the way these servers do it: a few characters per chunk, then the token counts
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.end_headers()
+
+        def chunk(delta=None, finish=None, **extra):
+            row = {"model": model, "choices": [{"index": 0, "delta": delta or {}, "finish_reason": finish}], **extra}
+            self.wfile.write(f"data: {json.dumps(row)}\n\n".encode())
+            self.wfile.flush()
+
+        content = message.get("content") or ""
+        for i in range(0, len(content), 5):
+            chunk({"content": content[i:i + 5]})
+        for index, call in enumerate(message.get("tool_calls") or []):
+            arguments = call["function"]["arguments"]
+            chunk({"tool_calls": [{"index": index, "id": call["id"], "type": "function", "function": {"name": call["function"]["name"], "arguments": ""}}]})
+            for i in range(0, len(arguments), 7):
+                chunk({"tool_calls": [{"index": index, "function": {"arguments": arguments[i:i + 7]}}]})
+        chunk(finish="tool_calls" if message.get("tool_calls") else "stop")
+        if body.get("stream_options", {}).get("include_usage"):
+            self.wfile.write(f"data: {json.dumps({'model': model, 'choices': [], 'usage': usage})}\n\n".encode())
+        self.wfile.write(b"data: [DONE]\n\n")
 
 
 @pytest.fixture

@@ -48,6 +48,10 @@ model:
 3. **Text protocol**: the server refused the request ("does not support tools"), so the tools are described in the
    system prompt and the model is asked for one JSON object, the same way the Claude Code adapter works.
 
+The reply is streamed in all three modes when you are watching: the server is asked for `"stream": true` and the
+text is passed on as it arrives. In the second and third modes the model writes a JSON object, so only the answer
+inside it is shown, never the braces.
+
 ### What to expect
 
 A 7B model on a laptop is a noticeably weaker agent than a hosted model: it picks the wrong tool more often, loses
@@ -68,5 +72,5 @@ exactly where it goes wrong, and the tool gate, budgets and repeat detection are
 ## Status
 
 The local provider is tested over real HTTP against a stub server that behaves like each of the three kinds of
-model above, including full turns through the harness and the offline fallback. It has not been run against every
+model above, including full turns through the harness, streamed replies and the offline fallback. It has not been run against every
 runner and model; if yours misbehaves, `loopwright ask "..." --provider local --steps` shows the exchange.

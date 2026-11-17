@@ -11,6 +11,8 @@ insulation lives:
   fallback         when retries run out, the next model in the chain answers
   circuit breaker  a provider that keeps failing is skipped for a cooldown
                    instead of being hammered on every call
+  streaming        when someone is watching, the reply is passed on as it is
+                   written (streaming.py), and a retry starts a fresh stream
   accounting       tokens and cost of every call, by purpose, for the receipt
 
 Only transient errors are retried. A bad API key or a malformed request fails
@@ -34,10 +36,21 @@ from loopwright.models.claude_code import ClaudeCodeProvider, find_cli
 from loopwright.models.local import LocalProvider
 from loopwright.models.openai_compat import OpenAICompatProvider
 from loopwright.models.scripted import ScriptedProvider
+from loopwright.models.streaming import Streamer
 
 BREAKER_THRESHOLD = 3       # consecutive failures before a provider is skipped
 BREAKER_COOLDOWN_S = 30.0
 _breaker: dict[str, dict[str, float]] = {}   # provider name -> {"failures", "open_until"}
+
+
+
+def scripted_pace() -> float:
+    """Seconds the scripted model waits per word when it streams (LOOPWRIGHT_STREAM_PACE_MS, default 12)."""
+    try:
+        return max(0.0, float(os.environ.get("LOOPWRIGHT_STREAM_PACE_MS", "12"))) / 1000
+    except ValueError:
+        return 0.012
+
 
 PROVIDERS = {"scripted": ScriptedProvider, "local": LocalProvider, "claude-code": ClaudeCodeProvider,
              "anthropic": AnthropicProvider, "openai": OpenAICompatProvider}
@@ -83,6 +96,7 @@ class _Chaos:
 
     def __init__(self, inner: Provider, failures: int):
         self.inner, self.name, self.model, self.left = inner, inner.name, inner.model, failures
+        self.streams = getattr(inner, "streams", False)
 
     def complete(self, *args: Any, **kwargs: Any) -> ModelResponse:
         if self.left > 0:
@@ -139,8 +153,13 @@ class ModelGateway:
                                                                 "because": str(last_error)})
             for attempt in range(self.options.retries + 1):
                 started = time.perf_counter()
+                streamer = self._streamer(provider, purpose, iteration, rec)
                 try:
-                    response = provider.complete(system, messages, tools, max_tokens=max_tokens, purpose=purpose)
+                    if streamer:
+                        response = provider.complete(system, messages, tools, max_tokens=max_tokens, purpose=purpose,
+                                                     on_text=streamer.feed)
+                    else:
+                        response = provider.complete(system, messages, tools, max_tokens=max_tokens, purpose=purpose)
                 except TransientModelError as exc:
                     last_error = exc
                     self._breaker_fail(provider)
@@ -170,8 +189,9 @@ class ModelGateway:
                     break
                 else:
                     self._breaker_ok(provider)
+                    stream = streamer.finish(response.text) if streamer else None
                     return self._account(response, purpose, iteration, src, time.perf_counter() - started,
-                                         system, messages, tools, rec)
+                                         system, messages, tools, rec, stream)
         raise ModelError(str(last_error) if last_error else "no model provider is available")
 
     # ---------------------------------------------------------------- helpers
@@ -186,14 +206,29 @@ class ModelGateway:
                                         src="gate" if purpose == "gate" else "consolidate" if purpose == "extract" else "critic",
                                         max_tokens=600).text
 
+    def _streamer(self, provider: Provider, purpose: str, iteration: int, rec: Recorder) -> Streamer | None:
+        """Stream this call? Only the main loop's own calls (their text is what the
+        user will read), only when someone is watching live, and only from a
+        provider that can. Evals and scheduled turns have no watcher, so they
+        never stream and their traces do not change."""
+        if not (self.options.stream and rec.live and purpose == "loop" and rec.span == "main"
+                and getattr(provider, "streams", False)):
+            return None
+        # the scripted model answers instantly; a short pause per word makes the stream visible
+        pace = 0.0 if self.options.fast or provider.name != "scripted" else scripted_pace()
+        return Streamer(rec, provider.name, provider.model, iteration, guard=self.options.guardrails, pace_s=pace)
+
     def _account(self, response: ModelResponse, purpose: str, iteration: int, src: str, seconds: float,
-                 system: str, messages: list[Message], tools: list[dict[str, Any]], rec: Recorder) -> ModelResponse:
+                 system: str, messages: list[Message], tools: list[dict[str, Any]], rec: Recorder,
+                 stream: dict[str, Any] | None = None) -> ModelResponse:
         cost = response.cost_usd if response.cost_usd is not None else pricing.cost(
             response.model, response.usage.tokens_in, response.usage.tokens_out)
         row = {"purpose": purpose, "provider": response.provider, "model": response.model,
                "tokens_in": response.usage.tokens_in, "tokens_out": response.usage.tokens_out,
                "cached_in": response.usage.cached_in, "estimated": response.usage.estimated,
                "cost_usd": cost, "ms": int(seconds * 1000)}
+        if stream:
+            row["first_token_ms"] = stream["first_token_ms"]
         self.calls.append(row)
         wants = ", ".join(c.name for c in response.tool_calls)
         title = (f"Model asks for: {wants}" if wants else "Model answers") if purpose in ("loop", "subagent") \
@@ -207,7 +242,7 @@ class ModelGateway:
                   "A narrow side job given to a (usually cheaper) model, separate from the main loop.")
         rec.emit("model.call", "model", title, detail, src=src, dur_ms=int(seconds * 1000), data={
             **row, "iteration": iteration, "stop_reason": response.stop_reason, "thought": response.thought,
-            "text": response.text[:2000],
+            "text": response.text[:2000], **({"stream": stream} if stream else {}),
             "tool_calls": [{"id": c.id, "name": c.name, "arguments": c.arguments} for c in response.tool_calls],
             "prompt": {"system": system, "messages": messages[-12:], "tools": [t["name"] for t in tools],
                        "message_count": len(messages)},

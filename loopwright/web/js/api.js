@@ -203,8 +203,9 @@ export const api = {
   },
   suggestions: () => (demo ? [...new Set(demo.runs.filter((r) => r.main).map((r) => r.turn.message))] : null),
 
-  // Run a turn. onEvent gets each step; resolves with the final result.
-  async chat(message, session, options, onEvent, lesson = null) {
+  // Run a turn. onEvent gets each step, onDelta each piece of the reply while the model is
+  // still writing it; resolves with the final result.
+  async chat(message, session, options, onEvent, lesson = null, onDelta = null) {
     if (demo) {
       const recorded = lesson && demo.runs.find((r) => r.lesson === lesson && r.turn.message === message);
       const { run, exact } = recorded ? { run: recorded, exact: true } : closestRun(message);
@@ -215,6 +216,7 @@ export const api = {
     let result = null;
     await stream("api/chat", { message, session, options, space: this.space }, (msg) => {
       if (msg.type === "event") onEvent(msg);
+      else if (msg.type === "delta") onDelta?.(msg);
       else if (msg.type === "done") result = msg;
     });
     return result || { ok: false, reply: "The connection closed before the turn finished.", receipt: {}, checks: [] };

@@ -75,7 +75,8 @@ WEB = PACKAGE_DIR / "web"
 APPROVAL_TIMEOUT_S = 180
 SOURCE_SUFFIXES = {".py", ".md", ".toml", ".js", ".jsonl", ".txt"}
 PUBLIC_PAGE = "https://dev-null-k2.github.io/loopwright/"       # the static cockpit; LOOPWRIGHT_PAGE points at your own copy
-JOB_WAIT_S = 20.0            # how long one poll waits for the next message
+JOB_WAIT_S = 20.0           # how long one poll waits for the next message
+JOB_GATHER_S = 0.15          # how long a poll collects pieces of a streamed reply before answering
 JOB_KEEP_S = 600.0           # how long a finished job's messages stay collectable
 FORWARDED = ("X-Forwarded-For", "X-Forwarded-Host", "X-Real-Ip", "Forwarded", "Cf-Connecting-Ip")
 
@@ -112,6 +113,13 @@ class Job:
         """Messages from number `after` on. Waits a while for the next one, so polling is not a busy loop."""
         with self.changed:
             self.changed.wait_for(lambda: len(self.messages) > after or self.done, timeout=wait)
+            # A streamed reply is hundreds of tiny messages. Answering each poll with one word would mean a
+            # request per word, so while only pieces of the reply are waiting, gather them for a moment first.
+            ends = time.monotonic() + JOB_GATHER_S
+            while not self.done and all(m.get("type") == "delta" for m in self.messages[after:]):
+                left = ends - time.monotonic()
+                if left <= 0 or not self.changed.wait(left):
+                    break
             return {"messages": self.messages[after:], "next": len(self.messages), "done": self.done}
 
 
@@ -683,6 +691,7 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
                 try:
                     result = app.agent.run_turn(message, session=str(body.get("session") or "default"), options=options,
                                                 sinks=[lambda event: send({"type": "event", **event.to_json()})],
+                                                live=[send],        # the reply, a few words at a time, while it is written
                                                 approver=root_app.wait_for_approval, channel="web", origin="web:cockpit")
                     send({"type": "done", "turn_id": result.turn_id, "reply": result.reply, "ok": result.ok,
                           "receipt": result.receipt, "checks": result.checks})

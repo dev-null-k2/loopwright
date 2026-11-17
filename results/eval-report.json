@@ -1,14 +1,14 @@
 {
-  "generated": "2026-11-17T16:37:19",
-  "version": "0.6.0",
+  "generated": "2026-11-17T17:25:16",
+  "version": "0.8.0",
   "model": "scripted-v1 (rule-based; these are evals of the harness, not of an LLM)",
   "suites": {
     "core": {
-      "cases": 14,
-      "passed": 14,
+      "cases": 16,
+      "passed": 16,
       "pass_at_1": 1.0,
       "pass_all_trials": null,
-      "trials": 14
+      "trials": 16
     },
     "memory": {
       "cases": 11,
@@ -25,11 +25,11 @@
       "trials": 12
     },
     "reliability": {
-      "cases": 8,
-      "passed": 8,
+      "cases": 9,
+      "passed": 9,
       "pass_at_1": 1.0,
       "pass_all_trials": 1.0,
-      "trials": 18
+      "trials": 21
     },
     "context": {
       "cases": 5,
@@ -46,8 +46,8 @@
       "trials": 19
     }
   },
-  "cases_total": 69,
-  "cases_passed": 69,
+  "cases_total": 72,
+  "cases_passed": 72,
   "attack_success_rate": 0.0,
   "cases": [
     {
@@ -80,7 +80,7 @@
           "tokens_in": 4726,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 9,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -132,7 +132,7 @@
           "tokens_in": 7135,
           "turns": 1,
           "tokens_out": 36,
-          "duration_ms": 8,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -267,7 +267,7 @@
           "tokens_in": 5639,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 52,
+          "duration_ms": 50,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -309,7 +309,7 @@
           "tokens_in": 5158,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -351,7 +351,7 @@
           "tokens_in": 5158,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -398,7 +398,7 @@
           "tokens_in": 4720,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -497,7 +497,7 @@
           "tokens_in": 5795,
           "turns": 1,
           "tokens_out": 71,
-          "duration_ms": 7,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -539,7 +539,7 @@
           "tokens_in": 10957,
           "turns": 1,
           "tokens_out": 816,
-          "duration_ms": 12,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "delegate"
@@ -581,7 +581,7 @@
           "tokens_in": 4971,
           "turns": 1,
           "tokens_out": 180,
-          "duration_ms": 8,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -680,7 +680,7 @@
           "tokens_in": 10379,
           "turns": 2,
           "tokens_out": 158,
-          "duration_ms": 13,
+          "duration_ms": 14,
           "cost_usd": 0.0,
           "tools": [
             "create_skill",
@@ -689,6 +689,100 @@
           "model": "scripted-v1",
           "provider": "scripted",
           "memory_searches": 2,
+          "attack_succeeded": false
+        }
+      ]
+    },
+    {
+      "id": "core-stream-01",
+      "suite": "core",
+      "title": "A watched turn streams its reply, and the pieces add up to exactly the reply",
+      "concept": "streaming",
+      "prompt": "What is a retrieval gate?",
+      "attack": false,
+      "passed": true,
+      "pass_rate": 1.0,
+      "trials": [
+        {
+          "passed": true,
+          "checks": [
+            {
+              "check": "event: kind=model.stream",
+              "pass": true,
+              "note": "saw ['model.stream:ok']"
+            },
+            {
+              "check": "screen_ends_on_reply: True",
+              "pass": true,
+              "note": "69 piece(s) in 1 stream(s); the last one matches the reply"
+            },
+            {
+              "check": "reply_contains: [handbook: Retrieval gate]",
+              "pass": true,
+              "note": "found"
+            }
+          ],
+          "trial": {},
+          "reply": "**Retrieval gate**: A cheap check, before any search, of whether this turn needs memory at all.\n\nMost tutorials search memory on every message. The gate asks first: does answering this need what the agent knows about this person? Loopwright can decide by rules (personal words, known names, action verbs) or with one small-model call. Whatever the mode, it fails open: if the decision itself breaks, it retrieves.\n\nWhy it exists: Retrieving on every turn is slower, and loosely related memories in the prompt bias the answer. 'What is 2+2' does not need your address.\n\nThe tradeoff: A gate that wrongly skips loses a memory the turn needed. So it needs its own eval, and the model keeps a recall tool to pull memory mid-turn when the gate was wrong.\n\nIn this repo: `loopwright/memory/gate.py`\n\n[handbook: Retrieval gate]\n\nRelated: Push and pull retrieval, Agentic retrieval.",
+          "steps": 22,
+          "tokens_in": 5639,
+          "turns": 1,
+          "tokens_out": 235,
+          "duration_ms": 9,
+          "cost_usd": 0.0,
+          "tools": [
+            "search_knowledge"
+          ],
+          "model": "scripted-v1",
+          "provider": "scripted",
+          "memory_searches": 0,
+          "attack_succeeded": false
+        }
+      ]
+    },
+    {
+      "id": "core-stream-02",
+      "suite": "core",
+      "title": "With nobody watching, nothing is streamed and the answer is the same",
+      "concept": "streaming",
+      "prompt": "What is a retrieval gate?",
+      "attack": false,
+      "passed": true,
+      "pass_rate": 1.0,
+      "trials": [
+        {
+          "passed": true,
+          "checks": [
+            {
+              "check": "no_event: model.stream",
+              "pass": true,
+              "note": "saw no such event"
+            },
+            {
+              "check": "screen_ends_on_reply: False",
+              "pass": true,
+              "note": "nothing was streamed"
+            },
+            {
+              "check": "reply_contains: [handbook: Retrieval gate]",
+              "pass": true,
+              "note": "found"
+            }
+          ],
+          "trial": {},
+          "reply": "**Retrieval gate**: A cheap check, before any search, of whether this turn needs memory at all.\n\nMost tutorials search memory on every message. The gate asks first: does answering this need what the agent knows about this person? Loopwright can decide by rules (personal words, known names, action verbs) or with one small-model call. Whatever the mode, it fails open: if the decision itself breaks, it retrieves.\n\nWhy it exists: Retrieving on every turn is slower, and loosely related memories in the prompt bias the answer. 'What is 2+2' does not need your address.\n\nThe tradeoff: A gate that wrongly skips loses a memory the turn needed. So it needs its own eval, and the model keeps a recall tool to pull memory mid-turn when the gate was wrong.\n\nIn this repo: `loopwright/memory/gate.py`\n\n[handbook: Retrieval gate]\n\nRelated: Push and pull retrieval, Agentic retrieval.",
+          "steps": 21,
+          "tokens_in": 5639,
+          "turns": 1,
+          "tokens_out": 235,
+          "duration_ms": 6,
+          "cost_usd": 0.0,
+          "tools": [
+            "search_knowledge"
+          ],
+          "model": "scripted-v1",
+          "provider": "scripted",
+          "memory_searches": 0,
           "attack_succeeded": false
         }
       ]
@@ -781,7 +875,7 @@
           "tokens_in": 5000,
           "turns": 1,
           "tokens_out": 16,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -880,7 +974,7 @@
           "tokens_in": 14926,
           "turns": 3,
           "tokens_out": 133,
-          "duration_ms": 22,
+          "duration_ms": 38,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -924,7 +1018,7 @@
           "tokens_in": 9565,
           "turns": 2,
           "tokens_out": 52,
-          "duration_ms": 9,
+          "duration_ms": 15,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -967,7 +1061,7 @@
           "tokens_in": 4768,
           "turns": 1,
           "tokens_out": 35,
-          "duration_ms": 5,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "remember"
@@ -1019,7 +1113,7 @@
           "tokens_in": 10593,
           "turns": 3,
           "tokens_out": 294,
-          "duration_ms": 13,
+          "duration_ms": 18,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -1066,7 +1160,7 @@
           "tokens_in": 7788,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 7,
+          "duration_ms": 12,
           "cost_usd": 0.0,
           "tools": [
             "recall",
@@ -1146,10 +1240,10 @@
           "trial": {},
           "reply": "I searched the handbook and found nothing relevant. I'm running on Loopwright's built-in scripted model, which only understands a fixed set of request shapes. I can remember things across sessions, book and list calendar events, save and search notes, do exact arithmetic, answer questions about how AI agents are built (with citations from the handbook), compare two concepts using parallel subagents, search the web, fetch a page, work a real browser, run workflows, schedule tasks to run on their own, and draft a message that you approve before it goes anywhere. For open-ended questions, connect Claude Code or an API key (run `loopwright doctor`).",
           "steps": 25,
-          "tokens_in": 11159,
+          "tokens_in": 11160,
           "turns": 2,
           "tokens_out": 385,
-          "duration_ms": 17,
+          "duration_ms": 21,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge",
@@ -1197,7 +1291,7 @@
           "tokens_in": 9551,
           "turns": 2,
           "tokens_out": 59,
-          "duration_ms": 10,
+          "duration_ms": 14,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -1250,7 +1344,7 @@
           "tokens_in": 4938,
           "turns": 1,
           "tokens_out": 91,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1297,7 +1391,7 @@
           "tokens_in": 4929,
           "turns": 1,
           "tokens_out": 96,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1344,7 +1438,7 @@
           "tokens_in": 5229,
           "turns": 1,
           "tokens_out": 66,
-          "duration_ms": 4,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "read_file"
@@ -1396,7 +1490,7 @@
           "tokens_in": 4751,
           "turns": 1,
           "tokens_out": 40,
-          "duration_ms": 3,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -1443,7 +1537,7 @@
           "tokens_in": 4761,
           "turns": 1,
           "tokens_out": 34,
-          "duration_ms": 5,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -1490,7 +1584,7 @@
           "tokens_in": 4734,
           "turns": 1,
           "tokens_out": 29,
-          "duration_ms": 4,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "read_file"
@@ -1532,7 +1626,7 @@
           "tokens_in": 4752,
           "turns": 1,
           "tokens_out": 43,
-          "duration_ms": 6,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1574,7 +1668,7 @@
           "tokens_in": 4760,
           "turns": 1,
           "tokens_out": 52,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1668,7 +1762,7 @@
           "tokens_in": 4912,
           "turns": 1,
           "tokens_out": 92,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1720,7 +1814,7 @@
           "tokens_in": 5316,
           "turns": 1,
           "tokens_out": 112,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "web_search"
@@ -1767,7 +1861,7 @@
           "tokens_in": 8176,
           "turns": 1,
           "tokens_out": 175,
-          "duration_ms": 6,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "web_search",
@@ -1817,7 +1911,7 @@
           "tokens_in": 4726,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -1892,7 +1986,7 @@
           "tokens_in": 4726,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2248,7 +2342,7 @@
           "tokens_in": 7144,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2286,7 +2380,7 @@
           "tokens_in": 7144,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2336,7 +2430,7 @@
           "tokens_in": 7812,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 6,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2414,7 +2508,7 @@
           "tokens_in": 7812,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 6,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2462,7 +2556,7 @@
           "tokens_in": 2747,
           "turns": 1,
           "tokens_out": 38,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2570,6 +2664,159 @@
       ]
     },
     {
+      "id": "rel-stream-01",
+      "suite": "reliability",
+      "title": "A model that fails while a reader is watching is retried, and the screen still ends on the whole answer",
+      "concept": "streaming",
+      "prompt": "What's 18% of 2450?",
+      "attack": false,
+      "passed": true,
+      "pass_rate": 1.0,
+      "trials": [
+        {
+          "passed": true,
+          "checks": [
+            {
+              "check": "event: model.retry",
+              "pass": true,
+              "note": "saw ['model.retry:warn']"
+            },
+            {
+              "check": "event: kind=model.stream",
+              "pass": true,
+              "note": "saw ['model.stream:ok']"
+            },
+            {
+              "check": "screen_ends_on_reply: True",
+              "pass": true,
+              "note": "1 piece(s) in 1 stream(s); the last one matches the reply"
+            },
+            {
+              "check": "reply_contains: 441",
+              "pass": true,
+              "note": "found"
+            },
+            {
+              "check": "ok: True",
+              "pass": true,
+              "note": "ok=True"
+            }
+          ],
+          "trial": {
+            "chaos_model_failures": 1
+          },
+          "reply": "0.18 * 2450 = **441**.",
+          "steps": 22,
+          "tokens_in": 4726,
+          "turns": 1,
+          "tokens_out": 18,
+          "duration_ms": 4,
+          "cost_usd": 0.0,
+          "tools": [
+            "calculator"
+          ],
+          "model": "scripted-v1",
+          "provider": "scripted",
+          "memory_searches": 0,
+          "attack_succeeded": false
+        },
+        {
+          "passed": true,
+          "checks": [
+            {
+              "check": "event: model.retry",
+              "pass": true,
+              "note": "saw ['model.retry:warn']"
+            },
+            {
+              "check": "event: kind=model.stream",
+              "pass": true,
+              "note": "saw ['model.stream:ok']"
+            },
+            {
+              "check": "screen_ends_on_reply: True",
+              "pass": true,
+              "note": "1 piece(s) in 1 stream(s); the last one matches the reply"
+            },
+            {
+              "check": "reply_contains: 441",
+              "pass": true,
+              "note": "found"
+            },
+            {
+              "check": "ok: True",
+              "pass": true,
+              "note": "ok=True"
+            }
+          ],
+          "trial": {
+            "chaos_model_failures": 2
+          },
+          "reply": "0.18 * 2450 = **441**.",
+          "steps": 23,
+          "tokens_in": 4726,
+          "turns": 1,
+          "tokens_out": 18,
+          "duration_ms": 4,
+          "cost_usd": 0.0,
+          "tools": [
+            "calculator"
+          ],
+          "model": "scripted-v1",
+          "provider": "scripted",
+          "memory_searches": 0,
+          "attack_succeeded": false
+        },
+        {
+          "passed": true,
+          "checks": [
+            {
+              "check": "event: model.retry",
+              "pass": true,
+              "note": "saw ['model.retry:warn']"
+            },
+            {
+              "check": "event: kind=model.stream",
+              "pass": true,
+              "note": "saw ['model.stream:ok']"
+            },
+            {
+              "check": "screen_ends_on_reply: True",
+              "pass": true,
+              "note": "1 piece(s) in 1 stream(s); the last one matches the reply"
+            },
+            {
+              "check": "reply_contains: 441",
+              "pass": true,
+              "note": "found"
+            },
+            {
+              "check": "ok: True",
+              "pass": true,
+              "note": "ok=True"
+            }
+          ],
+          "trial": {
+            "chaos_model_failures": 4
+          },
+          "reply": "0.18 * 2450 = **441**.",
+          "steps": 26,
+          "tokens_in": 4726,
+          "turns": 1,
+          "tokens_out": 18,
+          "duration_ms": 4,
+          "cost_usd": 0.0,
+          "tools": [
+            "calculator"
+          ],
+          "model": "scripted-v1",
+          "provider": "scripted",
+          "memory_searches": 0,
+          "attack_succeeded": false
+        }
+      ]
+    },
+    {
       "id": "ctx-01",
       "suite": "context",
       "title": "A long session is compacted before the next call",
@@ -2599,7 +2846,7 @@
           "tokens_in": 2920,
           "turns": 1,
           "tokens_out": 104,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -2639,7 +2886,7 @@
           "tokens_in": 6343,
           "turns": 1,
           "tokens_out": 59,
-          "duration_ms": 11,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -2681,7 +2928,7 @@
           "tokens_in": 2597,
           "turns": 1,
           "tokens_out": 104,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -2721,7 +2968,7 @@
           "tokens_in": 8061,
           "turns": 1,
           "tokens_out": 177,
-          "duration_ms": 6,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -2812,12 +3059,12 @@
             {
               "check": "tool_called: list_events",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
+              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
             },
             {
               "check": "tool_called: search_notes",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
+              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
             },
             {
               "check": "reply_contains: Design review",
@@ -2841,12 +3088,12 @@
           "tokens_in": 377,
           "turns": 1,
           "tokens_out": 62,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "list_events",
-            "search_notes",
-            "search_knowledge"
+            "search_knowledge",
+            "search_notes"
           ],
           "model": "scripted-v1",
           "provider": "scripted",
@@ -2945,7 +3192,7 @@
           "tokens_in": 249,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "save_note"
@@ -3002,7 +3249,7 @@
           "tokens_in": 529,
           "turns": 1,
           "tokens_out": 233,
-          "duration_ms": 6,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "web_search",
@@ -3050,7 +3297,7 @@
           "tokens_in": 0,
           "turns": 1,
           "tokens_out": 0,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": null,
           "tools": [
             "web_search",
@@ -3098,7 +3345,7 @@
           "tokens_in": 4759,
           "turns": 1,
           "tokens_out": 38,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3150,7 +3397,7 @@
           "tokens_in": 4809,
           "turns": 1,
           "tokens_out": 85,
-          "duration_ms": 6,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3197,7 +3444,7 @@
           "tokens_in": 4741,
           "turns": 1,
           "tokens_out": 29,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "list_events"
@@ -3339,7 +3586,7 @@
           "tokens_in": 2351,
           "turns": 1,
           "tokens_out": 40,
-          "duration_ms": 1,
+          "duration_ms": 2,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -3399,7 +3646,7 @@
           "tokens_in": 5066,
           "turns": 1,
           "tokens_out": 66,
-          "duration_ms": 8,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3489,7 +3736,7 @@
           "tokens_in": 4942,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3546,7 +3793,7 @@
           "tokens_in": 6902,
           "turns": 1,
           "tokens_out": 155,
-          "duration_ms": 1595,
+          "duration_ms": 1656,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3588,7 +3835,7 @@
           "tokens_in": 7211,
           "turns": 1,
           "tokens_out": 164,
-          "duration_ms": 1581,
+          "duration_ms": 1670,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3635,7 +3882,7 @@
           "tokens_in": 4787,
           "turns": 1,
           "tokens_out": 45,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3682,7 +3929,7 @@
           "tokens_in": 6006,
           "turns": 1,
           "tokens_out": 167,
-          "duration_ms": 638,
+          "duration_ms": 776,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3724,7 +3971,7 @@
           "tokens_in": 5815,
           "turns": 1,
           "tokens_out": 106,
-          "duration_ms": 277,
+          "duration_ms": 354,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -3746,14 +3993,14 @@
       "reliability": 1.0,
       "context": 1.0,
       "automation": 1.0,
-      "cases_passed": 69,
-      "cases_total": 69,
+      "cases_passed": 72,
+      "cases_total": 72,
       "attack_success_rate": 0.0,
       "attacks_succeeded": 0,
       "attacks": 5,
-      "avg_tokens_in_per_turn": 4830,
+      "avg_tokens_in_per_turn": 4844,
       "memory_searches": 29,
-      "turns": 88,
+      "turns": 93,
       "failed": []
     },
     "no-memory": {
@@ -3764,14 +4011,14 @@
       "reliability": 1.0,
       "context": 0.8,
       "automation": 1.0,
-      "cases_passed": 59,
-      "cases_total": 69,
+      "cases_passed": 62,
+      "cases_total": 72,
       "attack_success_rate": 0.0,
       "attacks_succeeded": 0,
       "attacks": 5,
-      "avg_tokens_in_per_turn": 4307,
+      "avg_tokens_in_per_turn": 4320,
       "memory_searches": 0,
-      "turns": 88,
+      "turns": 93,
       "failed": [
         "mem-01",
         "mem-03",
@@ -3793,14 +4040,14 @@
       "reliability": 1.0,
       "context": 1.0,
       "automation": 1.0,
-      "cases_passed": 67,
-      "cases_total": 69,
+      "cases_passed": 70,
+      "cases_total": 72,
       "attack_success_rate": 0.0,
       "attacks_succeeded": 0,
       "attacks": 5,
-      "avg_tokens_in_per_turn": 4802,
-      "memory_searches": 83,
-      "turns": 88,
+      "avg_tokens_in_per_turn": 4818,
+      "memory_searches": 88,
+      "turns": 93,
       "failed": [
         "mem-02",
         "mem-08"
@@ -3808,20 +4055,20 @@
     },
     "no-guardrails": {
       "what": "input, tool-result and output guards off",
-      "core": 0.857,
+      "core": 0.875,
       "memory": 0.909,
       "safety": 0.25,
       "reliability": 1.0,
       "context": 0.8,
       "automation": 0.421,
-      "cases_passed": 45,
-      "cases_total": 69,
+      "cases_passed": 48,
+      "cases_total": 72,
       "attack_success_rate": 1.0,
       "attacks_succeeded": 5,
       "attacks": 5,
-      "avg_tokens_in_per_turn": 5032,
+      "avg_tokens_in_per_turn": 5029,
       "memory_searches": 29,
-      "turns": 88,
+      "turns": 93,
       "failed": [
         "core-05",
         "core-09",
@@ -3854,21 +4101,22 @@
       "core": 1.0,
       "memory": 1.0,
       "safety": 1.0,
-      "reliability": 0.667,
+      "reliability": 0.593,
       "context": 1.0,
       "automation": 1.0,
-      "cases_passed": 66,
-      "cases_total": 69,
+      "cases_passed": 68,
+      "cases_total": 72,
       "attack_success_rate": 0.0,
       "attacks_succeeded": 0,
       "attacks": 5,
-      "avg_tokens_in_per_turn": 4330,
+      "avg_tokens_in_per_turn": 4219,
       "memory_searches": 29,
-      "turns": 88,
+      "turns": 93,
       "failed": [
         "rel-01",
         "rel-02",
-        "rel-05"
+        "rel-05",
+        "rel-stream-01"
       ]
     }
   },
@@ -3948,7 +4196,7 @@
       {
         "check": "core: every case passes",
         "pass": true,
-        "got": "14/14",
+        "got": "16/16",
         "need": "all"
       },
       {
@@ -3966,7 +4214,7 @@
       {
         "check": "reliability: every case passes",
         "pass": true,
-        "got": "8/8",
+        "got": "9/9",
         "need": "all"
       },
       {
@@ -4020,7 +4268,7 @@
       {
         "check": "teeth: reliability cases fail with retries off",
         "pass": true,
-        "got": 0.667,
+        "got": 0.593,
         "need": "< 1.0"
       },
       {
@@ -4044,5 +4292,5 @@
       "gate_false_skip_rate_max": 0.2
     }
   },
-  "seconds": 30.01
+  "seconds": 31.24
 }

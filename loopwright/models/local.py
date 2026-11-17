@@ -39,9 +39,10 @@ import urllib.request
 from typing import Any
 
 from loopwright.models import openai_compat
-from loopwright.models._http import post_json
-from loopwright.models.base import FatalModelError, Message, ModelResponse, TransientModelError, Usage, estimate_tokens
+from loopwright.models._http import post_json, post_stream
+from loopwright.models.base import FatalModelError, Message, ModelResponse, OnText, TransientModelError, Usage, estimate_tokens
 from loopwright.models.claude_code import PROTOCOL, parse_reply, render_transcript
+from loopwright.models.streaming import ReplyFilter
 
 KNOWN_SERVERS = [("Ollama", "http://127.0.0.1:11434"), ("LM Studio", "http://127.0.0.1:1234"),
                  ("llama.cpp", "http://127.0.0.1:8080")]
@@ -125,9 +126,10 @@ def detect(refresh: bool = False) -> dict[str, Any] | None:
 
 class LocalProvider:
     name = "local"
+    streams = True
 
-    def __init__(self, model: str = "", transport=post_json):
-        self._post = transport
+    def __init__(self, model: str = "", transport=post_json, stream=post_stream):
+        self._post, self._stream = transport, stream
         self._wanted = model or os.environ.get("LOOPWRIGHT_MODEL", "")
         self.model = self._wanted or "local"
 
@@ -144,14 +146,17 @@ class LocalProvider:
         return server
 
     def complete(self, system: str, messages: list[Message], tools: list[dict[str, Any]],
-                 *, max_tokens: int = 2048, purpose: str = "loop") -> ModelResponse:
+                 *, max_tokens: int = 2048, purpose: str = "loop", on_text: OnText | None = None) -> ModelResponse:
         server = self._server()
         url = f"{server['url']}/v1/chat/completions"
+        # A small model may write its tool call, or its whole answer, as a JSON object in the text.
+        # The filter lets prose through and, from such an object, only the answer inside it.
+        feed = ReplyFilter(on_text).feed if on_text else None
         if tools and self.model not in _text_only:
             body = {"model": self.model, "messages": openai_compat.to_wire(system, messages), "max_tokens": max_tokens,
                     "tools": [{"type": "function", "function": t} for t in tools]}
             try:
-                response = openai_compat.from_wire(self._call(url, body), self.model)
+                response = openai_compat.from_wire(self._call(url, body, feed), self.model)
             except FatalModelError as exc:
                 if "tool" not in str(exc).lower():          # some other 4xx: a real error
                     raise
@@ -170,7 +175,7 @@ class LocalProvider:
         prompt = render_transcript(messages) if tools else None
         wire = ([{"role": "system", "content": system + protocol}, {"role": "user", "content": prompt}] if tools
                 else openai_compat.to_wire(system, messages))
-        data = self._call(url, {"model": self.model, "messages": wire, "max_tokens": max_tokens})
+        data = self._call(url, {"model": self.model, "messages": wire, "max_tokens": max_tokens}, feed)
         text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         final, calls, thought = parse_reply(text) if tools else (text, [], "")
         usage = data.get("usage") or {}
@@ -180,9 +185,12 @@ class LocalProvider:
             usage=Usage(usage.get("prompt_tokens") or estimate_tokens(system + str(prompt or "")),
                         usage.get("completion_tokens") or estimate_tokens(text), estimated=not usage)))
 
-    def _call(self, url: str, body: dict[str, Any]) -> dict[str, Any]:
+    def _call(self, url: str, body: dict[str, Any], on_text: OnText | None = None) -> dict[str, Any]:
+        headers = {"authorization": "Bearer local"}
         try:
-            return self._post(url, {"authorization": "Bearer local"}, body, TIMEOUT_S)
+            if on_text:
+                return openai_compat.stream_chat(self._stream, url, headers, body, on_text, TIMEOUT_S)
+            return self._post(url, headers, body, TIMEOUT_S)
         except TransientModelError as exc:
             if "network error" in str(exc):
                 _found["at"] = 0.0                          # the server went away: look again next time

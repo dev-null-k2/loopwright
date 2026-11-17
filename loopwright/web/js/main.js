@@ -32,6 +32,7 @@ const SUGGESTIONS = [
 ];
 
 const LAB = [
+  ["stream", "Stream the reply", "On shows the words as the model writes them. Off holds the reply until it is whole: same total time, a longer blank wait.", "bool"],
   ["pattern", "Orchestration", "react: decide step by step. plan: write the steps first. reflect: a critic reviews the draft.", ["react", "plan", "reflect"]],
   ["memory", "Long-term memory", "Off removes the gate, retrieval, the memory tools and consolidation.", "bool"],
   ["gate", "Retrieval gate", "rules or model decide per turn. always searches every turn. never forces the model to pull.", ["rules", "model", "always", "never"]],
@@ -399,15 +400,73 @@ function drawChat() {
   log.scrollTop = log.scrollHeight;
 }
 
+// ------------------------------------------------------------------ the reply, while it is being written
+// A streamed reply arrives in pieces ("delta" messages), each tagged with the model.stream step it belongs to.
+// The waiting bubble types toward the newest stream the board has reached, so the words appear at the same
+// moment the board says the reply starts to arrive. A recorded run has no pieces: its text is on the model
+// call that follows the stream's step, and it is typed out the same way.
+const stillMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+function onDelta(m, msg) {
+  const stream = m.streams.get(msg.stream) || { text: "" };
+  stream.text = "replace" in msg ? msg.replace : stream.text + (msg.text || "");     // replace: the guard masked something already shown
+  m.streams.set(msg.stream, stream);
+  typeDraft(m);
+}
+
+function draftTarget(m) {
+  const step = m.events.findLast((e) => e.kind === "model.stream" && e.seq <= m.reached);
+  if (!step) return null;
+  const live = m.streams.get(step.seq);
+  if (live) return { seq: step.seq, text: live.text };
+  const call = m.events.find((e) => e.kind === "model.call" && e.data.stream?.event === step.seq);
+  return { seq: step.seq, text: call ? call.data.stream.shown ?? call.data.text ?? "" : "" };
+}
+
+function typeDraft(m) {
+  if (m.revealed || !m.draftEl) return;
+  const target = draftTarget(m);
+  const draft = m.draft;
+  if (!target) { draft.seq = 0; draft.text = ""; m.draftEl.hidden = true; return; }
+  if (target.seq !== draft.seq) { draft.seq = target.seq; draft.text = ""; }
+  if (!target.text.startsWith(draft.text)) {                  // the text on screen was corrected: keep what still matches
+    let same = 0;
+    while (same < draft.text.length && draft.text[same] === target.text[same]) same += 1;
+    draft.text = draft.text.slice(0, same);
+  }
+  const left = target.text.length - draft.text.length;
+  if (left > 0) {
+    // a live model is slower than this, so its words show as they come; a finished text is typed in under a second
+    const take = stillMotion.matches ? left : Math.max(2, Math.ceil(left / 40));
+    draft.text = target.text.slice(0, draft.text.length + take);
+  }
+  const log = $("chat-log");
+  const follow = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  m.draftEl.hidden = !draft.text;
+  m.draftEl.innerHTML = lightMarkdown(draft.text);
+  m.draftEl.classList.toggle("writing", draft.text.length < target.text.length || m.streams.has(target.seq) && !m.result);
+  if (follow) log.scrollTop = log.scrollHeight;
+  if (draft.text.length < target.text.length && !draft.timer) {
+    draft.timer = requestAnimationFrame(() => { draft.timer = 0; typeDraft(m); });
+  }
+}
+
 function agentNode(m) {
   const node = h("div", { class: "msg agent" });
+  m.streams = new Map();          // model.stream step -> { text }: the pieces received so far
+  m.draft = { seq: 0, text: "", timer: 0 };
+  m.reached = 0;
   m.render = (upTo) => {
     if (!m.revealed) {
       node.className = "msg agent pending";
-      put(node, h("div", { class: "body" }, m.status || "Working..."), trailNode(m, upTo ?? 0),
+      m.reached = upTo ?? 0;
+      m.draftEl = h("div", { class: "draft", hidden: true, "aria-live": "off" });
+      put(node, h("div", { class: "body" }, h("div", { class: "status" }, m.status || "Working..."), m.draftEl), trailNode(m, upTo ?? 0),
         m.result ? h("div", { class: "meta" }, h("button", { onclick: () => { player.pause(); player.seek(player.events.length - 1); reveal(m); } }, "Skip to the answer")) : null);
+      typeDraft(m);
       return;
     }
+    m.draftEl = null;
     node.className = "msg agent";
     const r = m.result.receipt || {};
     put(node,
@@ -419,6 +478,8 @@ function agentNode(m) {
         r.model_calls != null ? h("span", {}, `${r.model_calls} model call(s)`) : null,
         r.tokens_in != null ? h("span", {}, `${r.estimated ? "~" : ""}${fmt(r.tokens_in + r.tokens_out)} tokens`) : null,
         r.duration_ms != null ? h("span", {}, r.duration_ms > 1500 ? `${(r.duration_ms / 1000).toFixed(1)} s` : `${fmt(r.duration_ms)} ms`) : null,
+        r.first_token_ms != null ? h("span", { title: "The reply was streamed. This is how long the last model call took to produce its first words (time to first token)." },
+          `first words after ${r.first_token_ms > 1500 ? `${(r.first_token_ms / 1000).toFixed(1)} s` : `${fmt(r.first_token_ms)} ms`}`) : null,
         r.cost_usd ? h("span", {}, `$${r.cost_usd.toFixed(4)}`) : null,
         feedbackButtons(m)));
   };
@@ -490,7 +551,7 @@ async function send(text, { options = {}, quiet = false, inSession = null, lesso
         player.seekToSeq(event.seq);              // jump the board to the step that is waiting on you
         approvalCard(event, m);
       }
-    }, lesson);
+    }, lesson, quiet ? null : (msg) => onDelta(m, msg));
   } catch (error) {
     m.result = { ok: false, reply: `Could not reach the server: ${error.message}`, receipt: {}, checks: [] };
   }

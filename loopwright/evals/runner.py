@@ -116,6 +116,11 @@ def run_case(case: dict[str, Any], overrides: dict[str, Any] | None = None,
                     from loopwright.scheduler import Scheduler
                     results.extend(Scheduler(agent, options).tick(FROZEN_NOW))
                     continue
+                if case.get("watch"):           # someone is watching this turn, so its reply is streamed
+                    pieces: list[dict[str, Any]] = []
+                    results.append(agent.run_turn(say, session=session, options=options, live=[pieces.append]))
+                    results[-1].watched = pieces
+                    continue
                 results.append(agent.run_turn(say, session=session, options=options))
             checks = grade(results, agent, case["expect"])
             trials.append({

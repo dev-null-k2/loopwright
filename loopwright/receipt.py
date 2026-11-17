@@ -38,6 +38,9 @@ def build(calls: list[dict[str, Any]], tool_log: list[dict[str, Any]], *, memory
         "memory_used": memory_used, "memory_written": memory_written,
         "iterations": iterations, "stop": stop, "duration_ms": duration_ms,
     }
+    streamed = [c["first_token_ms"] for c in calls if c.get("first_token_ms") is not None]
+    if streamed:                # the reply was streamed: how long the reader waited for its first words
+        receipt["first_token_ms"] = streamed[-1]
     receipt["line"] = line(receipt)
     return receipt
 

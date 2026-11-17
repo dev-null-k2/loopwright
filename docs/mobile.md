@@ -85,9 +85,10 @@ view, a wrong key, and a computer that is off. The tunnel start-up was tested wi
 It has not yet been run through a real Cloudflare tunnel or on a real phone.
 
 Cloudflare documents that quick tunnels do not pass Server-Sent Events, the kind of stream the cockpit normally
-uses for a turn. So whenever the page is not talking to a server on its own network, it does not stream: the
-turn runs as a job on the computer and the page collects its steps with short requests. That also means a turn
-is not lost when the phone locks its screen.
+uses for a turn. So whenever the page is not talking to a server on its own network, it does not hold a stream
+open: the turn runs as a job on the computer and the page collects its steps with short requests. The words of
+the reply come the same way, a few at a time with each request, so the answer still appears as it is written.
+That also means a turn is not lost when the phone locks its screen.
 
 ## Your own agent, on the same Wi-Fi
 

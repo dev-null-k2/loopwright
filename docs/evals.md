@@ -12,7 +12,7 @@ loopwright compare --targets scripted local claude-code     # the same questions
 
 | Part | What it is | Where |
 |---|---|---|
-| Suites | `core` (tool routing, skills, patterns), `memory`, `safety`, `reliability`, `context`, `automation` (workflows, scheduled tasks, the shell, the browser). 69 cases | [`evals/datasets/*.jsonl`](../loopwright/evals/datasets/) |
+| Suites | `core` (tool routing, skills, patterns), `memory`, `safety`, `reliability`, `context`, `automation` (workflows, scheduled tasks, the shell, the browser). 72 cases | [`evals/datasets/*.jsonl`](../loopwright/evals/datasets/) |
 | Trials | Reliability cases run three times with failures injected at different points. `pass_at_1` is the mean; `pass_all_trials` is the share that passed every time (pass^3) | `trials` in a case |
 | Ablations | Every suite again with one mechanism off: `no-memory`, `always-retrieve`, `no-guardrails`, `no-retries` | `VARIANTS` in [`runner.py`](../loopwright/evals/runner.py) |
 | Retrieval | 44 labelled questions against the handbook; recall@1 and @3 for BM25, dense and hybrid | `retrieval.jsonl` |

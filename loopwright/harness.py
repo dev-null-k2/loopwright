@@ -44,7 +44,7 @@ from loopwright import context as ctx_mod
 from loopwright import guardrails, patterns, receipt
 from loopwright import workflows as wf
 from loopwright.config import Options, home_dir
-from loopwright.events import Event, Recorder, Sink, new_id, write_trace
+from loopwright.events import Event, Live, Recorder, Sink, new_id, write_trace
 from loopwright.loop import LoopResult, run_loop
 from loopwright.memory import gate as gate_mod
 from loopwright.memory.consolidation import consolidate
@@ -69,6 +69,7 @@ class TurnResult:
     checks: list[dict[str, Any]]
     tool_log: list[dict[str, Any]]
     trace_path: str = ""
+    watched: list[dict[str, Any]] = field(default_factory=list)     # an eval that watches the turn keeps the streamed pieces here
 
     def kinds(self) -> list[str]:
         return [e.kind for e in self.events]
@@ -132,12 +133,14 @@ class Agent:
     def run_turn(self, message: str, session: str = "default", options: Options | None = None,
                  sinks: list[Sink] | None = None, approver: Approver | None = None,
                  turn_id: str | None = None, channel: str = "local", origin: str = "",
-                 trigger: dict[str, Any] | None = None) -> TurnResult:
+                 trigger: dict[str, Any] | None = None, live: list[Live] | None = None) -> TurnResult:
+        """`sinks` receive every event. `live` listeners receive the pieces of the
+        reply while the model writes it; passing one is what turns streaming on."""
         run_now = re.fullmatch(r"/task\s+#?(\d+)", message.strip()) if trigger is None else None
         if run_now and self.store.task(int(run_now.group(1))):       # "/task 3": run a scheduled task now, as the clock would
             from loopwright.scheduler import Scheduler
             return Scheduler(self, options).run_task(self.store.task(int(run_now.group(1))), sinks=sinks, turn_id=turn_id)
-        t = self._begin(message, session, options or Options(), sinks, approver, turn_id or new_id())
+        t = self._begin(message, session, options or Options(), sinks, approver, turn_id or new_id(), live)
         t.channel, t.tools.origin, t.trigger = channel, origin, trigger
         try:
             self._arrive(t)             # steps 0-2
@@ -156,14 +159,14 @@ class Agent:
         return self._finish(t)      # steps 13-15
 
     def resume(self, turn_id: str, options: Options | None = None, sinks: list[Sink] | None = None,
-               approver: Approver | None = None) -> TurnResult:
+               approver: Approver | None = None, live: list[Live] | None = None) -> TurnResult:
         """Continue a turn that died mid-loop, from its last checkpoint."""
         saved = self.store.last_checkpoint(turn_id)
         if saved is None:
             raise ValueError(f"no checkpoint for turn {turn_id}")
         step, state = saved
         t = self._begin(state["message"], state["session"], options or Options.from_dict(state["options"]),
-                        sinks, approver, turn_id)
+                        sinks, approver, turn_id, live)
         t.system, t.messages, t.resumed_from = state["system"], state["messages"], step
         t.rec.emit("checkpoint.resume", "checkpoint", f"Resumed from the checkpoint after step {step}",
                    "Durable execution. The loop's state was saved after every round, so a turn that died "
@@ -181,8 +184,8 @@ class Agent:
 
     # ================================================================ the steps
     def _begin(self, message: str, session: str, options: Options, sinks: list[Sink] | None,
-               approver: Approver | None, turn_id: str) -> _Turn:
-        rec = Recorder(turn_id, sinks)
+               approver: Approver | None, turn_id: str, live: list[Live] | None = None) -> _Turn:
+        rec = Recorder(turn_id, sinks, live=live)
         gateway = ModelGateway(options, rec, home=self.home, providers=list(self._providers) if self._providers else None)
         state = TurnState(chaos_left=options.chaos_tool_failures)
         tools = ToolContext(self.store, self.home, rec, options, self.now)

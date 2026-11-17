@@ -6,8 +6,6 @@ Roughly in order.
 - Scores for real models: three trials per model through the local, Claude Code and API providers, published
   from `loopwright compare`.
 - A real embedding model behind the existing `embed` seam, with the retrieval eval re-run against it.
-- Token streaming for model responses, and the guardrail question that comes with it. (Steps are streamed today;
-  model text arrives whole.)
 - The chat gateways run against the live services, with the results written up.
 
 **Then**

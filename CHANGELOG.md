@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.0
+
+The reply arrives while the model is still writing it.
+
+- **Every provider streams.** The Anthropic API and OpenAI-compatible servers through their streaming formats
+  (tool calls included, reassembled from fragments), local servers the same way, Claude Code through its partial
+  messages, and the scripted model a few words at a time. Each still returns the whole response at the end, so
+  the loop, the trace and the evals are the same with streaming on or off.
+- **The cockpit types the reply** into the waiting bubble at the step where the board says the first words
+  arrived. It works over a held-open stream and over the short requests a phone or a tunnel uses. A recorded run
+  types the same text at the same step. In a terminal, `loopwright` prints the reply as it comes.
+- **The output guard works inside the stream.** The secret patterns run on the text so far and the last 24
+  characters are held back until the words after them arrive, so a credential is masked before any of it is
+  shown. If a pattern only completes after part of it was released, the screen is corrected. The full guard still
+  runs on the finished reply.
+- **Models that answer in JSON** (Claude Code, and the text protocol for small local models) show only the
+  answer inside the object, un-escaped as it grows, and nothing for a tool call.
+- **A retry starts a new stream**, so a connection that drops half-way shows the answer beginning again instead
+  of a spliced one.
+- One new event, `model.stream`, with the time to first token; the totals are on the model call, and the receipt
+  under each reply shows "first words after". Nothing is streamed when nobody is watching: evals, scheduled tasks
+  and a piped `loopwright ask` get the reply whole.
+- A Lab switch (Stream the reply), a lesson (Watching the reply arrive; 25 lessons), the Streaming handbook card
+  now runs (85 of 95 do), and three eval cases with two new graders that read what was on the reader's screen
+  (72 cases). 133 tests.
+- Not yet run: streaming against a signed-in Claude Code, the hosted APIs or a real Ollama. Each is tested
+  against a stand-in that sends that service's documented stream.
+
 ## 0.7.0
 
 Exercises where you write the code.

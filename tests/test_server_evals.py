@@ -248,7 +248,7 @@ def test_lessons_run_as_written_on_the_scripted_model(tmp_path):
             agent.run_turn(prompt, session="a", options=Options.from_dict({**base, "approvals": "approve"}))
         options = Options.from_dict({**base, "approvals": "approve", **lesson.get("options", {})})
         result = agent.run_turn(lesson["prompt"], session="b" if lesson.get("new_session") else "a", options=options,
-                                approver=lambda request: True)
+                                approver=lambda request: True, live=[lambda piece: None])      # the cockpit is always watching
         kinds = [e.kind for e in result.events]
         for watch in lesson["watch"]:
             assert watch["kind"] in kinds, f"lesson {lesson['id']} promises {watch['kind']}"

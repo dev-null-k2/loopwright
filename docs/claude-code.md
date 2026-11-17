@@ -27,6 +27,10 @@ claude -p --output-format json --model sonnet --system-prompt <Loopwright's prom
 - It runs in an empty folder under `~/.loopwright/`, so no project `CLAUDE.md` or settings leak in.
 - Loopwright's tools are described in the system prompt and the model is asked to reply with one JSON object:
   tool calls or a final answer. A reply in plain prose is taken as the final answer.
+- When you are watching (the cockpit, or `loopwright` in a terminal) the call is made with
+  `--output-format stream-json --verbose --include-partial-messages` instead. The CLI then prints one JSON object
+  per line while it works, and Loopwright passes the answer on as it grows. Because the model answers in that JSON
+  object, only the characters of its `final` string are shown; a tool call shows nothing.
 
 Costs to know about: each call starts a process, so expect a few seconds per loop round; usage counts against
 your subscription's limits; and the figure Claude Code reports as cost is shown in the receipt as reported.
@@ -39,7 +43,9 @@ including a full turn through the harness, a prose reply, an authentication erro
 signed-in Claude Code, so check your own install with `loopwright selftest --provider claude-code`: eight
 questions end to end, checked on what the agent did, not on how the model worded it. The exact command line was also run against Claude Code
 2.1.323 on a machine with no login: the CLI accepted every flag and returned its JSON authentication error, which
-Loopwright reports as "not signed in". That is as far as a machine without an account can go. If your CLI version
+Loopwright reports as "not signed in". The streaming command line was run the same way against Claude Code 2.1.326, with the same result; the streamed
+text itself is tested against a stand-in for the CLI that prints the documented `stream_event` lines, and has not
+been run against a signed-in Claude Code. That is as far as a machine without an account can go. If your CLI version
 rejects a flag, the error says which.
 
 ## Loopwright as a tool server for Claude Code (MCP)

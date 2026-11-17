@@ -104,6 +104,13 @@ Anything shaped like a credential in your message is masked before it reaches th
 again on the way out. Memory consolidation drops any candidate fact that looks like a secret. This is pattern
 matching: it catches common key formats, not every secret.
 
+A streamed reply is on screen before the output guard has read all of it. So the same patterns run on the text
+so far while it streams, and the last 24 characters are kept back until the words after them arrive
+([`models/streaming.py`](../loopwright/models/streaming.py)). A secret that fits in that window is masked before
+any of it is shown. One that is wider (a card number read out with a space after every digit) can show its first
+characters for a moment before the screen is corrected; a test demonstrates exactly that case. The trace keeps
+both the text the model wrote and, when they differ, the text that was shown.
+
 ## What you are trusting
 
 - **Files in `~/.loopwright/tools/`** run as your own code. Loopwright loads only from that folder and never

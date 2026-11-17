@@ -1387,19 +1387,20 @@ Prompting changes instructions and examples: instant and cheap. RAG supplies kno
 >
 > I ask what problem they are solving. If the model needs to know what is in their documents, that is a knowledge gap and RAG fits: it stays current, cites sources and needs no training. Fine-tuning suits behaviour: a house style, a strict format, a narrow classification at scale. I would start with prompting and retrieval, build an eval, and consider fine-tuning only if a measured gap remains that context cannot close.
 
-### <a id="streaming"></a>Streaming *(explained, not built here)*
+### <a id="streaming"></a>Streaming
 
 **Sending the reply as it is generated instead of waiting for all of it.**
 
-Model APIs can emit tokens as they are produced. Forwarding them to the user cuts perceived latency from the full generation time to the time to first token. Loopwright streams events (each step as it happens, over Server-Sent Events) but returns each model response whole.
+A model writes its answer one token at a time, and its API can pass those on as they are produced. Forwarding them to the user cuts the wait they feel from the whole generation time to the time to first token. Loopwright streams twice over: each step of a turn reaches the cockpit as an event, and the reply itself is passed on a few words at a time while the model writes it. Every provider does it: the Anthropic and OpenAI-style APIs stream natively, a local server streams the same way, Claude Code prints partial messages, and the scripted model hands its answer over word by word. The pieces are not events and are not kept. The trace records one model.stream event when the first words arrive, and the totals on the model call that follows.
 
 - **Why it exists.** A ten-second wait with nothing on screen feels broken; the same ten seconds with text appearing feels fast.
-- **The tradeoff.** You cannot run an output guardrail on text you have already shown. Streaming forces a choice: check in chunks, delay slightly behind the stream, or accept that a violation may be visible before it is caught.
-- **In this repo.** [`loopwright/server.py`](../loopwright/server.py)
+- **The tradeoff.** You cannot run an output guardrail on text you have already shown. Here the secret patterns run on the text so far and the last 24 characters are held back, so the screen runs a few words behind the model; if a pattern only matches after part of it was released, the screen is corrected. The citation check still needs the finished reply. A stream that drops is retried from the start, so the reader can see the text begin again. Nothing is streamed when nobody is watching: evals and scheduled turns get the reply whole.
+- **In this repo.** [`loopwright/models/streaming.py`](../loopwright/models/streaming.py)
+- **See it run.** `loopwright ask "What is streaming?" --steps`
 
 > **Interview question.** How do you apply output guardrails to a streaming response?
 >
-> You cannot fully check what is already on screen, so pick a tradeoff: buffer a sentence or two and check before release, run a fast checker in parallel and cut the stream on a hit, or stream only low-risk content and hold structured or sensitive answers until complete. I choose by risk, and keep the full post-hoc check for logging and evals either way.
+> You cannot fully check what is already on screen, so pick a tradeoff: buffer a sentence or two and check before release, run a fast checker in parallel and cut the stream on a hit, or stream only low-risk content and hold structured or sensitive answers until complete. I choose by risk, and keep the full post-hoc check for logging and evals either way. Loopwright takes the first option: it holds back a few words, masks secrets inside the stream, corrects the screen if something slipped out, and still runs the whole guard on the finished reply.
 
 ### <a id="determinism"></a>Non-determinism *(explained, not built here)*
 

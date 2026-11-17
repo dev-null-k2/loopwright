@@ -75,6 +75,43 @@ def _ask_approval(request: dict[str, Any]) -> bool:
         return False
 
 
+class _LiveText:
+    """Prints a streamed reply in the terminal while the model writes it. Give
+    it to `run_turn(live=[...])`; afterwards `covers(reply)` says whether what
+    is on screen is already the whole reply."""
+
+    def __init__(self) -> None:
+        self.text, self.stream, self.open = "", 0, False
+
+    def __call__(self, message: dict[str, Any]) -> None:
+        if message.get("type") != "delta":
+            return
+        if message.get("stream") != self.stream:        # a new stream: the next model call, or a retry
+            self.end_line()
+            if self.text:
+                print()
+            self.stream, self.text = message.get("stream"), ""
+        if "replace" in message:                        # the guard masked something already printed
+            self.end_line()
+            note = "(the output guard rewrote the text above; the corrected text follows)"
+            print(f"{DIM}{note}{RESET}" if _colour() else note)
+            self.text = message["replace"]
+            sys.stdout.write(self.text)
+        else:
+            self.text += message.get("text", "")
+            sys.stdout.write(message.get("text", ""))
+        sys.stdout.flush()
+        self.open = bool(self.text) and not self.text.endswith("\n")
+
+    def end_line(self) -> None:
+        if self.open:
+            print()
+            self.open = False
+
+    def covers(self, reply: str) -> bool:
+        return bool(self.text.strip()) and self.text.strip() == reply.strip()
+
+
 def _agent():
     from loopwright.harness import Agent
     return Agent()
@@ -105,20 +142,42 @@ def cmd_chat(args: argparse.Namespace) -> int:
             why = not why
             print(f"  explanations {'on' if why else 'off'}")
             continue
-        sinks = [lambda e, verbose=why: print(format_step(e, verbose))] if steps else []
-        result = agent.run_turn(message, session=session, options=options, sinks=sinks, approver=_ask_approval)
-        print(f"\n{result.reply}\n")
+        live = _LiveText()
+
+        def step(e: Event, verbose: bool = why, live: _LiveText = live) -> None:
+            live.end_line()
+            print(format_step(e, verbose))
+
+        def approve(request: dict[str, Any], live: _LiveText = live) -> bool:
+            live.end_line()
+            return _ask_approval(request)
+
+        result = agent.run_turn(message, session=session, options=options, sinks=[step] if steps else [],
+                                approver=approve, live=[live])
+        live.end_line()
+        print() if live.covers(result.reply) else print(f"\n{result.reply}\n")     # already on screen, or print it now
         print(f"{DIM if _colour() else ''}{result.receipt['line']}  (replay: loopwright replay {result.turn_id}){RESET if _colour() else ''}\n")
 
 
 def cmd_ask(args: argparse.Namespace) -> int:
     agent, options = _agent(), _options(args)
-    sinks = [lambda e: print(format_step(e, args.why), file=sys.stderr)] if args.steps else []
-    result = agent.run_turn(" ".join(args.message), session=args.session, options=options, sinks=sinks,
-                            approver=_ask_approval if sys.stdin.isatty() else None)
+    # in a terminal the reply is printed as it is written; piped into another program it is printed once, whole
+    live = _LiveText() if sys.stdout.isatty() and not args.json else None
+
+    def step(e: Event) -> None:
+        if live:
+            live.end_line()
+        print(format_step(e, args.why), file=sys.stderr)
+
+    result = agent.run_turn(" ".join(args.message), session=args.session, options=options, sinks=[step] if args.steps else [],
+                            approver=_ask_approval if sys.stdin.isatty() else None, live=[live] if live else None)
     if args.json:
         print(json.dumps(result.to_json(), indent=2, ensure_ascii=False))
+    elif live and live.covers(result.reply):
+        live.end_line()
     else:
+        if live:
+            live.end_line()
         print(result.reply)
     return 0 if result.ok else 1
 

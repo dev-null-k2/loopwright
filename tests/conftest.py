@@ -15,6 +15,7 @@ NOW = dt.datetime(2026, 11, 12, 18, 0)        # a Thursday
 def _isolated(tmp_path, monkeypatch):
     """Every test gets its own state folder and no real model credentials."""
     monkeypatch.setenv("LOOPWRIGHT_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("LOOPWRIGHT_STREAM_PACE_MS", "0")                    # the scripted model streams without pausing
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LOOPWRIGHT_PROVIDER", "TAVILY_API_KEY", "BRAVE_API_KEY", "LOOPWRIGHT_SEARCH",
                 "OTEL_EXPORTER_OTLP_ENDPOINT", "TELEGRAM_BOT_TOKEN", "DISCORD_BOT_TOKEN", "SLACK_APP_TOKEN", "WHATSAPP_TOKEN"):
         monkeypatch.delenv(key, raising=False)

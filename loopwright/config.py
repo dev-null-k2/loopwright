@@ -42,6 +42,7 @@ class Options:
     # ---- model
     provider: str = "auto"          # auto | scripted | local | claude-code | anthropic | openai
     model: str = ""                 # empty = the provider's default
+    stream: bool = True             # pass the reply on as it is written, when someone is watching
     # ---- orchestration
     pattern: str = "react"          # react | plan | reflect
     max_iterations: int = 8         # loop stop condition 2

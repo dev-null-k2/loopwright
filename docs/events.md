@@ -44,6 +44,7 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 | `model.exhausted` | Model gateway | [Retries with backoff](glossary.md#retry-backoff) |
 | `model.fallback` | Model gateway | [Model fallback](glossary.md#fallback) |
 | `model.retry` | Model gateway | [Retries with backoff](glossary.md#retry-backoff) |
+| `model.stream` | Reply | [Streaming](glossary.md#streaming) |
 | `plan.made` | Planner | [Plan-and-execute](glossary.md#plan-and-execute) |
 | `reply.send` | Reply | [Harness](glossary.md#harness) |
 | `schedule.create` | Scheduler | [Standing instructions and persistence](glossary.md#standing-instructions) |

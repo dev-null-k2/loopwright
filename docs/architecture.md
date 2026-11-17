@@ -73,6 +73,15 @@ UPDATE, NOOP or DROP. Facts are superseded, never edited.
 [`models/`](../loopwright/models/) translates at the last moment. The Claude Code adapter has no native channel
 for foreign tools, so it describes them in the system prompt and parses one JSON object back.
 
+**The reply is streamed beside the events, not as events.** When someone is watching, the gateway hands the
+provider an `on_text` callback and a [`Streamer`](../loopwright/models/streaming.py) passes each piece of text to
+the watcher on the recorder's live channel (`Recorder.say`). The pieces are not recorded: the trace gets one
+`model.stream` event when the first words arrive and the totals on the `model.call` that follows, so a replay
+can type the reply out again. The provider still returns the whole response, which is why the loop, the evals
+and the trace are the same with streaming on or off. The Streamer runs the secret patterns over the text so far
+and keeps the last 24 characters back; the full output guard runs on the finished reply as before. With nobody
+watching (evals, scheduled tasks, a piped `loopwright ask`) nothing is streamed.
+
 **A worker is the same loop with a different toolset.** `Agent._work` runs `run_loop` with a fresh context, its
 own tool registry and its own gate. Research workers (`delegate`), the browser worker (`browse_web`) and a
 workflow's `agent` steps are all that one function. What a worker read taints the turn that receives its summary.

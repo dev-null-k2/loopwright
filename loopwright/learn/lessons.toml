@@ -178,6 +178,19 @@ takeaway = "Set 'Fail the first N model calls' to 4 in the Lab: retries run out 
 concepts = ["retry-backoff", "fallback", "circuit-breaker"]
 
 [[lesson]]
+id = "streaming"
+title = "Watching the reply arrive"
+goal = "See the answer appear while the model is still writing it, then switch streaming off and feel the difference."
+prompt = "What is streaming?"
+watch = [
+  { kind = "model.stream", say = "The first words are already in the chat, and the model call is not finished yet. This moment is the time to first token." },
+  { kind = "guard.output", say = "The whole reply is checked once it is complete. While it streamed, a lighter check masked secrets and kept the last few words back." },
+  { kind = "cost.receipt", say = "Under the reply: the total time, and how long the first words took. Streaming changes the second number, not the first." },
+]
+takeaway = "Streaming does not make the model faster. It replaces a blank wait with words. Open the Lab, switch 'Stream the reply' off and run this again: same answer, same total time, and nothing to read until the end."
+concepts = ["streaming", "output-guardrails", "model-gateway"]
+
+[[lesson]]
 id = "limits"
 title = "Hitting a limit"
 goal = "Give a two-step request to a loop that is only allowed one round."

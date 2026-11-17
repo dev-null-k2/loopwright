@@ -79,15 +79,15 @@ async def main() -> None:
 
         page = await page_for("light")
         await page.click("#left-mode button[data-mode=lessons]")
-        await page.click(".lesson:nth-child(10) > button")
+        await page.click('.lesson > button:has-text("A prompt injection, defended")')      # by title: numbers move when a lesson is added
         await page.click(".lesson.open .run")
         await page.wait_for_timeout(9000)
         await page.click(".lesson.open ol li:first-child button")
         await page.wait_for_timeout(700)
         await page.screenshot(path=f"{OUT}/lesson-injection.png")
-        for number, watch, name in ((20, 3, "lesson-browser"), (18, 1, "lesson-workflow")):
+        for title, watch, name in (("A browser agent", 3, "lesson-browser"), ("A workflow: the code decides", 1, "lesson-workflow")):
             await page.click("#left-mode button[data-mode=lessons]")
-            await page.click(f".lesson:nth-child({number}) > button")
+            await page.click(f'.lesson > button:has-text("{title}")')
             await page.click(".lesson.open .run")
             await page.wait_for_timeout(11000)
             await page.click(f".lesson.open ol li:nth-child({watch}) button")
@@ -95,7 +95,7 @@ async def main() -> None:
             await page.evaluate("document.getElementById('inspector').scrollTop = 330")     # bring the picture into view
             await page.wait_for_timeout(300)
             await page.screenshot(path=f"{OUT}/{name}.png")
-            await page.click(f".lesson:nth-child({number}) > button")
+            await page.click(f'.lesson > button:has-text("{title}")')
         for tab, name in (("evals", "evals"), ("evals/compare", "compare"), ("automations/workflows", "automations"),
                           ("learn/retrieval-gate", "learn"), ("memory", "memory"), ("tools", "tools")):
             await page.goto(URL + "#" + tab)

@@ -15,6 +15,11 @@ than anyone can read. So the cockpit never shows a turn "live" at full speed. It
 
 Live and recorded runs are therefore the same code path. There is no separate replay mode to drift out of date.
 
+The reply's own text is the one thing that does not travel as events. While the model writes, its words arrive as
+small `delta` messages beside the event stream, and the waiting bubble in the chat types them out once the player
+reaches the `model.stream` step they belong to. A recorded run has no deltas, so the bubble types the text stored
+on the model call instead: the same words at the same step, without the original rhythm.
+
 ## Controls
 
 | Control | Key | |

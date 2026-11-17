@@ -22,6 +22,14 @@ Two things about this adapter are worth understanding:
 
 It is slower than the API (each call starts a process) and usage counts
 against your subscription's limits.
+
+STREAMING: with `--output-format stream-json --include-partial-messages` the
+CLI prints one JSON object per line while it works. Lines of type
+`stream_event` wrap the same events the Messages API streams (a `text_delta`
+is a piece of the reply) and the last line, of type `result`, is the object
+the plain `json` format would have printed. Because the model here answers in
+the JSON protocol above, the pieces go through a ReplyFilter, which passes on
+only the characters of the "final" answer.
 """
 
 from __future__ import annotations
@@ -31,11 +39,23 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
+import threading
 import uuid
 from pathlib import Path
 from typing import Any
 
-from loopwright.models.base import FatalModelError, Message, ModelResponse, ToolCall, TransientModelError, Usage, estimate_tokens
+from loopwright.models.base import (
+    FatalModelError,
+    Message,
+    ModelResponse,
+    OnText,
+    ToolCall,
+    TransientModelError,
+    Usage,
+    estimate_tokens,
+)
+from loopwright.models.streaming import ReplyFilter
 
 DEFAULT_MODEL = "sonnet"
 TIMEOUT_S = 240
@@ -103,14 +123,15 @@ def parse_reply(text: str) -> tuple[str, list[ToolCall], str]:
 
 class ClaudeCodeProvider:
     name = "claude-code"
+    streams = True
 
-    def __init__(self, model: str = "", runner=subprocess.run, home: Path | None = None):
+    def __init__(self, model: str = "", runner=subprocess.run, home: Path | None = None, popen=subprocess.Popen):
         self.model = model or os.environ.get("LOOPWRIGHT_MODEL") or DEFAULT_MODEL
-        self._run = runner
+        self._run, self._popen = runner, popen
         self._cwd = Path(home or Path.home() / ".loopwright") / "claude-code-cwd"
 
     def complete(self, system: str, messages: list[Message], tools: list[dict[str, Any]],
-                 *, max_tokens: int = 2048, purpose: str = "loop") -> ModelResponse:
+                 *, max_tokens: int = 2048, purpose: str = "loop", on_text: OnText | None = None) -> ModelResponse:
         cli = find_cli()
         if not cli:
             raise FatalModelError("the `claude` command was not found. Install Claude Code, or pick another provider")
@@ -120,21 +141,15 @@ class ClaudeCodeProvider:
         prompt = render_transcript(messages)
         # an empty working directory, so no project CLAUDE.md or settings leak into the call
         self._cwd.mkdir(parents=True, exist_ok=True)
-        cmd = [cli, "-p", "--output-format", "json", "--model", self.model, "--system-prompt", full_system,
+        cmd = [cli, "-p", "--model", self.model, "--system-prompt", full_system,
                "--tools", "", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"]
-        try:
-            proc = self._run(cmd, input=prompt, capture_output=True, text=True, timeout=TIMEOUT_S, cwd=str(self._cwd))
-        except subprocess.TimeoutExpired as exc:
-            raise TransientModelError(f"claude did not answer within {TIMEOUT_S}s") from exc
-        except OSError as exc:
-            raise FatalModelError(f"could not start claude: {exc}") from exc
-        try:
-            data = json.loads(proc.stdout.strip().splitlines()[-1]) if proc.stdout.strip() else {}
-        except json.JSONDecodeError:
-            data = {}
+        if on_text:
+            data, code, stderr = self._streamed(cmd, prompt, on_text)
+        else:
+            data, code, stderr = self._whole(cmd, prompt)
         result = str(data.get("result", ""))
-        if proc.returncode != 0 or data.get("is_error") or not data:
-            message = result or proc.stderr.strip()[:300] or f"claude exited with code {proc.returncode}"
+        if code != 0 or data.get("is_error") or not data:
+            message = result or stderr.strip()[:300] or f"claude exited with code {code}"
             if re.search(r"authenticat|log ?in|sign ?in|credential|unauthori[sz]ed|invalid api key", message, re.I):
                 raise FatalModelError("Claude Code is not signed in. Run `claude` once in a terminal and sign in. "
                                       f"({message})")
@@ -150,3 +165,66 @@ class ClaudeCodeProvider:
             stop_reason="tool_use" if calls else "end_turn", cost_usd=data.get("total_cost_usd"),
             usage=Usage(tokens_in or estimate_tokens(full_system + prompt),
                         usage.get("output_tokens") or estimate_tokens(result), cached, estimated=not usage))
+
+    def _whole(self, cmd: list[str], prompt: str) -> tuple[dict[str, Any], int, str]:
+        """Run to the end, then read the one JSON object it printed."""
+        try:
+            proc = self._run([*cmd, "--output-format", "json"], input=prompt, capture_output=True, text=True,
+                             timeout=TIMEOUT_S, cwd=str(self._cwd))
+        except subprocess.TimeoutExpired as exc:
+            raise TransientModelError(f"claude did not answer within {TIMEOUT_S}s") from exc
+        except OSError as exc:
+            raise FatalModelError(f"could not start claude: {exc}") from exc
+        try:
+            data = json.loads(proc.stdout.strip().splitlines()[-1]) if proc.stdout.strip() else {}
+        except json.JSONDecodeError:
+            data = {}
+        return (data if isinstance(data, dict) else {}), proc.returncode, proc.stderr or ""
+
+    def _streamed(self, cmd: list[str], prompt: str, on_text: OnText) -> tuple[dict[str, Any], int, str]:
+        """Read the CLI's output a line at a time while it runs, passing reply text on as it appears."""
+        feed = ReplyFilter(on_text).feed
+        data: dict[str, Any] = {}
+        with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as errors:     # a file, so a chatty stderr cannot block the pipe
+            try:
+                proc = self._popen([*cmd, "--output-format", "stream-json", "--verbose", "--include-partial-messages"],
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors, text=True,
+                                   encoding="utf-8", errors="replace", cwd=str(self._cwd))
+            except OSError as exc:
+                raise FatalModelError(f"could not start claude: {exc}") from exc
+            timed_out = threading.Event()
+
+            def stop() -> None:
+                timed_out.set()
+                proc.kill()
+
+            watchdog = threading.Timer(TIMEOUT_S, stop)
+            watchdog.start()
+            try:
+                try:
+                    proc.stdin.write(prompt)
+                    proc.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass                                # it exited before reading: the exit code will say why
+                for line in proc.stdout:
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(row, dict):
+                        continue
+                    if row.get("type") == "stream_event":
+                        delta = (row.get("event") or {}).get("delta") or {}
+                        if delta.get("type") == "text_delta":
+                            feed(delta.get("text", ""))
+                    elif row.get("type") == "result":
+                        data = row
+                code = proc.wait()
+            finally:
+                watchdog.cancel()
+                if proc.poll() is None:
+                    proc.kill()
+            if timed_out.is_set():
+                raise TransientModelError(f"claude did not answer within {TIMEOUT_S}s")
+            errors.seek(0)
+            return data, code, errors.read(4000)

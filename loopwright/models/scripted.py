@@ -33,7 +33,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from loopwright.models.base import Message, ModelResponse, ToolCall, Usage, estimate_tokens, messages_text
+from loopwright.models.base import Message, ModelResponse, OnText, ToolCall, Usage, estimate_tokens, messages_text
+
+STREAM_PIECES = 120     # a streamed answer is cut into at most this many pieces
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 DAYPARTS = [("early morning", "08:00"), ("morning", "09:00"), ("lunch", "12:30"), ("afternoon", "14:00"),
@@ -726,12 +728,13 @@ def _pick_route(prompt: str) -> str:
 
 class ScriptedProvider:
     name = "scripted"
+    streams = True          # it has no tokens, so it hands its answer over a few words at a time
 
     def __init__(self, model: str = ""):
         self.model = model or "scripted-v1"
 
     def complete(self, system: str, messages: list[Message], tools: list[dict[str, Any]],
-                 *, max_tokens: int = 2048, purpose: str = "loop") -> ModelResponse:
+                 *, max_tokens: int = 2048, purpose: str = "loop", on_text: OnText | None = None) -> ModelResponse:
         names = {t["name"] for t in tools}
         user, results, critic = _turn(messages)
         env = _env(system, names, critic)
@@ -754,6 +757,11 @@ class ScriptedProvider:
                      if done else "I could not complete any step."))
             calls = []
         tool_calls = [ToolCall(f"call_{len(messages)}_{i}", name, arguments) for i, (name, arguments) in enumerate(calls)]
+        if on_text and text and not tool_calls:
+            words = re.findall(r"\S+\s*|\s+", text)
+            step = max(1, -(-len(words) // STREAM_PIECES))          # a long answer goes out in bigger pieces
+            for i in range(0, len(words), step):
+                on_text("".join(words[i:i + step]))
         prompt = system + messages_text(messages) + json.dumps(tools)
         return ModelResponse(text=text, tool_calls=tool_calls, thought=thought, provider=self.name, model=self.model,
                              stop_reason="tool_use" if tool_calls else "end_turn", cost_usd=0.0,

@@ -2,7 +2,7 @@
 
 # The guided path
 
-Eighteen short lessons. Each runs one real turn and tells you which steps to stop on. In the cockpit they are under **Lessons**, run in a scratch copy of the agent (the classroom) so they never touch your own memory, and every *watch for* line becomes a link that jumps the board to that step.
+Twenty-four short lessons. Each runs one real turn and tells you which steps to stop on. In the cockpit they are under **Lessons**, run in a scratch copy of the agent (the classroom) so they never touch your own memory, and every *watch for* line becomes a link that jumps the board to that step.
 
 The same lessons work in the terminal: run the command, then `loopwright replay last`.
 

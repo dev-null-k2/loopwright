@@ -246,3 +246,328 @@ People. Users told what it can and cannot do, a feedback button, and an escalati
 
 Then I would offer the VP a real option instead of a yes or no: a staged launch next week to a small group with a human in the loop, with the criteria for widening it written down. That gets real usage data sooner than waiting, and it bounds the risk.
 """
+
+# =============================================================== THE FORWARD-DEPLOYED LOOP
+# The rounds that are particular to forward-deployed and solutions roles: the open case study, the
+# customer conversation, integration with systems you do not own, and the questions about you.
+# docs/fde-interviews.md maps each round to these.
+
+[[scenario]]
+id = "case-clinicians"
+kind = "Case study"
+title = "A vague ask: 'an AI assistant for clinicians'"
+prompt = "A hospital network says it wants an AI assistant for clinicians. That is all you are given. You have 45 minutes. Where do you start, and what do you propose?"
+concepts = ["workflow-vs-agent", "data-boundaries", "human-in-the-loop", "rag", "evals", "rollout"]
+answer = """
+This round is graded on how you break the problem down, not on the architecture. So I say out loud that 'an assistant for clinicians' is a hope, not a requirement, and I spend the first third finding the requirement.
+
+Clarify. Who exactly: nurses at handover, physicians writing notes, coders after discharge? What do they do today, how long does it take, and what goes wrong? What has the hospital already tried? Then the constraints that decide everything in healthcare: is this patient data, which regulation applies, may it leave their network, and is the output advice to a clinician or a decision about a patient? I ask who signs off, because a project without a clinical owner dies in review.
+
+Pick one job. I would rank candidate jobs by volume, by how checkable the output is, and by the cost of an error. Drafting a discharge summary from the chart scores well: frequent, tedious, and a clinician reads and signs every one. Suggesting a diagnosis scores badly: rare, hard to check, and the error is harm. I propose the first and say why I am refusing the second for now.
+
+Shape. It is a workflow, not an agent: fetch the encounter, retrieve the relevant notes and results, draft in the hospital's template with every statement linked to its source line, and put it in front of the clinician to edit and sign. Nothing is written to the record without a person.
+
+Failure. A fabricated medication is the case that matters, so the draft may only state what it can cite and flags anything it could not find. Wrong patient context is the second: the encounter id is passed in code, never inferred from text.
+
+Measure. Before launch, a set of past encounters with the signed summary as reference, scored by clinicians for omissions and unsupported statements, with unsupported statements required to be zero. After launch, edit distance between draft and signed version, time saved per summary, and how often clinicians discard the draft. Start with one ward and ten volunteers.
+
+I close by naming what I would do in the first two weeks on site: sit with the users, read fifty real summaries, and get the data access agreed. That is the answer they are listening for.
+"""
+
+[[scenario]]
+id = "case-disputes"
+kind = "Case study"
+title = "'Automate our disputes with AI'"
+prompt = "A bank's operations head says: we handle 40,000 card disputes a month with 300 people, automate it with AI. Decompose this into something you could ship in eight weeks."
+concepts = ["routing", "workflow-vs-agent", "tool-gate", "idempotency", "evals", "cost-accounting"]
+answer = """
+I start by refusing the word 'automate' as a goal and asking for the number behind it: is the pain cost per dispute, time to resolve, error rate, or a regulatory deadline being missed? Each leads to a different first project.
+
+Map the work before designing anything. A dispute has stages: intake, classification by reason, evidence gathering from several systems, a decision against scheme rules, the customer letter, and the ledger action. I ask for the volume and handling time of each stage and each reason code. Usually a few reason codes are most of the volume and one stage, often evidence gathering, is most of the time.
+
+Choose the slice. For eight weeks I take the highest-volume reason code and the stage with the most time and the least risk. Gathering evidence and drafting the case file for a human decision is a good first slice: the person still decides, so an error costs minutes, not money. Auto-deciding low-value disputes under a threshold is the second slice, once the first has data.
+
+Shape. Classification is a routing step with a confidence threshold; below it the case goes to the normal queue. Evidence gathering is a fixed workflow of read-only calls. Only the drafting step needs a model writing free text. No agent is choosing its own steps, because the steps are known. Any action that moves money sits behind a rule in code, an idempotency key, and for now a human.
+
+Failure. Misclassification sends a case down the wrong path: measure it and keep the fallback queue. A scheme rule changes: rules live in a versioned table the workflow reads, not in a prompt. A system is down: the case waits and is retried, it is never decided on partial evidence.
+
+Measure and decide. An eval set of a thousand closed disputes with the human outcome. Report classification accuracy, completeness of the evidence file, and handler time on assisted cases against a control group. I give the operations head the decision rule in advance: if assisted handling time drops by a third with no rise in reversals, we extend to the next reason code.
+
+What I would not promise: headcount. I would promise a measured change in handling time on one slice, and the data to decide the next.
+"""
+
+[[scenario]]
+id = "discovery-first-meeting"
+kind = "Customer"
+title = "The first meeting with a new customer"
+prompt = "You are meeting a new enterprise customer for the first time tomorrow. They bought the platform three weeks ago and nothing is deployed. What do you ask, and what do you want to leave with?"
+concepts = ["data-boundaries", "multi-tenancy", "evals", "rollout", "human-in-the-loop", "workflow-vs-agent"]
+answer = """
+I want to leave with four things: one use case with an owner, a definition of success with a number in it, a named path to the data, and the list of people who can say no. Everything I ask serves one of those.
+
+The outcome. What made you buy this? What would have to be true in ninety days for you to call it a success, and how would you measure that today? Who feels the problem most? I keep asking 'what happens then' until I reach a cost, a delay or a risk someone is accountable for.
+
+The current process. Walk me through the last time this was done by hand. Who does it, with which systems, how long does it take, where does it go wrong? I ask to watch it, because the description and the practice always differ.
+
+The data. Where does the information live, who owns each system, is there an API, what is the quality like, and who may see what? Permissions and data quality are the two things that sink deployments, so I ask now.
+
+The constraints. Which security review, which regulations, where must data be processed, what is the approval process for a production change, and how long did the last one take? Who else has to agree: security, legal, the works council, the business owner?
+
+The people. Who will use it daily, and can I talk to three of them this week? Who on your side will own it after I leave?
+
+Then I say what I heard back in two sentences and propose a first step small enough to finish in two weeks: one workflow, read-only, for a handful of users. I name the risks I already see, even if it is uncomfortable, because a surprise in week six costs more trust than candour in week one.
+
+What I avoid: demoing features, promising a date before I have seen the data, and accepting 'we want AI across the business' as a scope.
+"""
+
+[[scenario]]
+id = "customer-pushback"
+kind = "Customer"
+title = "The pilot is failing and they want fine-tuning"
+prompt = "Role-play: I am the customer's VP. The pilot answers are wrong a third of the time, my team has stopped using it, and I have been told we need to fine-tune a model on our data. Respond to me."
+concepts = ["customisation-options", "rag", "evals", "tracing", "hallucination", "feedback-loop"]
+answer = """
+First I do not argue. I say that a third wrong is not acceptable, that I would have stopped using it too, and that I want to find out why before either of us spends money on a fix.
+
+Then I ask for evidence instead of opinions: can we look at twenty of the wrong answers together, today? I sort each one into a cause, because 'wrong' has several. The right document was never retrieved. It was retrieved but the answer ignored it. The document itself is out of date. The question needed data the system has no access to. The answer was right and the user expected something else.
+
+I explain, without jargon, why that sorting matters for the fine-tuning question. Fine-tuning changes how a model writes and behaves. It does not give it today's facts and it does not fix a search that returns the wrong page. If most failures are missing or stale documents, a tuned model will be confidently wrong in your house style. If the failures are format, tone or a narrow classification task, tuning may well be the answer, and I will say so.
+
+I commit to something concrete and short: by Friday, a table of those failures by cause with the count for each, and the two fixes that address the largest causes. Usually that is retrieval, chunking and permissions on a document set, plus an 'I could not find this' answer instead of a guess.
+
+Then I address trust, because the team has stopped using it. I propose we take it back from the whole team to five volunteers, add a one-click 'this is wrong' that feeds an eval set, and only widen again when that set passes a bar we agree now.
+
+I offer the VP a decision, not reassurance: if after the retrieval fixes the error rate is still above the bar and the remaining errors are behavioural, I will bring a fine-tuning plan with its cost and timeline myself.
+
+What the interviewer is checking: that I stay calm, take the complaint seriously, turn it into data, explain a technical tradeoff in plain language, and say no to the proposed fix without saying no to the customer.
+"""
+
+[[scenario]]
+id = "security-review"
+kind = "Customer"
+title = "Get the design through the customer's security review"
+prompt = "The customer's security officer has blocked your deployment: 'an AI that reads our systems and takes actions' is not something she will sign. You have one meeting. What do you bring?"
+concepts = ["data-boundaries", "least-privilege", "lethal-trifecta", "tool-gate", "prompt-injection", "tracing", "agent-auth"]
+answer = """
+I treat her as the person whose job is to stop exactly the failure I am also afraid of, and I bring a document, not a pitch.
+
+One page of data flow. Which systems are read, which fields, what is sent to the model, where the model runs, what is stored, for how long, and what is never sent. If the honest diagram shows customer data leaving the network, I say so and show the contractual and technical controls, or I change the design before the meeting.
+
+The identity model. The agent acts with a service identity scoped to this use case, or with the calling user's own token, never with an administrator's. Every tool lists the permission it needs. I show that the agent cannot read anything the user could not.
+
+The action model. I separate reads from writes. Reads are logged. Writes are a short list, each with a limit enforced in code outside the model, an approval rule, and a way to undo. I show the three things that must never happen and the line of code that prevents each.
+
+The injection answer. She will ask what happens when a document tells the model to do something. I explain that content the agent reads is marked untrusted, that after reading it the agent loses the ability to act outwards without a person, and that the limits do not depend on the model behaving. I show the test cases and their results.
+
+The audit trail. Every run is a trace: who asked, what was retrieved, which tools ran with which arguments, who approved. I show one, and how it reaches their logging system.
+
+The kill switch and the rollout. Who can turn it off, how fast, and the plan: read-only first, then one write action with approval for a small group.
+
+Then I ask what would make her comfortable, and write down her conditions as requirements. Often the result is a narrower first version, and that is a good outcome. The mistake is to treat security as an obstacle to route around; the people who do that are back in the same meeting after the incident.
+"""
+
+[[scenario]]
+id = "webhooks-crm"
+kind = "Integration"
+title = "Sync with a customer's CRM when events arrive twice or out of order"
+prompt = "Your product has to stay in sync with a customer's CRM through webhooks. In testing you see duplicates, events out of order, and the occasional missing one. Design the integration."
+concepts = ["idempotency", "retry-backoff", "circuit-breaker", "checkpointing", "tracing", "tool-errors"]
+answer = """
+I assume the three things I saw are permanent properties of the channel, not bugs to wait out: delivery is at least once, order is not guaranteed, and some events never arrive. The design has to be correct under all three.
+
+Receive fast, process later. The webhook endpoint verifies the signature, writes the raw event to a durable queue or table, and returns 200 immediately. If I do the work inside the request, a slow downstream makes the CRM retry and multiplies the duplicates.
+
+Make processing idempotent. Every event has an id; I record processed ids and skip repeats. Where there is no reliable id I derive a key from the object id and its version. Applying the same event twice must leave the same state.
+
+Handle order with versions, not arrival time. Each record carries the CRM's updated-at or a version number. An update is applied only if it is newer than what I hold; an older one is dropped. For events that depend on each other, such as a contact arriving before its account, I park the dependent event and retry it rather than failing.
+
+Assume loss. Webhooks are a hint, not the source of truth. A reconciliation job pages through the CRM's API for anything changed since the last checkpoint and repairs differences. That job is what makes the system correct; the webhooks only make it fast.
+
+Protect both sides. Calls back to the CRM respect its rate limits, retry with backoff and jitter on transient errors, and stop behind a circuit breaker when it is down. Events that fail repeatedly go to a dead-letter queue with an alert, never silently dropped.
+
+Make it observable. For any record I can answer: which events arrived, which were applied, which were skipped and why. I track lag between the CRM change and my update, the duplicate rate, and the reconciliation diff size; a growing diff means webhooks are being lost.
+
+If an agent sits on top of this data, the same rules reach it: its write tools carry idempotency keys, and it reads my synchronised copy with a freshness timestamp instead of trusting that it is current.
+"""
+
+[[scenario]]
+id = "legacy-no-api"
+kind = "Integration"
+title = "The system of record is twenty years old and has no API"
+prompt = "The customer wants an assistant that answers questions about orders and can update them. The order system is a twenty-year-old application with a database nobody dares touch and no API. What do you do?"
+concepts = ["tool-calling", "tool-schema", "least-privilege", "browser-agent", "idempotency", "human-in-the-loop", "fallback"]
+answer = """
+The model is the easy part here. The work is building a safe, narrow door into a system that was never meant to have one, so I spend my questions there: who owns it, what is its load, is there a reporting copy, how do people change an order today, and what broke the last time someone integrated with it?
+
+Reads first, from a copy. I do not query the production database. I ask for a read replica, a nightly export, or change data capture into a store I control, and I build read tools over that: get_order, search_orders, order_history. I state the freshness of the data in every answer, because a copy can be hours old.
+
+Writes through the path the business already trusts. In order of preference: an existing batch import or message interface the application already consumes; stored procedures the vendor supports; and only last, driving the user interface with automation. Writing straight to tables bypasses twenty years of validation logic and is how integrations corrupt data.
+
+A thin service in front. Whatever the mechanism, the agent never sees it. It sees three or four typed tools with validation, limits and an idempotency key, backed by a small service I own that queues writes, applies them one at a time, and confirms each by reading back. That service is also where rate limiting protects the old system from a new kind of load.
+
+If the only way in is the screen. Then I say plainly that it is brittle, and I contain it: a fixed, scripted sequence per operation rather than a model exploring freely, a screenshot per step, verification after each write, and a human approval on every change until the error rate is known.
+
+Failure. The legacy system is slow or down: queue and tell the user it is pending, never report success early. A write half-applies: every operation is designed to be re-runnable and is checked by a read. The copy is stale: answers say as of when.
+
+Measure. Before any write goes live, replay a month of real change requests through the tools against a test instance and compare with what staff actually did.
+
+The sentence I want the interviewer to hear: I would rather ship a read-only assistant in three weeks and add one write operation at a time than promise full updates and take down the order system.
+"""
+
+[[scenario]]
+id = "rag-at-scale"
+kind = "System design"
+title = "Retrieval over ten million documents at a thousand questions a second"
+prompt = "Design a question-answering system over ten million internal documents, serving a thousand queries per second at peak, with answers in under two seconds. Many tenants, each with their own documents."
+concepts = ["vector-index", "multi-tenancy", "chunking", "hybrid-search", "reranking", "semantic-cache", "prompt-caching", "cost-accounting"]
+answer = """
+Clarify the numbers, because they decide the design. Ten million documents is perhaps a hundred million chunks. A thousand queries a second at peak: what is the average? Two seconds to the full answer or to the first words? How fresh must a new document be, and how strict is tenant isolation: contractual, or regulatory?
+
+Split the latency budget. Two seconds might be 150 ms for retrieval, 150 ms for reranking, and the rest for generation, which dominates. That tells me to stream the answer, keep prompts short, and use a small fast model for most questions.
+
+Ingestion, offline. Parse, chunk on document structure, attach tenant id, access list, source and date to every chunk, embed in batches, and write to the index. Updates flow through a queue so a changed document is re-indexed in minutes.
+
+Retrieval. An approximate vector index, sharded, with the tenant filter applied inside the search, plus a keyword index for exact terms; merge the two, then rerank only the top fifty. Tenant isolation is enforced here: large or regulated tenants get their own index, small ones share with a mandatory filter that the query layer adds and the caller cannot omit.
+
+Generation. Send the top handful of chunks, require citations, and answer 'not found' when retrieval scores are low. Cache at three levels: frequent query embeddings, retrieval results for popular questions, and the provider's prompt cache for the fixed instructions. Every cache key includes tenant and permissions.
+
+Scale and cost. Retrieval scales with replicas. Generation is the bill: a thousand queries a second with a few thousand tokens each is large, so I route easy questions to a cheaper model, cap context, and measure cost per answer per tenant from the first day. Queueing and per-tenant rate limits protect everyone from one noisy customer.
+
+Failure. Index lag: answers show the document date. A provider outage: fall back to a second model, or to search results without a generated answer. A tenant filter bug: this is the one that ends the product, so it has its own test suite and an alarm on any cross-tenant citation.
+
+Measure. Offline recall@k and answer faithfulness per tenant on labelled questions; online latency percentiles, 'not found' rate, citation click-through and thumbs-down, with every change to chunking or the index going through the offline set first.
+"""
+
+[[scenario]]
+id = "conflicting-sources"
+kind = "System design"
+title = "The retrieved documents disagree"
+prompt = "Your assistant retrieves two policy documents that give different answers to the user's question. What should the system do, and how do you build that?"
+concepts = ["rag", "reranking", "hallucination", "output-guardrails", "llm-as-judge", "evals", "context-engineering"]
+answer = """
+The wrong behaviour is the default one: the model blends both into a confident answer that matches neither document. So the goal is that the system notices the conflict and resolves it by rule, or says so.
+
+Clarify what 'disagree' usually means in this corpus. Most conflicts are not real: one document is an old version, one is a draft, one applies to a different region or product. A smaller number are real contradictions that only the business can settle.
+
+Resolve what metadata can resolve, before generation. Every chunk carries its source, version, effective date, status and scope. Retrieval filters out drafts and superseded versions and filters by the asker's region and product. Ranking prefers the authoritative source and the newest effective date. A large share of conflicts disappear here, which is why I would fix ingestion before touching the prompt.
+
+Make the remaining conflict visible to the model. Each passage goes into the context labelled with its source and date, and the instructions say: if passages disagree, do not merge them; state the answer from the more authoritative or more recent one, say that another document differs, and cite both.
+
+Check the output. A grounding check verifies that each claim is supported by a cited passage. A simple detector flags answers that cite sources whose key values differ, such as two different notice periods, and those are either rewritten to present both or sent to a person.
+
+Know when to stop. For topics where a wrong answer is costly, such as legal or safety policy, a detected conflict means the assistant presents both passages and routes to the owner instead of choosing.
+
+Close the loop. Every detected conflict is logged with the two documents and sent to the content owner. The durable fix is in the documents, and the assistant has just become the best tool the company has for finding its own contradictions.
+
+Measure. An eval set built from known conflicting pairs: does the answer acknowledge the conflict, pick the right source by the stated rule, and cite both? Plus a count of conflicts per week by document, which should fall as owners fix them.
+"""
+
+[[scenario]]
+id = "high-impact-action"
+kind = "System design"
+title = "An agent allowed to take an action that costs money"
+prompt = "Design an agent that can issue refunds up to $500 on its own. Convince me it is safe."
+concepts = ["tool-gate", "human-in-the-loop", "idempotency", "lethal-trifecta", "budgets", "trajectory-evals", "rollout", "prompt-injection"]
+answer = """
+I would not try to convince you the model is safe. I would show you that the system is safe when the model is wrong, because it will be.
+
+Clarify. What does a wrong refund cost compared with a delayed right one? What share of refunds are under $500, and what are the rules a human applies today? Is the $500 per refund, per customer, per day?
+
+Narrow the action. The tool is not 'issue refund'. It is refund(order_id, amount, reason_code) where the order must belong to the authenticated customer, the amount cannot exceed what was paid or the remaining refundable balance, and the reason code is from a fixed list. Those checks run in code in front of the tool. The model proposes; the gate decides.
+
+Limits the model cannot talk its way past. Per-refund cap, per-customer cap per month, and a daily total across the whole system, all enforced outside the prompt. Above a threshold or outside policy the action becomes a request for human approval with the evidence attached.
+
+Idempotency and reversibility. Each refund carries a key derived from the order and the conversation, so a retry or a repeated tool call cannot pay twice. I prefer a mechanism with a hold period over an instant irreversible transfer.
+
+The injection case. The customer's own message is untrusted text, and so is anything retrieved. A message saying 'I was promised $500' changes nothing, because eligibility is computed from order data, not from the conversation. After the agent reads external content it cannot take a money action without approval.
+
+Evidence. Every refund stores the trace: the data read, the rule that allowed it, the amount, the key. A daily report compares the agent's refunds with policy and a sample is audited by a person.
+
+Prove it before launch. An eval set of real past cases including the adversarial ones: fraud patterns, duplicate requests, attempts to raise the amount. I grade the trajectory, not only the reply: was the right tool called with the right amount, and was every out-of-policy case refused or escalated. The bar for wrongly issued refunds is zero.
+
+Roll out by raising the limit, not by flipping a switch. Shadow mode first, then $50 with full audit, then $200, with a kill switch and an alarm on daily total and on refunds per customer. The limit goes up only when the audited error rate supports it.
+"""
+
+[[scenario]]
+id = "why-fde"
+kind = "Behavioral"
+title = "Why forward-deployed, and a deployment that went wrong"
+prompt = "Two questions every loop asks. Why do you want to be a forward-deployed engineer instead of a product engineer? And tell me about a time a deployment or project went wrong and what you did."
+concepts = ["feedback-loop", "rollout", "evals", "human-in-the-loop"]
+answer = """
+These have no model answer, because the interviewer is checking that the stories are yours. What follows is the shape a strong answer has, and what to prepare.
+
+Why forward-deployed. A weak answer is about liking customers or variety. A strong one shows you understand the trade: you give up owning one codebase for years and gain being in the room where the problem is real, and you prefer that. Say what you have already done that looks like the job: a time you sat with users and it changed what you built, shipped inside someone else's constraints, or were the person who explained a technical limit to a non-technical owner. Then say what you expect to be hard, such as context switching, travel, saying no to a customer, and that you want it anyway. Name why this company's customers, not the role in general.
+
+Prepare three sentences: what I have done that is this job, what I want more of, what I know it costs.
+
+A deployment that went wrong. Use one real incident and tell it in order. The situation in two sentences, with the stakes. What went wrong, stated as fact, including your own part: interviewers distrust a story where the candidate did nothing wrong. What you did in the first hour: who you told, what you stopped, what you checked. How you found the cause. What you changed afterwards that still exists: a test, a checklist, a rollout rule, a monitor. What it cost and what you would do differently.
+
+Prepare four stories before any loop, because they cover most behavioural questions: a failure you owned, a disagreement with someone senior where you were right or wrong, a time you turned a vague request into something shipped, and a time you said no to a customer or stakeholder and kept the relationship.
+
+For each, write the numbers down: how many users, how long, what improved. Keep each under two minutes and expect follow-ups; the follow-ups are where they test whether it happened.
+
+What to avoid: blaming a team or a customer, a failure that is secretly a success, and answers so polished that they contain no decision you actually made.
+"""
+
+[[scenario]]
+id = "take-home"
+kind = "Take-home"
+title = "A week to build and present an agent for a customer brief"
+prompt = "You are given a customer brief and a week: build a small working system and present it to a panel playing the customer. How do you spend the week, and what do you show?"
+concepts = ["evals", "tracing", "replay", "tool-gate", "ablations", "cost-accounting", "release-gate"]
+answer = """
+The panel is not grading how much I built. They are grading whether I scoped it like someone they could send to a customer alone, so I plan the week backwards from the presentation.
+
+Day one: read the brief three times and write down what it does not say. I list my assumptions and the questions I would ask a real customer, and I choose one path through the problem that I can make work completely. A narrow system that works and is measured beats a broad one that demos.
+
+Days two and three: the thinnest end-to-end version. Real inputs, a couple of typed tools, the decision about workflow or agent made deliberately and written down. I keep every limit in code and every step in a trace from the first hour, because that is what I will show.
+
+Day four: evaluation. Twenty to fifty cases built from the brief, including the awkward ones: missing data, a request the system must refuse, an injection in a document. I grade the steps as well as the answers, and I record the score. I run at least one ablation, such as with and without retrieval, so I can show a number that justifies a design choice.
+
+Day five: failure and cost. I break it on purpose and fix or document what I find. I measure latency and cost per run and say what they would be at the customer's volume.
+
+Day six: the write-up, one or two pages. The problem as I understood it, the assumptions, the design in one diagram, the eval results, what it cannot do, and what I would do in the next two weeks with a real customer. The limits section is where trust is won.
+
+The presentation. I open with the customer's problem, not my architecture. I show one run live with its trace, then the eval table, then one failure and how the system contains it. I leave a third of the time for questions.
+
+In the questions I expect to defend every choice: why not an agent, why this model, what happens at ten times the load, how I would know it regressed. When I do not know, I say what I would measure to find out.
+
+Loopwright is a rehearsal for this: it already has the trace, the gate, the eval suites, the ablation table and the cost receipt. Building a small variant of it for a brief and explaining each part in your own words is the fastest practice I know of.
+"""
+
+[[scenario]]
+id = "coding-loop"
+kind = "Coding"
+title = "Write the agent loop, live"
+prompt = "In a shared editor, without a framework: write a function that runs a tool-calling loop against a chat model. I will add requirements as you go."
+concepts = ["react-loop", "tool-calling", "stop-conditions", "tool-errors", "retry-backoff", "budgets", "idempotency"]
+answer = """
+Forward-deployed coding rounds are mostly practical: an API client, a data transformation, a small service, or this. They are graded on clarifying before typing, working code early, and how you react when the requirements change.
+
+Clarify in one minute. What does the model client return: text, tool calls, or both? Are tools plain functions with a name and a schema? Synchronous is fine? What should happen on a tool error?
+
+Write the smallest correct loop first. Keep a list of messages. Call the model with the messages and the tool definitions. If the reply has no tool calls, return its text. Otherwise append the assistant message, run each requested tool, append each result as a tool message tied to its call id, and go round again. Say out loud that the loop needs a stop condition and add a maximum number of iterations before running it once.
+
+Then the requirements arrive, and each has a standard answer worth knowing cold.
+
+A tool raises: catch it and return the error to the model as the tool result so it can recover; do not crash the loop.
+
+The model calls a tool that does not exist or with bad arguments: validate against the schema and return a clear error message as the result.
+
+The model call fails or times out: retry with exponential backoff and jitter on transient errors only, with a cap.
+
+It loops forever: the iteration cap, plus detecting the same call with the same arguments repeated.
+
+Limit cost: count tokens or calls and stop with a clear message when the budget is spent.
+
+A tool has side effects: require approval through a callback before running it, and pass an idempotency key so a retry cannot act twice.
+
+Run tools in parallel: only the read-only ones, and keep results in call order.
+
+Make it testable: inject the model client, so a test can pass a fake that returns a scripted sequence of replies. Write that test.
+
+What they watch: that you ran the code early, named the edge cases before being told, kept the function readable, and talked through tradeoffs instead of going silent.
+
+Practise by writing it from memory in fifteen minutes, then compare with loopwright/loop.py, which is this function with every one of those requirements added. Algorithm puzzles still appear in some loops; this project does not train those.
+"""

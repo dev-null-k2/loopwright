@@ -181,6 +181,19 @@ def test_every_card_points_at_a_real_file_and_a_real_box():
         assert all(i in ids for i in scenario["concepts"]) and len(scenario["answer"]) > 600
 
 
+def test_the_forward_deployed_guide_points_at_things_that_exist():
+    """docs/fde-interviews.md maps interview rounds to cards and scenarios. A renamed card must not leave a dead link."""
+    guide = (ROOT / "docs" / "fde-interviews.md").read_text()
+    cards = {c["id"] for c in load_concepts()}
+    scenarios = {s["id"]: s for s in load_interview()}
+    assert set(re.findall(r"glossary\.md#([a-z0-9-]+)", guide)) <= cards
+    assert set(re.findall(r"interview-prep\.md#([a-z0-9-]+)", guide)) <= set(scenarios)
+    rounds = {s["kind"] for s in scenarios.values()}
+    assert {"Case study", "Customer", "Integration", "System design", "Coding", "Take-home", "Behavioral"} <= rounds
+    for file in re.findall(r"`(loopwright/[a-z_/]+\.py)`", guide):
+        assert (ROOT / file).is_file()
+
+
 def test_every_event_kind_the_engine_emits_is_explained_by_exactly_one_card():
     source = "\n".join(p.read_text() for p in PACKAGE_DIR.rglob("*.py"))
     emitted = set(re.findall(r'\.emit\(\s*"([a-z_]+\.[a-z_]+)"', source))

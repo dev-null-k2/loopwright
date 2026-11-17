@@ -44,17 +44,18 @@ def interview() -> str:
            "2. **Shape**: workflow or agent, which tools, where the human sits\n3. **Design**: context, memory, tools, guardrails, by name\n"
            "4. **Failure**: how it breaks and what catches each break\n5. **Measure**: the evals and the launch plan\n\n"
            "Say your own answer out loud before reading. The cockpit's Learn tab has these as reveal-on-click cards, "
-           "plus a flashcard deck of the short questions from every glossary card.\n"]
+           "plus a flashcard deck of the short questions from every glossary card. "
+           "[fde-interviews.md](fde-interviews.md) maps these to the rounds of a forward-deployed loop.\n"]
     names = {c["id"]: c["term"] for c in load_concepts()}
     for s in load_interview():
         cards = ", ".join(f"[{names[i]}](glossary.md#{i})" for i in s["concepts"])
-        out.append(f"\n## {s['title']}\n\n*{s['kind']}*\n\n> {s['prompt']}\n\n{s['answer'].strip()}\n\nCards behind this answer: {cards}\n")
+        out.append(f"\n<a id=\"{s['id']}\"></a>\n\n## {s['title']}\n\n*{s['kind']}*\n\n> {s['prompt']}\n\n{s['answer'].strip()}\n\nCards behind this answer: {cards}\n")
     return "".join(out)
 
 
 def lessons() -> str:
     names = {c["id"]: c["term"] for c in load_concepts()}
-    out = [NOTE + "# The guided path\n\nEighteen short lessons. Each runs one real turn and tells you which steps to stop on. "
+    out = [NOTE + "# The guided path\n\nTwenty-four short lessons. Each runs one real turn and tells you which steps to stop on. "
            "In the cockpit they are under **Lessons**, run in a scratch copy of the agent (the classroom) so they never touch "
            "your own memory, and every *watch for* line becomes a link that jumps the board to that step.\n\n"
            "The same lessons work in the terminal: run the command, then `loopwright replay last`.\n"]

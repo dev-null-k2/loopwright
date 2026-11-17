@@ -1498,3 +1498,75 @@ file = "loopwright/otel.py"
 try = "What is OpenTelemetry for agents?"
 question = "How would you get this agent's traces into the customer's existing observability stack?"
 answer = "Export OpenTelemetry. One trace per turn, a span per model call and per tool call with the GenAI attribute names for model, token counts and tool name, and the session id so turns can be grouped. I would send it through their collector over OTLP so sampling, redaction and routing follow their existing policy, decide explicitly whether prompt and response bodies are captured, and keep the trace id in our own logs and user-facing error messages so support can go from a complaint to the exact trace."
+
+# --------------------------------------------------------------- what a customer deployment adds
+# Asked about in almost every forward-deployed and system-design interview. Explained here, not built:
+# Loopwright is one person's agent on one machine.
+
+[[concept]]
+id = "multi-tenancy"
+term = "Multi-tenancy and permission-aware retrieval"
+aliases = ["tenant isolation", "access control", "ACL filtering", "permission-aware RAG", "row-level security", "document-level permissions"]
+pillar = "safety"
+node = "kb"
+kinds = []
+runs = false
+one_liner = "One system serving many customers or users, where each may only ever see their own data."
+explain = "The moment an assistant serves more than one person, every read has to be filtered by who is asking. In retrieval that means the permission check happens inside the search, as a filter on tenant and on the user's groups, not afterwards on the answer. The same boundary applies to memory, caches, traces and evals: a semantic cache keyed only on the question will hand one customer another customer's answer. Loopwright has a single user and a single store, so none of this is built here; the place it would go is the retrieval call and every table's key."
+why = "The failure is silent and severe: the model writes a fluent answer from a document the asker was never allowed to open. No output filter can reliably tell, because the leak happened at retrieval."
+tradeoff = "Filtering inside the index costs recall and speed, and permissions drift from the source system unless they are synced. Separate indexes per tenant are the strongest isolation and the most expensive; a shared index with a mandatory filter is cheaper and one missing filter away from a leak."
+file = "loopwright/memory/retrieval.py"
+try = "What is permission-aware retrieval?"
+question = "How do you stop an internal assistant from showing someone a document they are not allowed to see?"
+answer = "Enforce permissions at retrieval, never after generation. Each chunk carries the access list of its source document, synced from the source system, and the search itself filters on the asker's identity and groups, so forbidden text never reaches the model. I apply the same key to caches and memory, log which documents fed each answer, and test it with an eval set of questions a given user must not be able to answer. If the source permissions are a mess, that is the first thing I tell the customer, because the assistant will expose it."
+
+[[concept]]
+id = "data-boundaries"
+term = "Data boundaries: PII, residency and retention"
+aliases = ["PII", "personal data", "redaction", "data residency", "data retention", "compliance", "GDPR", "HIPAA", "audit trail", "zero data retention"]
+pillar = "safety"
+node = "guard_out"
+kinds = []
+runs = false
+one_liner = "Knowing what data may reach the model, where it is processed, how long it is kept, and who can prove it."
+explain = "A customer's first questions are rarely about accuracy. They are: does our data leave our network, which region is it processed in, is it used for training, how long do prompts and traces live, and can you show an auditor who saw what. The engineering answers are concrete: classify fields before they enter the context, redact or tokenise what the task does not need, choose a deployment (the customer's cloud, a regional endpoint, a zero-retention agreement) that matches the rule, set retention on traces because traces contain everything, and write an audit record per action. Loopwright runs on your own machine and keeps full traces locally, which is right for learning and wrong for a regulated deployment as it stands."
+why = "A system that answers well and cannot pass the security review never ships. Finding the constraint in week one costs a conversation; finding it in week ten costs the project."
+tradeoff = "Redaction removes context the model may need, regional and private deployments limit which models you can use and cost more, and short retention makes debugging and evals harder. Each rule buys compliance with capability."
+file = "loopwright/guardrails.py"
+try = "What are data boundaries in an AI deployment?"
+question = "The customer's security officer asks what happens to their data. What do you say?"
+answer = "I answer the five things they are really asking. What enters the model: only the fields the task needs, with identifiers redacted or tokenised before the prompt is built. Where it is processed: the region and account, in their cloud if required. Whether it trains anything: no, with the contract clause named. How long it lives: prompts and traces have a retention period, and traces are treated as sensitive because they hold everything. Who can prove it: every tool call and every document read is in an audit log tied to a user. Then I ask which regulation applies, because that decides the deployment, not my preference."
+
+[[concept]]
+id = "vector-index"
+term = "Vector indexes at scale"
+aliases = ["vector database", "vector DB", "ANN", "approximate nearest neighbour", "HNSW", "IVF", "quantization", "metadata filtering", "sharding"]
+pillar = "memory"
+node = "kb"
+kinds = []
+runs = false
+one_liner = "Finding the nearest vectors among millions without comparing against every one."
+explain = "Loopwright compares a query against every stored vector, which is exact and fine for a few thousand chunks. At millions that is too slow, so an index trades a little accuracy for speed: HNSW walks a graph of neighbours (fast, memory-hungry), IVF searches only the nearest clusters (smaller, needs training), and quantization shrinks each vector to fit more in memory. Around the index sit the decisions that actually dominate: filtering by tenant or date without destroying recall, keeping the index fresh as documents change, sharding and replicas for throughput, and a keyword index beside it because exact terms still matter."
+why = "Brute force is linear in corpus size. At ten million chunks and a thousand queries a second it is not a cost question any more; it simply does not return in time."
+tradeoff = "Approximate search misses some true neighbours, and you tune that against latency and memory. Filters applied after the search can leave too few results; filters applied before can be slow. A separate vector service adds an operational system to run, where a vector extension in the existing database is simpler and scales less far."
+file = "loopwright/memory/retrieval.py"
+try = "What is a vector index?"
+question = "Retrieval is exact but too slow at ten million chunks. What do you change?"
+answer = "Move from brute force to an approximate index and measure what it costs in recall. I would start with HNSW for latency or IVF with quantization if memory is the limit, keep BM25 alongside for exact terms, and push tenant and date filters into the index. Then I size it: shard by tenant or hash, add replicas for query volume, cache frequent queries, and rerank only the top fifty. The recall@k eval that already exists is the test: any index setting has to be justified by that number against the brute-force baseline."
+
+[[concept]]
+id = "a2a"
+term = "Agent-to-agent protocols"
+aliases = ["A2A", "agent2agent", "agent interoperability", "agent card", "inter-agent communication", "handoffs between agents"]
+pillar = "tools"
+node = "subagent"
+kinds = []
+runs = false
+one_liner = "A shared way for separately built agents to find each other, hand over a task and report back."
+explain = "MCP connects one agent to tools and data. An agent-to-agent protocol connects agents to each other across teams or companies: an agent publishes a description of what it can do, another sends it a task, and the two exchange status and results without sharing memory or prompts. That is different from the subagents in this repository, which are workers the same harness creates, with the same gate and the same trace. A remote agent is somebody else's system: you cannot see its steps, so everything it returns is untrusted input and everything you send it has left your boundary."
+why = "Organisations end up with many agents owned by different teams and vendors. Without a common protocol each pair needs custom glue; with one, an agent can delegate to another the way a service calls an API."
+tradeoff = "Delegating to an agent you do not control gives up observability, cost control and the ability to enforce your own limits. It also adds a new injection path: a remote agent's answer can carry instructions. Most problems that look like they need several agents are solved more reliably by one agent with better tools."
+file = "loopwright/tools/delegate.py"
+try = "What is an agent-to-agent protocol?"
+question = "What is the difference between MCP and an agent-to-agent protocol, and when do you need the second?"
+answer = "MCP gives an agent tools and data: the agent stays in control and calls functions. An agent-to-agent protocol lets it hand a whole task to another agent that plans for itself and reports back. I need the second only when the other agent belongs to someone else and encapsulates knowledge or permissions I do not have. Inside one system I would rather use subagents under my own gate and trace. When I do call a remote agent I treat its output as untrusted, set a budget and a timeout, and send it the minimum data the task needs."

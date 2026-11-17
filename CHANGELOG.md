@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0
+
+Preparation for forward-deployed engineering interviews.
+
+- **Thirteen new interview scenarios** for the rounds particular to forward-deployed roles: two open case
+  studies, the first customer meeting, a failing pilot where the customer wants fine-tuning, the security
+  review, webhooks that arrive twice and out of order, a system of record with no API, retrieval over ten
+  million documents, documents that disagree, an agent allowed to spend money, the take-home, live coding of the
+  agent loop, and the behavioural questions. 25 scenarios in all, grouped by round in the Learn tab.
+- **Be interviewed on this.** A button on every scenario opens a chat in which the agent plays the interviewer,
+  asks one follow-up at a time, and grades you when you say "grade me". It needs a real model.
+- **`docs/fde-interviews.md`**: each round of a loop mapped to the lessons, cards and scenarios that prepare for
+  it, a two-week plan, and what this project does not cover.
+- **Four handbook cards** on what a customer deployment adds, each labelled as explained and not built here:
+  multi-tenancy and permission-aware retrieval, data boundaries (PII, residency, retention), vector indexes at
+  scale, and agent-to-agent protocols. 95 cards.
+
 ## 0.5.1
 
 - **A foldable opened flat no longer breaks the cockpit.** Between 820 and 1000 px wide the two-pane layout did

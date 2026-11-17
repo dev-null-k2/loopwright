@@ -12,7 +12,8 @@
 ## Learn
 - [Handbook](docs/glossary.md): 91 agent-design terms
 - [Lessons](docs/lessons.md): 24 guided runs
-- [Interview practice](docs/interview-prep.md): 12 scenarios with answers
+- [Interview practice](docs/interview-prep.md): 25 scenarios with answers
+- [Forward-deployed interview preparation](docs/fde-interviews.md): the loop round by round, mapped to this repository
 
 ## Use and extend
 - [Tools, skills and MCP](docs/tools.md)

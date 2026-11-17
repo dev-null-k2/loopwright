@@ -9,6 +9,17 @@ const spaceNote = () => (api.space === "classroom" ? h("p", { class: "classroom"
 const paragraphs = (text) => String(text).trim().split(/\n\s*\n/).map((p) => h("p", {}, p.trim()));
 
 // ============================================================ LEARN
+// The message that turns the agent into an interviewer for one scenario.
+function mockInterview(s) {
+  return `Be my interviewer for a forward-deployed engineering interview. This is practice, so stay in the role until I say "grade me".
+
+The round is: ${s.kind}. The question is: "${s.prompt}"
+
+Ask me the question now and wait for my answer. After each answer ask one follow-up at a time, the way a senior engineer or the customer would: probe what I skipped, change a requirement, push back. Do not give me the answer.
+
+When I say "grade me", score my answers from 1 to 5 on each of: clarifying before designing, choosing the right shape, naming concrete mechanisms, covering failure, and saying how it would be measured. Then give the two things a strong answer would have added.`;
+}
+
 export function createLearn(book, actions) {
   const list = document.getElementById("learn-list");
   const detail = document.getElementById("learn-detail");
@@ -39,9 +50,17 @@ export function createLearn(book, actions) {
       }
       if (!list.children.length) list.append(h("p", { class: "hint", style: "padding:12px 8px" }, "No term matches that. Try a shorter word."));
     } else if (mode === "interview") {
-      for (const s of book.interview) {
-        list.append(h("button", { class: s.id === scenario ? "on" : "", onclick: () => { scenario = s.id; shown = false; draw(); } },
-          s.title, h("small", {}, s.kind)));
+      // grouped by the interview round each belongs to, in the order a loop usually runs
+      const rounds = ["Case study", "Customer", "System design", "Integration", "Security", "Debugging", "Evals", "Tradeoffs", "Coding", "Take-home", "Behavioral"];
+      const kinds = [...rounds, ...new Set(book.interview.map((x) => x.kind).filter((k) => !rounds.includes(k)))];
+      for (const kind of kinds) {
+        const rows = book.interview.filter((x) => x.kind === kind);
+        if (!rows.length) continue;
+        list.append(h("h3", {}, kind));
+        for (const s of rows) {
+          list.append(h("button", { class: s.id === scenario ? "on" : "", onclick: () => { scenario = s.id; shown = false; draw(); } },
+            s.title, h("small", {}, s.prompt.length > 96 ? `${s.prompt.slice(0, 94)}…` : s.prompt)));
+        }
       }
     } else {
       list.append(h("p", { class: "hint", style: "padding:12px 8px" },
@@ -78,6 +97,9 @@ export function createLearn(book, actions) {
         h("h1", {}, s.title),
         h("p", { class: "lede" }, s.prompt),
         h("p", { class: "hint" }, "Say your answer out loud first. A strong answer clarifies, picks a shape, names mechanisms, covers failure, and says how it will be measured."),
+        h("div", { class: "actions" },
+          h("button", { onclick: () => actions.tryPrompt(mockInterview(s)) }, "Be interviewed on this"),
+          h("span", { class: "hint" }, "Opens a chat where the agent plays the interviewer and pushes back. Needs a real model: Claude Code, a local model or an API key. The built-in scripted model cannot role-play.")),
         h("div", { class: "qa" }, h("h2", {}, "A strong answer"),
           shown ? h("div", { class: "a" }, paragraphs(s.answer)) : h("button", { class: "primary", onclick: () => { shown = true; drawDetail(); } }, "Show the answer")),
         h("h2", {}, "Cards behind this answer"), conceptChips(s.concepts || [])));

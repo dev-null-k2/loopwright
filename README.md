@@ -56,7 +56,7 @@ that says which part of the system it happened in and why. That one decision giv
 |---|---|
 | **Replay is the interface** | Play, pause, step forward and back, scrub a strip coloured by subsystem, 0.4x to 4x. Live turns and old traces use the same player. |
 | **Every reply shows its work** | Under each answer: what it looked up in memory, which skill loaded, every tool call with its arguments and raw output, retries, refusals. Click a row and the board jumps to that step. |
-| **It teaches while it runs** | Each step is explained in plain words, linked to a 91-card handbook and to the file that implements it. Twenty-four guided lessons run real turns and tell you where to look. |
+| **It teaches while it runs** | Each step is explained in plain words, linked to a 95-card handbook and to the file that implements it. Twenty-four guided lessons run real turns and tell you where to look. |
 | **Switch any mechanism off** | The Lab turns off memory, the retrieval gate or guardrails, injects model and tool failures, and changes the orchestration pattern, per message. |
 | **Runs with no key, and with no internet** | A built-in scripted model makes everything work the moment you clone. Or use an open-source model on your own machine (Ollama, LM Studio, llama.cpp), your Claude Code subscription, or any Anthropic or OpenAI-compatible key. |
 | **Not only a chat box** | The same agent runs fixed **workflows**, **scheduled tasks** with nobody watching, a **browser agent** that clicks through real pages, an opt-in sandboxed **shell**, and answers on **Telegram, Discord, Slack and WhatsApp**. Each is a few hundred readable lines, and each is watched and replayed like everything else. |
@@ -180,16 +180,22 @@ Loopwright is meant to be the fastest way to understand how agents are built, in
   undefended, web search, failure and recovery, limits, planning, a critic, teaching it a skill, a workflow
   against an agent, steps in parallel, a browser agent, the shell tool, scheduling a task, and a run with nobody
   watching.
-- **[The handbook](docs/glossary.md)**: 91 terms, each with what it is, why it exists, the tradeoff, the file
+- **[The handbook](docs/glossary.md)**: 95 terms, each with what it is, why it exists, the tradeoff, the file
   that implements it, and an interview question with a strong answer. Harness, ReAct, context engineering,
   context rot, compaction, prompt caching, the retrieval gate, hybrid search and RRF, consolidation, tool gates,
   MCP, prompt injection, the lethal trifecta, idempotency, circuit breakers, trajectory evals, pass^k, ablations,
   release gates, workflow versus agent, routing, scheduled agents, standing instructions, browser agents, code
-  sandboxes, OpenTelemetry, and the rest. 84 of them run in this repository; 7 are explained and labelled as not
-  built here.
-- **[Interview practice](docs/interview-prep.md)**: 12 scenario questions (design a support agent, add memory, an
-  agent that reads and sends email, cut cost by two thirds, "is this ready for production?") with full answers on
-  one spine: clarify, shape, design, failure, measure. Plus a flashcard deck.
+  sandboxes, OpenTelemetry, and the rest. 84 of them run in this repository; 11 are explained and labelled as
+  not built here.
+- **[Interview practice](docs/interview-prep.md)**: 25 scenario questions with full answers on one spine: clarify,
+  shape, design, failure, measure. Twelve on agent design (a support agent, memory, an agent that reads and sends
+  email, cutting cost, "is this ready for production?") and thirteen for the rounds particular to
+  forward-deployed roles: the open case study, the first customer meeting, a failing pilot, the security review,
+  webhooks that arrive twice, a system with no API, retrieval at scale, a money action, the take-home, live
+  coding. With a real model connected, **Be interviewed on this** makes the agent the interviewer. Plus a
+  flashcard deck.
+- **[Preparing for forward-deployed interviews](docs/fde-interviews.md)**: each round of the loop mapped to what
+  here prepares you for it, a two-week plan, and what this does not cover.
 - **The agent explains itself.** Its knowledge base *is* the handbook, so "What is a harness?" is answered by RAG
   over these cards, with a citation the output guard verifies.
 
@@ -416,7 +422,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              96 tests
+tests/              97 tests
 docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports

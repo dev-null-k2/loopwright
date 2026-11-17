@@ -86,6 +86,16 @@ between them and anyone else is one access key, printed in the link at start-up.
 - The tunnel provider carries your traffic. With `--tunnel` that is Cloudflare, over HTTPS to its edge and then
   to `cloudflared` on your computer.
 
+### The exercises run code you write
+
+**Check my work** in the Learn tab, and `loopwright exercise <id> --check`, execute the Python in your answer
+file. That is the point of them, and it means the cockpit has an endpoint that runs code. It is reachable by
+exactly the same people as the rest of the cockpit: this machine, or a holder of the access key. The code runs
+in a child process with a time limit, a CPU limit and a scrubbed environment, and inside the same OS sandbox as
+the shell tool where the machine has one (no network, writes only inside `~/.loopwright/workshop`). Where there
+is no sandbox it runs with your own permissions, and the result says so. If you share the cockpit with a public
+link, whoever holds that link can run code on the machine: one more reason to treat it as a password.
+
 None of this has been reviewed by anyone outside the project.
 
 ## Secrets

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.0
+
+Exercises where you write the code.
+
+- **Twelve exercises**, each one small function a real agent needs: a tool, the agent loop, retry with backoff,
+  a limit enforced in code, an idempotent action, a token budget, chunking, reciprocal rank fusion, an injection
+  filter, a trajectory grader, an eval case with teeth (run by the real eval runner, with and without memory),
+  and a bug to find from a trace. Each has a brief, starter code, three hints, a reference solution, the
+  interview question it answers, and a pointer to the full version in the repository.
+- **A checker that explains.** Every check has a name in plain words and, when it fails, what was expected and
+  what came back, with the line of your file if your code raised. What your code printed is shown too.
+- **An editor in the cockpit** (Learn, then Exercises), usable from a phone, and `loopwright exercise` for a
+  terminal and your own editor. The tool exercise ends with a button that adds your tool to your agent.
+- Answers run in a child process with a time limit and, where available, the shell tool's OS sandbox.
+  `docs/security.md` says what that does and does not protect.
+
 ## 0.6.0
 
 Preparation for forward-deployed engineering interviews.

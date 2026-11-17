@@ -13,7 +13,7 @@ AI-native companies. Loops differ; ask your recruiter which rounds yours has.
 | Round | What it tests | Practise here |
 |---|---|---|
 | Recruiter and hiring-manager screens | Why this role and not product engineering; whether your past work looks like the job | [Why forward-deployed](interview-prep.md#why-fde) |
-| Coding | Practical engineering: an API client, a data transformation, a small service. Clarify, get something running, adapt when requirements change | [Write the agent loop, live](interview-prep.md#coding-loop), then read `loopwright/loop.py` and `toolgate.py` |
+| Coding | Practical engineering: an API client, a data transformation, a small service. Clarify, get something running, adapt when requirements change | The [exercises](exercises.md): write the loop, a retry, an idempotent action, a gate, a grader, with a checker. Then [Write the agent loop, live](interview-prep.md#coding-loop) |
 | System design | An LLM system in a real deployment: retrieval, agents, guardrails, evals, cost and latency | The system-design scenarios, [retrieval at scale](interview-prep.md#rag-at-scale), [a money action](interview-prep.md#high-impact-action), [conflicting sources](interview-prep.md#conflicting-sources) |
 | Case study, or decomposition | A vague customer ask turned into a scoped first deployment. Often the round that decides the offer | [An assistant for clinicians](interview-prep.md#case-clinicians), [Automate our disputes](interview-prep.md#case-disputes) |
 | Customer conversation, or role-play | Discovery questions, explaining a tradeoff in plain words, pushing back without losing the customer | [The first meeting](interview-prep.md#discovery-first-meeting), [The pilot is failing](interview-prep.md#customer-pushback), [The security review](interview-prep.md#security-review) |
@@ -54,7 +54,8 @@ AI-native companies. Loops differ; ask your recruiter which rounds yours has.
 5. Days 10 and 11: the two case studies and the three customer scenarios. With a real model connected, use
    **Be interviewed on this** in the Learn tab: the agent plays the interviewer, pushes back, and grades you
    when you say "grade me".
-6. Day 12: write the agent loop from memory in fifteen minutes. Compare with `loop.py`.
+6. Day 12: the [exercises](exercises.md). Do the loop, retry, limit and idempotency ones without hints, then write
+   the loop again from memory in fifteen minutes and compare with `loop.py`.
 7. Days 13 and 14: your four behavioural stories, written with numbers, each under two minutes. Then a small
    take-home of your own: pick a brief, change Loopwright to fit it (a new tool, three eval cases, one
    ablation), and present it to someone.

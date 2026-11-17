@@ -56,7 +56,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
-from loopwright import __version__, otel, qr, scheduler, tunnel, workflows
+from loopwright import __version__, otel, qr, scheduler, tunnel, workflows, workshop
 from loopwright.config import PACKAGE_DIR, Options, home_dir
 from loopwright.context import IDENTITY, load_identity
 from loopwright.evals import compare as eval_compare
@@ -83,6 +83,7 @@ FORWARDED = ("X-Forwarded-For", "X-Forwarded-Host", "X-Real-Ip", "Forwarded", "C
 def handbook() -> dict[str, Any]:
     concepts = load_concepts()
     return {"concepts": concepts, "interview": load_interview(), "lessons": load_lessons(), "pillars": PILLARS,
+            "exercises": workshop.load_exercises(), "levels": workshop.LEVELS,
             "stages": {k: {"label": v[0], "pillar": v[1], "file": v[2]} for k, v in STAGES.items()},
             "kinds": {kind: c["id"] for c in concepts for kind in c.get("kinds", [])}}
 
@@ -471,6 +472,8 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
                 return self._json(app.health())
             if path == "/api/handbook":
                 return self._json(handbook())
+            if path == "/api/workshop":
+                return self._json(workshop.overview(root_app.home))
             if path == "/api/runs":
                 return self._json({"runs": list_traces(app.home)})
             if path.startswith("/api/runs/"):
@@ -582,6 +585,26 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
                     return self._json({"ok": True})
                 result = scheduler.Scheduler(app.agent).run_task(task)
                 return self._json({"ok": result.ok, "turn_id": result.turn_id, "reply": result.reply})
+            if path.startswith("/api/workshop/"):
+                # The exercises. `check` runs code the learner wrote, in a child process (see workshop/__init__.py).
+                _, _, _, exercise_id, action = (path.split("/") + [""])[:5]
+                try:
+                    if action == "check":
+                        return self._json(workshop.check(root_app.home, exercise_id, str(body["code"]) if "code" in body else None))
+                    if action == "save":
+                        workshop.save(root_app.home, exercise_id, str(body.get("code", "")))
+                        return self._json({"ok": True})
+                    if action == "reset":
+                        return self._json({"ok": True, "code": workshop.reset(root_app.home, exercise_id)})
+                    if action == "install":
+                        file = workshop.install(root_app.home, exercise_id)
+                        root_app.agent.load_extensions()
+                        return self._json({"ok": True, "file": str(file)})
+                except KeyError as exc:
+                    return self._json({"error": str(exc.args[0])}, 404)
+                except ValueError as exc:
+                    return self._json({"error": str(exc)}, 400)
+                return self._json({"error": "unknown action"}, 404)
             if path == "/api/feedback":
                 return self._json({"ok": True, "feedback": eval_mine.add_feedback(app.home, str(body.get("turn_id", "")),
                                                                                   str(body.get("rating", "")), str(body.get("note", "")))})

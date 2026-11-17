@@ -2,6 +2,7 @@
 
     loopwright                 chat in the terminal, printing each step as it happens
     loopwright ask "..."       one question, one answer
+    loopwright exercise        hands-on exercises: write a part of an agent and have it checked
     loopwright serve           the web cockpit on http://127.0.0.1:8765 (--tunnel or --lan: from your phone)
     loopwright replay [id]     play a past turn back, step by step
     loopwright runs            list past turns
@@ -407,6 +408,63 @@ def cmd_workflow(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def cmd_exercise(args: argparse.Namespace) -> int:
+    """The workshop from a terminal: read a brief, edit the file in your own editor, check it."""
+    from loopwright import workshop
+    from loopwright.config import home_dir
+
+    home = home_dir()
+    if not args.id:
+        state = workshop.progress(home)
+        print(f"Exercises: write a small function, and the checker tells you what works. {len(state['passed'])} of {len(workshop.load_exercises())} done.\n")
+        for level, label in workshop.LEVELS.items():
+            print(label)
+            for item in workshop.load_exercises():
+                if item["level"] == level:
+                    print(f"  {'done' if item['id'] in state['passed'] else '    '}  {item['id']:<11} {item['title']}  ({item['minutes']} min)")
+        print(f"\nloopwright exercise <id>           read one and get the path of your file\n"
+              f"loopwright exercise <id> --check   check your answer\nYour answers: {workshop.folder(home)}")
+        return 0
+    try:
+        item = workshop.exercise(args.id)
+    except KeyError as exc:
+        print(exc.args[0])
+        return 2
+    file = workshop.answer_file(home, item["id"])
+    if args.reset or not file.is_file():
+        workshop.reset(home, item["id"])
+    if args.solution:
+        print(item["solution"])
+        return 0
+    if args.hint:
+        for number, hint in enumerate(item["hints"], start=1):
+            print(f"{number}. {hint}")
+        return 0
+    if args.install:
+        try:
+            print(f"added to your agent: {workshop.install(home, item['id'])}")
+        except ValueError as exc:
+            print(exc)
+            return 1
+        return 0
+    if args.check:
+        result = workshop.check(home, item["id"])
+        if result["error"]:
+            print(result["error"])
+        for check in result["checks"]:
+            print(f"  {'pass' if check['pass'] else 'FAIL'}  {check['name']}")
+            if check["detail"]:
+                print(f"        {check['detail']}")
+        if result["output"]:
+            print(f"\nyour code printed:\n{result['output']}")
+        good = sum(c["pass"] for c in result["checks"])
+        print(f"\n{good} of {len(result['checks'])} checks pass" + (f". {result['debrief']}" if result["passed"] else ""))
+        return 0 if result["passed"] else 1
+    print(f"{item['title']}  ({workshop.LEVELS[item['level']]}, about {item['minutes']} minutes)\n\n{item['brief']}")
+    print(f"Your file:  {file}\nCheck it:   loopwright exercise {item['id']} --check\nStuck:      --hint, then --solution. Start again: --reset")
+    return 0
+
+
 def cmd_tasks(args: argparse.Namespace) -> int:
     import datetime as dt
 
@@ -573,6 +631,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--why", action="store_true", help="add the explanation of each step")
     p.add_argument("--check", metavar="FILE", help="validate a workflow file and show its rounds")
     p.set_defaults(fn=cmd_workflow)
+
+    p = sub.add_parser("exercise", help="hands-on exercises: write a part of an agent and have it checked")
+    p.add_argument("id", nargs="?", help="which exercise (leave out to list them)")
+    p.add_argument("--check", action="store_true", help="run the checker on your answer")
+    p.add_argument("--hint", action="store_true", help="print the hints")
+    p.add_argument("--solution", action="store_true", help="print one way to write it")
+    p.add_argument("--reset", action="store_true", help="put the starter code back")
+    p.add_argument("--install", action="store_true", help="add a passing answer to your agent (the tool exercise)")
+    p.set_defaults(fn=cmd_exercise)
 
     p = sub.add_parser("tasks", help="scheduled tasks")
     p.add_argument("action", nargs="?", choices=["list", "add", "rm", "run", "pause", "resume", "tick"], default="list")

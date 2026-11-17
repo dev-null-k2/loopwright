@@ -314,6 +314,29 @@ details.raw { margin-top: 12px; } details.raw summary { cursor: pointer; color: 
 .learn-list button small { display: block; color: var(--ink-3); font-size: 13px; line-height: 1.3; }
 .learn-list button.on small { color: color-mix(in srgb, var(--panel) 70%, transparent); }
 .learn-detail { overflow-y: auto; padding: 30px 44px 60px; }
+/* the workshop: an exercise, an editor and what the checker said */
+.learn-list .tick { display: inline-block; width: 16px; margin-right: 4px; font-weight: 700; color: var(--ok); }
+.learn-list button.on .tick { color: inherit; }
+.exercise { max-width: 86ch !important; }
+.exercise > p, .exercise > ul, .exercise > ol { max-width: 70ch; }
+.exercise ul, .exercise ol { padding-left: 22px; margin: 0 0 12px; display: grid; gap: 5px; }
+.exercise code, .hints code { font: 14px/1.4 var(--code); background: var(--sunk); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+.chip.passed { border-color: var(--ok); color: var(--ok); }
+pre.sample { font: 13.5px/1.5 var(--code); background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; overflow-x: auto; white-space: pre; margin: 0 0 12px; tab-size: 4; }
+.code-editor { display: block; width: 100%; font: 14px/1.5 var(--code); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+               padding: 12px 14px; tab-size: 4; white-space: pre; overflow: auto; resize: vertical; min-height: 220px; }
+.code-editor:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+.exercise .actions { margin: 12px 0; }
+.hints { background: color-mix(in srgb, var(--memory) 8%, var(--panel)); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px 12px 34px !important; }
+.result { border: 1px solid var(--line); border-left: 4px solid var(--ink-3); border-radius: var(--r); padding: 4px 16px 12px; margin: 14px 0; background: var(--panel); }
+.result.all-pass { border-left-color: var(--ok); } .result.some-fail { border-left-color: var(--warn); }
+.result h2 { margin-top: 12px; }
+.check-list { list-style: none; padding: 0 !important; margin: 8px 0 !important; gap: 7px !important; }
+.check-list li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; }
+.check-mark { font-weight: 700; } .is-pass .check-mark { color: var(--ok); } .is-fail .check-mark { color: var(--warn); }
+.check-detail { font: 13.5px/1.45 var(--code); color: var(--ink-2); margin: 3px 0 0 !important; overflow-wrap: anywhere; white-space: pre-wrap; }
+.debrief { border-top: 1px solid var(--line); margin-top: 12px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .learn-detail .inner { max-width: 70ch; }
 .learn-detail h1 { font: 600 34px/1.1 var(--sign); margin: 6px 0 10px; }
 .learn-detail .lede { font-size: 19px; line-height: 1.4; color: var(--ink); margin-bottom: 18px; }

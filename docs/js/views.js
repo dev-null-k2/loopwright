@@ -2,6 +2,7 @@
 
 import { api } from "./api.js";
 import { workflowGraph } from "./inspector.js";
+import { createWorkshop } from "./workshop.js";
 import { h, put, fmt, pct, pillarVar } from "./util.js";
 
 const spaceNote = () => (api.space === "classroom" ? h("p", { class: "classroom", style: "margin-bottom:14px;border-radius:6px" }, "You are looking at the classroom: the scratch copy of the agent that lessons run in. Leave it from the cockpit to see your own.") : null);
@@ -27,6 +28,7 @@ export function createLearn(book, actions) {
   const tabs = [...document.querySelectorAll("#view-learn .seg button")];
   let mode = "glossary", selected = book.concepts[0].id, scenario = book.interview[0].id, card = 0, shown = false;
   const deck = book.concepts.filter((c) => c.question);
+  const workshop = createWorkshop(book, actions);
 
   search.placeholder = `Search ${book.concepts.length} terms`;
 
@@ -49,6 +51,8 @@ export function createLearn(book, actions) {
         }
       }
       if (!list.children.length) list.append(h("p", { class: "hint", style: "padding:12px 8px" }, "No term matches that. Try a shorter word."));
+    } else if (mode === "exercises") {
+      workshop.drawList(list, draw);
     } else if (mode === "interview") {
       // grouped by the interview round each belongs to, in the order a loop usually runs
       const rounds = ["Case study", "Customer", "System design", "Integration", "Security", "Debugging", "Evals", "Tradeoffs", "Coding", "Take-home", "Behavioral"];
@@ -90,6 +94,8 @@ export function createLearn(book, actions) {
           h("button", { onclick: () => actions.openSource(c.file) }, `Read ${c.file}`)),
         c.aliases && c.aliases.length ? h("p", { class: "hint" }, `Also called: ${c.aliases.join(", ")}`) : null,
         qa(c.question, c.answer)));
+    } else if (mode === "exercises") {
+      workshop.drawDetail(detail, conceptChips);
     } else if (mode === "interview") {
       const s = book.interview.find((x) => x.id === scenario);
       put(detail, h("div", { class: "inner" },
@@ -113,7 +119,8 @@ export function createLearn(book, actions) {
           h("button", { onclick: () => { card += 1; shown = false; drawDetail(); } }, "Next card"),
           h("button", { onclick: () => { mode = "glossary"; selected = c.id; setMode(); } }, `Open the card: ${c.term}`))));
     }
-    detail.scrollTop = 0;
+    if (!keepScroll) detail.scrollTop = 0;
+    keepScroll = false;
   }
 
   function qa(question, answer) {
@@ -125,13 +132,16 @@ export function createLearn(book, actions) {
   }
 
   function draw() { drawList(); drawDetail(); }
+  // The workshop redraws itself after a check or a hint; the reader should stay where they were.
+  let keepScroll = false;
+  workshop.onRedraw((top) => { if (mode === "exercises") { keepScroll = !top; draw(); } });
   function setMode() {
     tabs.forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
     if (mode === "cards") { deck.sort(() => Math.random() - 0.5); card = 0; }
     shown = false;
     draw();
   }
-  tabs.forEach((b) => b.addEventListener("click", () => { mode = b.dataset.mode; setMode(); }));
+  tabs.forEach((b) => b.addEventListener("click", () => { workshop.keep(); mode = b.dataset.mode; setMode(); }));
   search.addEventListener("input", drawList);
   draw();
 

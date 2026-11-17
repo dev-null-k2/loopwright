@@ -254,6 +254,13 @@ export const api = {
     return report;
   },
 
+  // the workshop: exercises where the learner writes code. Checking needs a computer to run it on.
+  workshop() { return demo ? null : getJSON("api/workshop"); },
+  exerciseCheck(id, code) { return post(`api/workshop/${id}/check`, { code }); },
+  exerciseSave(id, code) { return demo ? null : post(`api/workshop/${id}/save`, { code }); },
+  exerciseReset(id) { return post(`api/workshop/${id}/reset`, {}); },
+  exerciseInstall(id) { return post(`api/workshop/${id}/install`, {}); },
+
   // feedback and your own eval cases
   feedback(turn_id, rating, note = "") { return post("api/feedback", { turn_id, rating, note, space: this.space }); },
   saveCase(turn_id, note = "") { return post("api/evals/mine", { turn_id, note, space: this.space }); },

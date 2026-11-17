@@ -180,6 +180,11 @@ Loopwright is meant to be the fastest way to understand how agents are built, in
   undefended, web search, failure and recovery, limits, planning, a critic, teaching it a skill, a workflow
   against an agent, steps in parallel, a browser agent, the shell tool, scheduling a task, and a run with nobody
   watching.
+- **[12 exercises](docs/exercises.md)** where you write the code: a tool, the agent loop, retry with backoff, a
+  limit the model cannot talk its way past, an idempotent action, fitting a conversation into a token budget,
+  chunking, hybrid search, an injection filter (and why it is not enough), a trajectory grader, an eval case that
+  fails when memory is off, and a bug found from a trace. Write in the cockpit's editor or your own; the checker
+  says exactly which behaviour is wrong. The tool you write can be added to your agent with one click.
 - **[The handbook](docs/glossary.md)**: 95 terms, each with what it is, why it exists, the tradeoff, the file
   that implements it, and an interview question with a strong answer. Harness, ReAct, context engineering,
   context rot, compaction, prompt caching, the retrieval gate, hybrid search and RRF, consolidation, tool gates,
@@ -422,7 +427,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              97 tests
+tests/              114 tests
 docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports

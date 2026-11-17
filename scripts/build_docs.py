@@ -53,6 +53,30 @@ def interview() -> str:
     return "".join(out)
 
 
+def exercises() -> str:
+    from loopwright.workshop import LEVELS, load_exercises
+    names = {c["id"]: c["term"] for c in load_concepts()}
+    out = [NOTE + "# Exercises\n\nTwelve small functions that a real agent needs, written by you. Each has a brief, starter code, a "
+           "checker that says exactly what works and what does not, three hints, a reference solution, and a pointer to the "
+           "full version in this repository.\n\n"
+           "- In the cockpit: **Learn**, then **Exercises**. Write in the editor, press **Check my work**.\n"
+           "- In a terminal: `loopwright exercise` lists them, `loopwright exercise loop` prints one and the path of your "
+           "file, `loopwright exercise loop --check` checks it. `--hint`, `--solution` and `--reset` do what they say.\n\n"
+           "Your answers are files in `~/.loopwright/workshop/`. Checking runs your code in a separate process with a time "
+           "limit and, where the machine has one, an OS sandbox with no network.\n\n"
+           "| Exercise | Level | Minutes | You write |\n|---|---|---|---|\n"]
+    for e in load_exercises():
+        first = e["brief"].strip().split("\n\n")[0].replace("\n", " ")
+        out.append(f"| [{e['title']}](#{e['id']}) | {LEVELS[e['level']]} | {e['minutes']} | {first} |\n")
+    for e in load_exercises():
+        cards = ", ".join(f"[{names[i]}](glossary.md#{i})" for i in e["concepts"])
+        out.append(f"\n<a id=\"{e['id']}\"></a>\n\n## {e['title']}\n\n*{LEVELS[e['level']]}, about {e['minutes']} minutes. "
+                   f"`loopwright exercise {e['id']}`*\n\n{e['brief'].strip()}\n\n**Starter**\n\n```python\n{e['starter'].strip()}\n```\n\n"
+                   f"**How it comes up in an interview.** {e['interview']}\n\n**Afterwards.** {e['debrief']} "
+                   f"Read `{e['file']}`.\n\nCards: {cards}\n")
+    return "".join(out)
+
+
 def lessons() -> str:
     names = {c["id"]: c["term"] for c in load_concepts()}
     out = [NOTE + "# The guided path\n\nTwenty-four short lessons. Each runs one real turn and tells you which steps to stop on. "
@@ -90,6 +114,6 @@ def events() -> str:
 
 
 if __name__ == "__main__":
-    for name, text in (("glossary.md", glossary()), ("interview-prep.md", interview()), ("lessons.md", lessons()), ("events.md", events())):
+    for name, text in (("glossary.md", glossary()), ("interview-prep.md", interview()), ("lessons.md", lessons()), ("exercises.md", exercises()), ("events.md", events())):
         (DOCS / name).write_text(text, encoding="utf-8")
         print(f"docs/{name}: {len(text.split()):,} words")

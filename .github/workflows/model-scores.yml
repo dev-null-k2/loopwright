@@ -39,7 +39,6 @@ jobs:
     env:
       OLLAMA_CONTEXT_LENGTH: "16384"      # Ollama's default window is 4,096 tokens; the agent's prompt outgrows that in a few steps
       OLLAMA_KEEP_ALIVE: "60m"
-      LOOPWRIGHT_HOME: ${{ runner.temp }}/loopwright
       CHAT_MODELS: ${{ inputs.chat_models }}
       EMBEDDERS: ${{ inputs.embedders }}
       TRIALS: ${{ inputs.trials }}
@@ -52,6 +51,7 @@ jobs:
 
       - name: Install and start Ollama
         run: |
+          echo "LOOPWRIGHT_HOME=$RUNNER_TEMP/loopwright" >> "$GITHUB_ENV"      # a clean state folder for this run
           curl -fsSL https://ollama.com/install.sh | sh
           sudo systemctl stop ollama 2>/dev/null || true      # run it ourselves, so the settings above apply
           nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &

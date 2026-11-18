@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.11.0
+
+Model scores that survive a second run.
+
+- **Trials.** `loopwright compare --trials 3` asks each of the eight behaviour questions three times per model,
+  every trial in fresh state. A cell reads `pass 3/3`, `flaky 2/3` or `fail 0/3`, and each model gets three
+  numbers: right on every trial, right at least once, and the pass rate over all runs. The trial kept for
+  reading and replay is a failing one when there is one. An unreachable model is still tried once, not three
+  times, and a long run is saved after every question.
+- **Publish.** `--publish` writes `results/models.md` and `results/models.json`: the table, a per-question
+  breakdown, the date, the Loopwright version and the machine (system, cores, Python; nothing that names it).
+  The JSON holds numbers and failed checks, never replies.
+- The cockpit's Compare view has a trials picker and shows the same three numbers.
+- **What is published today is the scripted stand-in only**, and the file says so in bold. No real model has been
+  run through it: that needs a machine with a model on it. 157 tests.
+
 ## 0.10.0
 
 MCP over HTTP, and the protocol's 2026 revision.

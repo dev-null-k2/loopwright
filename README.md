@@ -260,7 +260,7 @@ answer. Reliability cases run three trials with failures injected at different p
 | The same, 60 held-out questions that paraphrase | BM25 60% / 75% · dense 50% / 62% · hybrid 60% / 73% |
 | Retrieval gate (rules), 30 labelled messages | 83% accurate; 2 false skips, 3 false retrieves |
 | Lessons | all 24 runnable lessons produce every step they promise (a test enforces it) |
-| Unit and end-to-end tests | 156 passing |
+| Unit and end-to-end tests | 157 passing |
 
 The `automation` suite covers workflows, scheduled tasks, the shell and the browser: a workflow's hard-coded send
 is refused after it read the web, a scheduled run cannot send or run commands, a turn that read a file cannot
@@ -348,7 +348,14 @@ asked. Setup for each: [docs/gateways.md](docs/gateways.md).
 
 **Compare models.** `loopwright compare --targets scripted local:qwen2.5:7b claude-code` runs the same eight
 behaviour cases through each and prints pass, time, tokens and cost; the cockpit shows the table and replays any
-cell.
+cell. Add `--trials 3` and each question is asked three times in fresh state, so the table can tell "right every
+time" from "right at least once"; add `--publish` and it is written to [`results/models.md`](results/models.md)
+with the date, the version and the machine. That file currently holds **only the scripted stand-in**: no real
+model has been run through it yet. On a machine with Ollama or a signed-in Claude Code:
+
+```bash
+loopwright compare --targets local claude-code --trials 3 --publish
+```
 
 **Your own evals, and your own observability stack.** Under every reply: Good, Bad, and Save as eval case, which
 turns that run into a regression test (`loopwright eval --mine`). `loopwright export last --otlp
@@ -384,7 +391,7 @@ trifecta"*. More in [docs/claude-code.md](docs/claude-code.md).
 
 | Part | How it is verified |
 |---|---|
-| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 156 automated tests and the 76-case eval suite, on every push, on Python 3.11 and 3.13 |
+| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 157 automated tests and the 76-case eval suite, on every push, on Python 3.11 and 3.13 |
 | Browser agent | Against real headless Chrome on a bundled four-page site: reading, clicking, filling in and submitting a form, screenshots, and refusal of local and private addresses, including a page's own sub-requests. Not run against arbitrary live websites |
 | Shell tool | Real commands: the opt-in switch, approval, scrubbed environment, timeout, denial in tainted and unattended turns. The sandbox was `none` on the machine the evals ran on (no bubblewrap); the macOS `sandbox-exec` profile is probed at run time and has not been exercised in CI |
 | Chat gateways | Each protocol against a stand-in: a fake Bot API (Telegram), a local WebSocket server playing Discord's gateway and Slack's Socket Mode, real signed and forged HTTP deliveries (WhatsApp). **Not run against the live services** |
@@ -432,7 +439,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              156 tests
+tests/              157 tests
 docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports
@@ -440,8 +447,8 @@ results/            the committed eval and comparison reports
 
 ## Where it goes next
 
-See [ROADMAP.md](ROADMAP.md): scores for real models, real embeddings behind the existing seam, the chat
-gateways run against the live services, and held-out eval cases written by someone other than
+See [ROADMAP.md](ROADMAP.md): running real models through the comparison and the retrieval eval and publishing
+the rows, the chat gateways run against the live services, and held-out eval cases written by someone other than
 the author. It also lists what comparable projects have that this one does not.
 
 Built by **Karthik Kasukurti**. Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under

@@ -711,7 +711,9 @@ def make_handler(root_app: App, access_key: str = "", pages: tuple[str, ...] = (
 
             def work(send: Any) -> None:
                 try:
-                    report = eval_compare.run_compare(targets, app.root / "compare", on_progress=lambda p: send({"type": "progress", **p}))
+                    trials = body.get("trials") if isinstance(body.get("trials"), int) else 1
+                    report = eval_compare.run_compare(targets, app.root / "compare", trials=max(1, min(trials, 5)),
+                                                      on_progress=lambda p: send({"type": "progress", **p}))
                     send({"type": "done", "report": report})
                 except Exception as exc:
                     send({"type": "error", "error": f"{type(exc).__name__}: {exc}"})

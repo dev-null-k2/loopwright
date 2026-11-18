@@ -495,10 +495,17 @@ def cmd_compare(args: argparse.Namespace) -> int:
         if t["label"] not in seen:
             seen.add(t["label"])
             unique.append(t)
-    print("Comparing " + ", ".join(t["label"] for t in unique) + " on the eight self-test questions.\n")
-    report = run_compare(unique, Path(args.out) if args.out else home_dir() / "compare",
-                         on_progress=lambda p: print(f"  {p['status']:<12} {p['target']:<28} {p['case']}"))
+    trials = max(1, min(args.trials, 10))
+    print("Comparing " + ", ".join(t["label"] for t in unique) + " on the eight self-test questions"
+          + (f", {trials} trials each" if trials > 1 else "") + ".\n")
+    report = run_compare(unique, Path(args.out) if args.out else home_dir() / "compare", trials=trials,
+                         on_progress=lambda p: print(f"  {p['status']:<12} {p['target']:<28} {p['case']}"
+                                                     + (f"  {p['passes']}/{p['trials']}" if trials > 1 and p["trials"] else "")))
     print("\n" + format_table(report))
+    if args.publish:
+        from loopwright.evals.compare import publish
+        command = "loopwright compare --targets " + " ".join(args.targets or ["scripted", "auto"]) + f" --trials {trials} --publish {args.publish}"
+        print(f"\nPublished: {publish(report, Path(args.publish), __version__, command)}  (and models.json beside it)")
     print("\nOpen the cockpit (loopwright serve), Evals, Compare, to replay any cell.")
     return 0
 
@@ -749,6 +756,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--targets", nargs="+", metavar="PROVIDER[:MODEL][+key=value]",
                    help="e.g. scripted local claude-code local:qwen2.5:7b scripted+pattern=plan")
     p.add_argument("--out", help="folder for the report and traces (default: your state folder)")
+    p.add_argument("--trials", type=int, default=1, help="ask every question this many times; 3 shows which behaviours are flaky")
+    p.add_argument("--publish", nargs="?", const="results", metavar="FOLDER",
+                   help="also write the table as models.md and models.json (default folder: results)")
     p.set_defaults(fn=cmd_compare)
 
     p = sub.add_parser("workflow", help="run or list workflows")

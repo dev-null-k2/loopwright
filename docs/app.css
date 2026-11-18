@@ -522,3 +522,4 @@ table.cmp tr.total td { border-top: 2px solid var(--line); font-variant-numeric:
 .msg.agent .meta .fb button { border-color: var(--line); color: var(--ink-2); font-weight: 400; }
 .msg.agent .meta .fb button.on { color: var(--panel); }
 .editor .row button { white-space: nowrap; }
+table.cmp .warn { color: var(--warn); font-weight: 600; }

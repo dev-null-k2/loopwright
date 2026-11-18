@@ -368,10 +368,61 @@ def test_compare_runs_the_same_cases_through_each_target_and_keeps_the_traces(tm
     assert "8/8" in compare.format_table(report)
 
 
+def test_three_trials_separate_what_a_model_can_do_from_what_it_does_every_time(tmp_path, monkeypatch, capsys):
+    """One run of a real model is an anecdote. With trials, a question it gets right two times in three
+    is reported as flaky, and the failing trial is the one kept for reading."""
+    outcomes = {"live-01": [True, True, True], "live-02": [True, False, True], "live-03": [False, False, False]}
+    asked = []
+
+    def fake_run_case(case, overrides=None, traces_dir=None):
+        start = sum(1 for c in asked if c == case["id"])
+        asked.extend([case["id"]] * len(case["trials"]))
+        runs = []
+        for i in range(start, start + len(case["trials"])):
+            ok = outcomes.get(case["id"], [True, True, True])[i]
+            runs.append({"passed": ok, "reply": f"trial {i + 1}", "steps": 10 + i, "tokens_in": 900 + 100 * i, "tokens_out": 100,
+                         "duration_ms": 1000 * (i + 1), "cost_usd": 0.002, "tools": ["calculator"], "model": "qwen-test",
+                         "checks": [{"check": "tool_called: calculator", "pass": ok, "note": "ran" if ok else "the calculator never ran"}]})
+        return {"passed": all(r["passed"] for r in runs), "trials": runs}
+
+    monkeypatch.setattr(compare, "run_case", fake_run_case)
+    seen = []
+    report = compare.run_compare([compare.parse_target("local:qwen-test")], tmp_path, trials=3, on_progress=seen.append)
+    column = report["targets"][0]
+    rows = {r["id"]: r for r in column["rows"]}
+    assert [rows[i]["status"] for i in ("live-01", "live-02", "live-03")] == ["pass", "flaky", "fail"]
+    assert (rows["live-02"]["passes"], rows["live-02"]["trials"]) == (2, 3) and rows["live-02"]["reply"] == "trial 2"      # the trial that failed
+    assert rows["live-02"]["failed_checks"] == ["tool_called: calculator: the calculator never ran"]
+    assert rows["live-02"]["ms"] == 2000 and rows["live-02"]["tokens"] == 1100 and rows["live-02"]["cost_usd"] == 0.006    # median time, mean tokens, total cost
+    assert (column["passed"], column["any_pass"], column["flaky"], column["total"]) == (6, 7, 1, 8)
+    assert column["pass_rate"] == round(20 / 24, 3) and asked.count("live-01") == 3
+    assert seen[1]["passes"] == 2 and seen[1]["trials"] == 3 and report["trials"] == 3 and "partial" not in report
+    table = compare.format_table(report)
+    assert "flaky 2/3" in table and "every trial 6/8" in table and "any trial   7/8" in table and "pass rate   83%" in table
+
+    page = compare.publish(report, tmp_path / "out", "9.9.9", "loopwright compare --targets local:qwen-test --trials 3 --publish out").read_text()
+    assert "| local · qwen-test | 6/8 | 7/8 | 83% |" in page and "| `live-02` Two tools in one request | 2/3 |" in page
+    assert "3 trials each" in page and "Loopwright 9.9.9" in page and "No real model is in this table yet" not in page
+    saved = json.loads((tmp_path / "out" / "models.json").read_text())
+    assert saved["targets"][0]["rows"][1] == {"id": "live-02", "status": "flaky", "passes": 2, "trials": 3, "ms": 2000, "tokens": 1100,
+                                              "cost_usd": 0.006, "failed_checks": ["tool_called: calculator: the calculator never ran"]}
+    assert "reply" not in json.dumps(saved)                                                 # the published file holds numbers, not transcripts
+
+    monkeypatch.undo()                                                                      # the real thing, on the stand-in
+    assert cli.main(["compare", "--targets", "scripted", "--trials", "2", "--out", str(tmp_path / "cmp"), "--publish", str(tmp_path / "pub")]) == 0
+    out = capsys.readouterr().out
+    assert "every trial 8/8" in out and "pass 2/2" in out
+    page = (tmp_path / "pub" / "models.md").read_text()
+    assert "No real model is in this table yet" in page and "*(stand-in, not an LLM)*" in page and "--trials 2 --publish" in page
+
+
 def test_an_unreachable_model_fails_fast_in_a_comparison(tmp_path):
     report = compare.run_compare([compare.parse_target("local")], tmp_path)
     statuses = [row["status"] for row in report["targets"][0]["rows"]]
     assert statuses[0] == "unreachable" and set(statuses[1:]) == {"skipped"} and report["targets"][0]["passed"] == 0
+    again = compare.run_compare([compare.parse_target("local")], tmp_path, trials=3)          # three trials do not mean three waits
+    assert again["targets"][0]["rows"][0]["trials"] == 1 and not again["targets"][0]["reachable"]
+    assert "could not be reached" in compare.publish(again, tmp_path / "out", "9.9.9").read_text()
 
 
 def test_a_real_run_becomes_an_eval_case_and_feedback_is_kept(agent, opts):

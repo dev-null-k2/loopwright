@@ -1,6 +1,6 @@
 {
-  "generated": "2026-11-17T18:30:10",
-  "version": "0.10.0",
+  "generated": "2026-11-17T18:44:29",
+  "version": "0.11.0",
   "model": "scripted-v1 (rule-based; these are evals of the harness, not of an LLM)",
   "suites": {
     "core": {
@@ -132,7 +132,7 @@
           "tokens_in": 7178,
           "turns": 1,
           "tokens_out": 36,
-          "duration_ms": 8,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -175,7 +175,7 @@
           "tokens_in": 4754,
           "turns": 1,
           "tokens_out": 14,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "clock"
@@ -222,7 +222,7 @@
           "tokens_in": 2363,
           "turns": 1,
           "tokens_out": 104,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -267,7 +267,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 74,
+          "duration_ms": 81,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -309,7 +309,7 @@
           "tokens_in": 5188,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 7,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -351,7 +351,7 @@
           "tokens_in": 5188,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 5,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -398,7 +398,7 @@
           "tokens_in": 4749,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -450,7 +450,7 @@
           "tokens_in": 7243,
           "turns": 1,
           "tokens_out": 563,
-          "duration_ms": 11,
+          "duration_ms": 16,
           "cost_usd": 0.0,
           "tools": [
             "delegate"
@@ -497,7 +497,7 @@
           "tokens_in": 5824,
           "turns": 1,
           "tokens_out": 71,
-          "duration_ms": 6,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -539,7 +539,7 @@
           "tokens_in": 11001,
           "turns": 1,
           "tokens_out": 816,
-          "duration_ms": 14,
+          "duration_ms": 13,
           "cost_usd": 0.0,
           "tools": [
             "delegate"
@@ -633,7 +633,7 @@
           "tokens_in": 5600,
           "turns": 1,
           "tokens_out": 274,
-          "duration_ms": 8,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "web_search"
@@ -680,7 +680,7 @@
           "tokens_in": 10436,
           "turns": 2,
           "tokens_out": 158,
-          "duration_ms": 13,
+          "duration_ms": 14,
           "cost_usd": 0.0,
           "tools": [
             "create_skill",
@@ -728,7 +728,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 10,
+          "duration_ms": 15,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -775,7 +775,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 7,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -832,7 +832,7 @@
           "tokens_in": 6388,
           "turns": 1,
           "tokens_out": 83,
-          "duration_ms": 5,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "handbook__loopwright_explain"
@@ -979,7 +979,7 @@
           "tokens_in": 5230,
           "turns": 1,
           "tokens_out": 58,
-          "duration_ms": 7,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -1031,7 +1031,7 @@
           "tokens_in": 15012,
           "turns": 3,
           "tokens_out": 133,
-          "duration_ms": 22,
+          "duration_ms": 26,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -1075,7 +1075,7 @@
           "tokens_in": 9623,
           "turns": 2,
           "tokens_out": 52,
-          "duration_ms": 9,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -1118,7 +1118,7 @@
           "tokens_in": 4798,
           "turns": 1,
           "tokens_out": 35,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "remember"
@@ -1170,7 +1170,7 @@
           "tokens_in": 10651,
           "turns": 3,
           "tokens_out": 294,
-          "duration_ms": 15,
+          "duration_ms": 16,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -1217,7 +1217,7 @@
           "tokens_in": 7831,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 7,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "recall",
@@ -1260,7 +1260,7 @@
           "tokens_in": 2389,
           "turns": 1,
           "tokens_out": 14,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -1300,7 +1300,7 @@
           "tokens_in": 11218,
           "turns": 2,
           "tokens_out": 385,
-          "duration_ms": 25,
+          "duration_ms": 20,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge",
@@ -1348,7 +1348,7 @@
           "tokens_in": 9610,
           "turns": 2,
           "tokens_out": 59,
-          "duration_ms": 12,
+          "duration_ms": 13,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -1401,7 +1401,7 @@
           "tokens_in": 4966,
           "turns": 1,
           "tokens_out": 91,
-          "duration_ms": 4,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1495,7 +1495,7 @@
           "tokens_in": 5258,
           "turns": 1,
           "tokens_out": 66,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "read_file"
@@ -1594,7 +1594,7 @@
           "tokens_in": 4790,
           "turns": 1,
           "tokens_out": 34,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -1641,7 +1641,7 @@
           "tokens_in": 4764,
           "turns": 1,
           "tokens_out": 29,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "read_file"
@@ -1725,7 +1725,7 @@
           "tokens_in": 4788,
           "turns": 1,
           "tokens_out": 52,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1772,7 +1772,7 @@
           "tokens_in": 4777,
           "turns": 1,
           "tokens_out": 28,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "save_note"
@@ -1871,7 +1871,7 @@
           "tokens_in": 5345,
           "turns": 1,
           "tokens_out": 112,
-          "duration_ms": 6,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "web_search"
@@ -1918,7 +1918,7 @@
           "tokens_in": 8219,
           "turns": 1,
           "tokens_out": 175,
-          "duration_ms": 11,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "web_search",
@@ -2015,7 +2015,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2052,7 +2052,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2090,7 +2090,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2228,7 +2228,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2409,7 +2409,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2446,7 +2446,7 @@
           "tokens_in": 7188,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 8,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2534,7 +2534,7 @@
           "tokens_in": 7855,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 8,
+          "duration_ms": 9,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2573,7 +2573,7 @@
           "tokens_in": 7855,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 9,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2612,7 +2612,7 @@
           "tokens_in": 7855,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 9,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2707,7 +2707,7 @@
           "tokens_in": 7190,
           "turns": 1,
           "tokens_out": 50,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2861,7 +2861,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2908,7 +2908,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2960,7 +2960,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 55,
+          "duration_ms": 79,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -3007,7 +3007,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 9,
+          "duration_ms": 11,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -3049,7 +3049,7 @@
           "tokens_in": 2935,
           "turns": 1,
           "tokens_out": 104,
-          "duration_ms": 5,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -3089,7 +3089,7 @@
           "tokens_in": 6371,
           "turns": 1,
           "tokens_out": 59,
-          "duration_ms": 10,
+          "duration_ms": 11,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -3171,7 +3171,7 @@
           "tokens_in": 8105,
           "turns": 1,
           "tokens_out": 177,
-          "duration_ms": 7,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -3262,12 +3262,12 @@
             {
               "check": "tool_called: list_events",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
+              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
             },
             {
               "check": "tool_called: search_notes",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
+              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
             },
             {
               "check": "reply_contains: Design review",
@@ -3291,12 +3291,12 @@
           "tokens_in": 377,
           "turns": 1,
           "tokens_out": 62,
-          "duration_ms": 7,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "list_events",
-            "search_knowledge",
-            "search_notes"
+            "search_notes",
+            "search_knowledge"
           ],
           "model": "scripted-v1",
           "provider": "scripted",
@@ -3395,7 +3395,7 @@
           "tokens_in": 249,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "save_note"
@@ -3548,7 +3548,7 @@
           "tokens_in": 4789,
           "turns": 1,
           "tokens_out": 38,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3600,7 +3600,7 @@
           "tokens_in": 4839,
           "turns": 1,
           "tokens_out": 85,
-          "duration_ms": 7,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3694,7 +3694,7 @@
           "tokens_in": 4776,
           "turns": 1,
           "tokens_out": 41,
-          "duration_ms": 3,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -3741,7 +3741,7 @@
           "tokens_in": 7365,
           "turns": 1,
           "tokens_out": 80,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -3789,7 +3789,7 @@
           "tokens_in": 2365,
           "turns": 1,
           "tokens_out": 40,
-          "duration_ms": 2,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -3849,7 +3849,7 @@
           "tokens_in": 5096,
           "turns": 1,
           "tokens_out": 66,
-          "duration_ms": 9,
+          "duration_ms": 12,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3896,7 +3896,7 @@
           "tokens_in": 7654,
           "turns": 1,
           "tokens_out": 68,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -3939,7 +3939,7 @@
           "tokens_in": 4972,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3996,7 +3996,7 @@
           "tokens_in": 6931,
           "turns": 1,
           "tokens_out": 155,
-          "duration_ms": 1676,
+          "duration_ms": 1773,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4038,7 +4038,7 @@
           "tokens_in": 7240,
           "turns": 1,
           "tokens_out": 164,
-          "duration_ms": 1686,
+          "duration_ms": 1723,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4085,7 +4085,7 @@
           "tokens_in": 4817,
           "turns": 1,
           "tokens_out": 45,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4132,7 +4132,7 @@
           "tokens_in": 6036,
           "turns": 1,
           "tokens_out": 167,
-          "duration_ms": 792,
+          "duration_ms": 767,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4174,7 +4174,7 @@
           "tokens_in": 5843,
           "turns": 1,
           "tokens_out": 106,
-          "duration_ms": 401,
+          "duration_ms": 394,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4334,7 +4334,7 @@
       "recall_at_3": 1.0
     },
     "dense": {
-      "recall_at_1": 0.705,
+      "recall_at_1": 0.727,
       "recall_at_3": 0.932
     },
     "hybrid": {
@@ -4490,9 +4490,9 @@
           "q": "use one model to grade another model's answers",
           "expected": "llm-as-judge",
           "got": [
-            "concept:model-comparison",
             "concept:context-window",
-            "concept:structured-output"
+            "concept:structured-output",
+            "concept:hallucination"
           ]
         },
         {
@@ -4662,5 +4662,5 @@
       "gate_false_skip_rate_max": 0.2
     }
   },
-  "seconds": 37.94
+  "seconds": 39.43
 }

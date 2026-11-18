@@ -7,6 +7,7 @@ loopwright eval --judge      # also run the model-graded cases; needs a real mod
 loopwright eval --mine       # only the cases you saved from your own runs
 loopwright eval --retrieval --embedder hash --embedder auto    # only retrieval: the stand-in next to a real embedding model
 loopwright compare --targets scripted local claude-code     # the same questions through several models
+loopwright compare --targets local claude-code --trials 3 --publish     # three trials each, written to results/models.md
 ```
 
 ## What runs

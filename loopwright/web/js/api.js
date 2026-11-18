@@ -246,9 +246,9 @@ export const api = {
   // model comparison
   async compareReport() { return demo ? { report: demo.compare, providers: demo.health.providers } : getJSON("api/compare/report"); },
   async compareTrace(slug, id) { return demo ? demo.compareTraces[`${slug}/${id}`] : getJSON(`api/compare/trace/${slug}/${id}`); },
-  async runCompare(targets, onProgress) {
+  async runCompare(targets, onProgress, trials = 1) {
     let report = null;
-    await stream("api/compare", { targets }, (msg) => {
+    await stream("api/compare", { targets, trials }, (msg) => {
       if (msg.type === "progress") onProgress(msg);
       else if (msg.type === "done") report = msg.report;
       else if (msg.type === "error") throw new Error(msg.error);

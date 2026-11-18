@@ -164,7 +164,7 @@ export function createEvals(actions) {
   const drawTabs = () => put(tabsBar, TABS.map(([id, label]) => h("button", { class: tab === id ? "on" : "", onclick: () => { location.hash = `#evals/${id}`; } }, label)));
 
   // ---------------------------------------------------------------- compare models
-  let cmp = null, cmpBusy = false, cmpProgress = "", picked = null;
+  let cmp = null, cmpBusy = false, cmpProgress = "", picked = null, cmpTrials = 1;
   const secs = (ms) => (ms == null ? "n/a" : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`);
 
   async function drawCompare() {
@@ -173,13 +173,18 @@ export function createEvals(actions) {
     if (!picked) picked = new Set(["scripted", ...Object.keys(providers).filter((n) => providers[n].ok && n !== "scripted").slice(0, 2)]);
     const extra = h("input", { placeholder: "more targets, e.g. local:qwen2.5:7b scripted+pattern=plan", style: "min-width:340px" });
     const r = cmp.report;
+    const many = (r?.trials || 1) > 1;
+    const trialsPick = h("select", { title: "How many times each question is asked", "aria-label": "Trials per question" },
+      [1, 3, 5].map((n) => h("option", { value: n }, n === 1 ? "1 trial" : `${n} trials`)));
+    trialsPick.value = String(cmpTrials);
+    trialsPick.addEventListener("change", () => { cmpTrials = Number(trialsPick.value); });
     const start = async () => {
       cmpBusy = true; cmpProgress = "Starting..."; drawCompare();
       try {
         const report = await api.runCompare([...picked, ...extra.value.trim().split(/\s+/).filter(Boolean)], (p) => {
-          cmpProgress = `${p.target}: ${p.case} ${p.status} (${p.done}/${p.total})`;
+          cmpProgress = `${p.target}: ${p.case} ${p.status}${p.trials > 1 ? ` ${p.passes}/${p.trials}` : ""} (${p.done}/${p.total})`;
           const line = root.querySelector(".progress"); if (line) line.textContent = cmpProgress;
-        });
+        }, cmpTrials);
         cmp = { ...cmp, report }; cmpProgress = "";
       } catch (error) { cmpProgress = `The comparison failed: ${error.message}`; }
       cmpBusy = false; drawCompare();
@@ -196,8 +201,8 @@ export function createEvals(actions) {
             box.addEventListener("change", () => { box.checked ? picked.add(name) : picked.delete(name); });
             return h("label", { class: "check", title: p.note }, box, h("span", {}, name + (p.ok ? "" : " (not set up)")));
           })),
-          h("div", { class: "row" }, extra, h("button", { class: "primary", disabled: cmpBusy, onclick: start }, cmpBusy ? "Running..." : "Run the comparison")),
-          h("p", { class: "hint" }, "A target is a provider, provider:model, or either with +setting=value to compare two configurations of one model. Real models take a minute or two.")),
+          h("div", { class: "row" }, extra, trialsPick, h("button", { class: "primary", disabled: cmpBusy, onclick: start }, cmpBusy ? "Running..." : "Run the comparison")),
+          h("p", { class: "hint" }, "A target is a provider, provider:model, or either with +setting=value to compare two configurations of one model. Real models take a minute or two per pass. One run of a real model is an anecdote: three trials show which behaviours it gets right every time and which only sometimes.")),
       h("p", { class: "progress" }, cmpProgress),
       r ? [
         h("table", { class: "grid cmp" },
@@ -209,15 +214,17 @@ export function createEvals(actions) {
                 const row = t.rows[i];
                 return h("td", { class: row.ms != null ? "clickable" : "", title: row.failed_checks?.join("\n") || row.note || "Replay this run",
                                  onclick: row.ms != null ? () => actions.replayCompare(t.slug, c.id, `${t.label}: ${c.title}`) : null },
-                  h("span", { class: row.status === "pass" ? "pass" : "fail" }, row.status),
+                  h("span", { class: row.status === "pass" ? "pass" : row.status === "flaky" ? "warn" : "fail" }, row.status, many && ["pass", "flaky", "fail"].includes(row.status) ? ` ${row.passes}/${row.trials}` : ""),
                   row.ms != null ? h("div", { class: "hint" }, `${secs(row.ms)} · ${fmt(row.tokens)} tok · ${row.tools.length} tool call(s)`) : h("div", { class: "hint" }, row.note || ""),
                   row.failed_checks?.length ? h("div", { class: "hint fail-why" }, row.failed_checks[0]) : null);
               }))),
-            h("tr", { class: "total" }, h("td", {}, h("b", {}, "Passed")), r.targets.map((t) => h("td", {}, h("b", { class: t.passed === t.total ? "pass" : "fail" }, `${t.passed}/${t.total}`)))),
+            h("tr", { class: "total" }, h("td", {}, h("b", {}, many ? "Right on every trial" : "Passed")), r.targets.map((t) => h("td", {}, h("b", { class: t.passed === t.total ? "pass" : "fail" }, `${t.passed}/${t.total}`)))),
+            many ? h("tr", { class: "total" }, h("td", {}, "Right at least once"), r.targets.map((t) => h("td", {}, `${t.any_pass}/${t.total}`, t.flaky ? h("span", { class: "hint" }, `  ${t.flaky} flaky`) : null))) : null,
+            many ? h("tr", { class: "total" }, h("td", {}, "Pass rate over all runs"), r.targets.map((t) => h("td", {}, pct(t.pass_rate)))) : null,
             h("tr", { class: "total" }, h("td", {}, "Median time per question"), r.targets.map((t) => h("td", {}, secs(t.median_ms)))),
-            h("tr", { class: "total" }, h("td", {}, "Tokens, all eight"), r.targets.map((t) => h("td", {}, fmt(t.tokens)))),
-            h("tr", { class: "total" }, h("td", {}, "Cost, all eight"), r.targets.map((t) => h("td", {}, t.cost_usd == null ? "n/a" : `$${t.cost_usd.toFixed(4)}`))))),
-        h("p", { class: "note" }, `Generated ${r.generated}. Eight cases are a smoke test, not a verdict: for a real decision, save your own runs as cases (Your cases) and run several trials.`),
+            h("tr", { class: "total" }, h("td", {}, "Tokens, one pass over all eight"), r.targets.map((t) => h("td", {}, fmt(t.tokens)))),
+            h("tr", { class: "total" }, h("td", {}, many ? "Cost, all trials" : "Cost, all eight"), r.targets.map((t) => h("td", {}, t.cost_usd == null ? "n/a" : `$${t.cost_usd.toFixed(4)}`))))),
+        h("p", { class: "note" }, `Generated ${r.generated}${many ? `, ${r.trials} trials per question` : ""}. Eight cases are a smoke test, not a verdict: for a real decision, save your own runs as cases (Your cases) and run several trials. From a terminal, loopwright compare --trials 3 --publish writes this table to a file you can keep.`),
       ] : h("p", { class: "note" }, "No comparison yet."));
   }
 

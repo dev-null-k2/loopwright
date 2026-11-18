@@ -28,6 +28,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from loopwright.memory import embedders
 from loopwright.memory.retrieval import Hit, Index
 
 SCHEMA = """
@@ -146,12 +147,13 @@ class Store:
         return {r["subject"] for r in self._rows(
             "SELECT DISTINCT subject FROM facts WHERE superseded_by IS NULL AND subject NOT IN ('', 'user')")}
 
-    def search_facts(self, query: str, k: int = 5, mode: str = "hybrid") -> list[Hit]:
-        index = Index()
+    def search_facts(self, query: str, k: int = 5, mode: str = "hybrid", embedder: str = "hash",
+                     report: dict[str, Any] | None = None, question: str = "") -> list[Hit]:
+        index = Index(embedders.get(embedder))
         for fact in self.facts():
             index.add(f"fact:{fact['id']}", fact["text"], {"kind": "fact", "subject": fact["subject"]},
                       boost=fact["subject"] if fact["subject"] != "user" else "")
-        hits = index.search(query, k=k, mode=mode)
+        hits = index.search(query, k=k, mode=mode, report=report, question=question)
         used = [int(h.id.split(":")[1]) for h in hits]
         if used:
             self._run(f"UPDATE facts SET uses=uses+1, last_used=? WHERE id IN ({','.join('?' * len(used))})",
@@ -166,11 +168,12 @@ class Store:
     def episodes(self) -> list[dict[str, Any]]:
         return self._rows("SELECT * FROM episodes ORDER BY id DESC")
 
-    def search_episodes(self, query: str, k: int = 2) -> list[Hit]:
-        index = Index()
+    def search_episodes(self, query: str, k: int = 2, embedder: str = "hash",
+                        report: dict[str, Any] | None = None, question: str = "") -> list[Hit]:
+        index = Index(embedders.get(embedder))
         for ep in self.episodes():
             index.add(f"episode:{ep['id']}", f"{ep['day']}: {ep['summary']}", {"kind": "episode", "day": ep["day"]})
-        return index.search(query, k=k, min_cosine=0.3)
+        return index.search(query, k=k, strict=True, report=report, question=question)
 
     # ------------------------------------------------ the world the tools act on
     def add_event(self, title: str, day: str, at: str, attendees: list[str]) -> int:

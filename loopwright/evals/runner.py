@@ -181,20 +181,63 @@ def summarise(cases: list[dict[str, Any]]) -> dict[str, Any]:
             "memory_searches": sum(t["memory_searches"] for t in trials), "turns": turns}
 
 
-def run_retrieval() -> dict[str, Any]:
-    """Recall@k of the knowledge base, per ranker, on labelled questions."""
-    rows = [json.loads(line) for line in (DATASETS / "retrieval.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
-    out: dict[str, Any] = {"questions": len(rows), "misses": []}
-    for mode in ("bm25", "dense", "hybrid"):
-        at1 = at3 = 0
-        for row in rows:
-            ids = [h.id for h in kb.search(row["q"], k=3, mode=mode)]
-            want = f"concept:{row['expect']}"
-            at1 += ids[:1] == [want]
-            at3 += want in ids
-            if mode == "hybrid" and want not in ids:
-                out["misses"].append({"q": row["q"], "expected": row["expect"], "got": ids})
-        out[mode] = {"recall_at_1": round(at1 / len(rows), 3), "recall_at_3": round(at3 / len(rows), 3)}
+RETRIEVAL_SETS = {
+    # written with the handbook, by the person who wrote the cards: mostly the cards' own words
+    "retrieval": "the first set, which uses the handbook's own vocabulary",
+    # written later, without looking at results, describing each idea in other words
+    "retrieval-heldout": "the held-out set, which paraphrases",
+}
+
+
+def _recall(rows: list[dict[str, Any]], search: Callable[[str], list[str]]) -> tuple[dict[str, float], list[dict[str, Any]]]:
+    at1 = at3 = 0
+    misses = []
+    for row in rows:
+        ids, want = search(row["q"]), f"concept:{row['expect']}"
+        at1 += ids[:1] == [want]
+        at3 += want in ids[:3]
+        if want not in ids[:3]:
+            misses.append({"q": row["q"], "expected": row["expect"], "got": ids[:3]})
+    return {"recall_at_1": round(at1 / len(rows), 3), "recall_at_3": round(at3 / len(rows), 3)}, misses
+
+
+def run_retrieval(embedder: str = "hash", rerank: str = "off", small: Callable[[str], str] | None = None) -> dict[str, Any]:
+    """Recall@k of the knowledge base on labelled questions: per ranker, on two
+    question sets, with any embedder, and with a reranker when one is named.
+
+    The first set was written alongside the cards and shares their words, which
+    flatters keyword search. The held-out set asks for the same cards in other
+    words, which is the case embeddings exist for. Reporting both is the point:
+    a retrieval score means little without knowing how the questions were made."""
+    out: dict[str, Any] = {"embedder": embedder, "rerank": rerank}
+    for name in RETRIEVAL_SETS:
+        rows = [json.loads(line) for line in (DATASETS / f"{name}.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        block: dict[str, Any] = {"questions": len(rows)}
+        report: dict[str, Any] = {}
+        for mode in ("bm25", "dense", "hybrid"):
+            block[mode], misses = _recall(rows, lambda q, mode=mode, report=report: [h.id for h in kb.search(q, k=3, mode=mode, embedder=embedder, report=report)])
+            if mode == "hybrid":
+                block["misses"] = misses
+        if rerank != "off":
+            notes: list[str] = []
+
+            def second_look(q: str, notes: list[str] = notes) -> list[str]:
+                info: dict[str, Any] = {}
+                hits = kb.search(q, k=3, embedder=embedder, rerank=rerank, small=small, report=info)
+                if info["rerank"].get("failed"):
+                    notes.append(info["rerank"]["note"])
+                return [h.id for h in hits]
+
+            block["reranked"], _ = _recall(rows, second_look)
+            block["reranked"]["failed"] = len(notes)                 # searches where the reranker gave up and the first stage stood
+            if notes:
+                block["reranked"]["why"] = notes[0]
+        if name == "retrieval":
+            out.update(block)                                        # the first set keeps its place at the top level
+        else:
+            out["heldout"] = block
+        out["fallback"] = report.get("fallback", "") or out.get("fallback", "")
+        out["embedder_used"] = "hash" if out["fallback"] else report.get("embedder", embedder)
     return out
 
 

@@ -233,7 +233,56 @@ def cmd_resume(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def _retrieval_table(rows: list[dict[str, Any]]) -> str:
+    """recall@1 / recall@3 per embedder and ranker, on both question sets."""
+    lines = [f"{'embedder':<30}{'ranker':<18}{'first set @1 / @3':>20}{'held-out @1 / @3':>20}"]
+    for r in rows:
+        label = f"{r['embedder']} (fell back to hash)" if r["fallback"] else r["embedder_used"]
+        for mode in ("bm25", "dense", "hybrid", "reranked"):
+            if mode not in r:
+                continue
+            first, held = r[mode], r["heldout"][mode]
+            name = f"hybrid + {r['rerank']}" if mode == "reranked" else mode
+            lines.append(f"{label:<30}{name:<18}{first['recall_at_1'] * 100:>12.0f}% / {first['recall_at_3'] * 100:>3.0f}%"
+                         f"{held['recall_at_1'] * 100:>12.0f}% / {held['recall_at_3'] * 100:>3.0f}%")
+            label = ""
+        if r.get("reranked", {}).get("failed") or r["heldout"].get("reranked", {}).get("failed"):
+            failed = r["reranked"]["failed"] + r["heldout"]["reranked"]["failed"]
+            lines.append(f"{'':<30}the reranker gave up on {failed} search(es): {r['reranked'].get('why') or r['heldout']['reranked'].get('why')}")
+        if r["fallback"]:
+            lines.append(f"{'':<30}{r['fallback'][:150]}")
+    return "\n".join(lines)
+
+
+def cmd_eval_retrieval(args: argparse.Namespace) -> int:
+    """`loopwright eval --retrieval`: the retrieval eval alone, for one or more embedders, with or without a reranker."""
+    from loopwright import __version__ as version
+    from loopwright.evals.runner import run_retrieval
+    small = None
+    if args.rerank == "model":
+        from loopwright.events import Recorder
+        from loopwright.models.gateway import ModelGateway
+        small = ModelGateway(_options(args), Recorder()).small("rerank")
+        if small is None:
+            print("--rerank model needs a real model (--provider local, claude-code, anthropic or openai). "
+                  "The scripted model cannot judge relevance, so the reranked rows will equal the hybrid ones.\n")
+    rows = []
+    for spec in args.embedder or ["hash"]:
+        print(f"embedding the handbook and the questions with {spec} ...", file=sys.stderr)
+        rows.append(run_retrieval(spec, args.rerank, small))
+    print(_retrieval_table(rows))
+    print("\nThe first set uses the handbook's own words; the held-out set asks for the same cards in other words.")
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "retrieval.json").write_text(json.dumps({"generated": time.strftime("%Y-%m-%dT%H:%M:%S"), "version": version, "rows": rows},
+                                                   indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"Saved: {out / 'retrieval.json'}")
+    return 0
+
+
 def cmd_eval(args: argparse.Namespace) -> int:
+    if args.retrieval or args.embedder or args.rerank != "off":
+        return cmd_eval_retrieval(args)
     from loopwright.evals.runner import SUITES, run_all
     judge_model = judge_turn = None
     if args.judge:
@@ -282,6 +331,10 @@ def cmd_eval(args: argparse.Namespace) -> int:
     print(f"\nretrieval recall@1/@3   bm25 {r['bm25']['recall_at_1']:.2f}/{r['bm25']['recall_at_3']:.2f}   "
           f"dense {r['dense']['recall_at_1']:.2f}/{r['dense']['recall_at_3']:.2f}   "
           f"hybrid {r['hybrid']['recall_at_1']:.2f}/{r['hybrid']['recall_at_3']:.2f}   ({r['questions']} questions)")
+    h = r["heldout"]
+    print(f"  held-out paraphrases  bm25 {h['bm25']['recall_at_1']:.2f}/{h['bm25']['recall_at_3']:.2f}   "
+          f"dense {h['dense']['recall_at_1']:.2f}/{h['dense']['recall_at_3']:.2f}   "
+          f"hybrid {h['hybrid']['recall_at_1']:.2f}/{h['hybrid']['recall_at_3']:.2f}   ({h['questions']} questions, hash embedder)")
     g = report["gate"]
     print(f"retrieval gate (rules)  accuracy {g['accuracy']:.2f}   false skips {g['false_skips']}   "
           f"false retrieves {g['false_retrieves']}   ({g['messages']} messages)")
@@ -352,6 +405,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     chosen = pick_provider("auto")
     for name, info in status.items():
         print(f"  {'ready ' if info['ok'] else 'no    '} {name:<12} {info['note']}{'   <- auto picks this' if name == chosen else ''}")
+    from loopwright.memory import embedders
+    found = embedders.local_embedding_models()
+    print("\nRetrieval")
+    print("  ready  hash         built in: offline, deterministic, matches spelling and not meaning (the default)")
+    print(f"  {'ready ' if found else 'no    '} local model  "
+          + (f"{', '.join(found[:5])}. Use one with: --set embedder=auto   (or LOOPWRIGHT_EMBEDDER=ollama:{found[0]})" if found
+             else "no embedding model on a local server. With Ollama: ollama pull nomic-embed-text"))
+    print("         compare    loopwright eval --retrieval --embedder hash --embedder auto")
     if args.ping:
         target = args.ping if args.ping in PROVIDERS else chosen
         print(f"\nSending one test message to {target}...")
@@ -674,6 +735,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--judge", action="store_true", help="also run model-graded cases (needs a real model)")
     p.add_argument("--out", default="results")
     p.add_argument("--mine", action="store_true", help="run only the cases you saved from your own runs")
+    p.add_argument("--retrieval", action="store_true", help="run only the retrieval eval (recall on two question sets)")
+    p.add_argument("--embedder", action="append", metavar="SPEC",
+                   help="with --retrieval: hash, auto, ollama:<model> or openai:<model>; repeat to compare several")
+    p.add_argument("--rerank", default="off", choices=["off", "model", "endpoint"],
+                   help="with --retrieval: add a second stage and report it as its own row")
+    p.add_argument("--provider", help="the model that reranks when --rerank model")
+    p.add_argument("--model")
     p.set_defaults(fn=cmd_eval)
 
     p = sub.add_parser("compare", help="the same questions through several models, side by side")

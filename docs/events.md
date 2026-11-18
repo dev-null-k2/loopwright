@@ -47,6 +47,7 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 | `model.stream` | Reply | [Streaming](glossary.md#streaming) |
 | `plan.made` | Planner | [Plan-and-execute](glossary.md#plan-and-execute) |
 | `reply.send` | Reply | [Harness](glossary.md#harness) |
+| `rerank.run` | Knowledge base (RAG) | [Reranking](glossary.md#reranking) |
 | `schedule.create` | Scheduler | [Standing instructions and persistence](glossary.md#standing-instructions) |
 | `schedule.fire` | Scheduler | [Scheduled and proactive agents](glossary.md#scheduled-agents) |
 | `shell.run` | Tools | [Code execution sandbox](glossary.md#code-sandbox) |

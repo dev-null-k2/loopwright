@@ -26,7 +26,7 @@ import urllib.request
 from typing import Any
 
 from loopwright.config import PACKAGE_DIR
-from loopwright.memory import kb
+from loopwright.memory import embedders, kb
 from loopwright.memory.consolidation import Candidate, extract_by_rules, resolve
 from loopwright.memory.retrieval import Index
 from loopwright.tools.registry import Registry, Tool, ToolContext, ToolError, TransientToolError
@@ -96,7 +96,10 @@ def remember(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
 
 def recall(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     """Memory the model pulls for itself, as opposed to what the gate pushed."""
-    hits = ctx.store.search_facts(args["query"], k=5) + ctx.store.search_episodes(args["query"], k=2)
+    report: dict[str, Any] = {}
+    hits = (ctx.store.search_facts(args["query"], k=5, embedder=ctx.options.embedder, report=report)
+            + ctx.store.search_episodes(args["query"], k=2, embedder=ctx.options.embedder))
+    embedders.emit(ctx.rec, report, "semantic")
     ctx.rec.emit("memory.recall", "semantic", f"Recall found {len(hits)} memory item(s)",
                  "Agentic retrieval: the model asked for memory through a tool, with its own query. "
                  "The retrieval gate pushes memory before the loop; this is the pull path, for when "
@@ -137,9 +140,22 @@ def create_skill(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
 
 
 def search_knowledge(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
-    hits = kb.search(args["query"], k=int(args.get("k", 3)))
+    report: dict[str, Any] = {}
+    how = ctx.options.rerank
+    hits = kb.search(args["query"], k=int(args.get("k", 3)), embedder=ctx.options.embedder, rerank=how,
+                     small=ctx.small("rerank") if how == "model" and ctx.small else None, report=report)
+    embedders.emit(ctx.rec, report, "kb")
     for hit in hits:
         ctx.cited.add(hit.meta["term"].lower())
+    second = report["rerank"]
+    if how != "off":
+        ctx.rec.emit("rerank.run", "kb",
+                     f"Reranker: {second['note']}" if second.get("failed") or not second.get("after")
+                     else f"Reranked {second['candidates']} candidates, {second['moved']} of the top {second['kept']} changed place",
+                     "A second, slower look. The first stage scored every passage on its own; the reranker read the "
+                     "question together with each of the best candidates and put them in a better order. It can "
+                     "only re-order what the first stage found, and if it fails the first-stage order is kept.",
+                     src="tools", status="warn" if second.get("failed") else "ok", dur_ms=second.get("ms"), data=second)
     ctx.rec.emit("kb.search", "kb", f"Knowledge base returned {len(hits)} passage(s)",
                  "RAG retrieval. Two rankers ran: BM25 (exact words) and dense vectors (similarity). "
                  "Reciprocal rank fusion merged them; the ranks from each are in the data.",
@@ -147,7 +163,7 @@ def search_knowledge(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
                  data={"query": args["query"], "hits": [
                      {"id": h.id, "term": h.meta["term"], "score": round(h.score, 4), "bm25_rank": h.bm25_rank,
                       "dense_rank": h.dense_rank, "bm25": round(h.bm25, 2), "cosine": round(h.cosine, 3),
-                      "coverage": round(h.coverage, 2)} for h in hits]})
+                      "coverage": round(h.coverage, 2)} for h in hits], "embedder": report.get("embedder", "hash")})
     return {"query": args["query"], "passages": [
         {"id": h.id, "term": h.meta["term"], "one_liner": h.meta["one_liner"], "explain": h.meta["explain"],
          "why": h.meta["why"], "tradeoff": h.meta["tradeoff"], "file": h.meta["file"], "cite": h.meta["cite"],

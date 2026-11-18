@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.0
+
+A real embedding model and a reranker, behind one option each.
+
+- **Embedders.** `embedder=ollama:<model>` (Ollama's `/api/embed`), `openai:<model>` (any `/v1/embeddings`), or
+  `auto` (the first embedding model on your local server). The built-in hash stand-in stays the default, so
+  nothing changes until you choose. Passages are embedded in batches and cached on disk; the question and the
+  passages get the instruction prefixes each model family was trained with; the similarity floor is measured for
+  the model instead of assumed; a real model is given the user's sentence, not the keyword query; and when the
+  model cannot be reached the search falls back to the stand-in and says so.
+- **Rerankers.** `rerank=endpoint` sends the best twelve handbook candidates to a cross-encoder behind the shared
+  `/v1/rerank` API; `rerank=model` has the chat model order them. Both fail open to the first-stage order.
+- **A held-out retrieval set.** 60 questions that ask for handbook cards in other words, written before any result
+  on them was seen. With the stand-in embedder the hybrid ranker finds the card in the top three for 98% of the
+  original questions and 73% of these. Both sets are in the report, the README and the Evals tab.
+- `loopwright eval --retrieval --embedder hash --embedder auto --rerank model` scores any combination side by
+  side and writes `results/retrieval.json`. `loopwright doctor` lists local embedding models.
+- Three new events (`embed.run`, `embed.fallback`, `rerank.run`); the Embeddings and Reranking cards now describe
+  code that runs; two Lab switches; two eval cases (74); `docs/retrieval.md`. 145 tests.
+- **Not yet run:** any real embedding model or reranker. Everything above is tested over HTTP against a stand-in
+  server that speaks those APIs. The retrieval table has no row for a real model until someone runs the command.
+
 ## 0.8.0
 
 The reply arrives while the model is still writing it.

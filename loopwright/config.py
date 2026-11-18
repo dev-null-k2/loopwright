@@ -52,6 +52,8 @@ class Options:
     memory: bool = True             # long-term memory on/off (ablation)
     gate: str = "rules"             # rules | model | always | never
     consolidate_every: int = 3      # background write after N user messages
+    embedder: str = "hash"          # hash | auto | ollama:<model> | openai:<model>  (memory/embedders.py)
+    rerank: str = "off"             # off | model | endpoint: a second look at the knowledge-base results
     # ---- context
     context_budget: int = 8_000     # tokens the prompt may use before compaction
     compact_at: float = 0.6         # compact history past this share of the budget

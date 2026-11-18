@@ -16,8 +16,13 @@ The same three functions serve long-term memory and the knowledge base (RAG).
 About the embedder: `embed()` hashes character trigrams and words into a
 fixed-size vector. It is a stand-in that needs no model download and gives the
 same vector on every machine, which keeps the evals reproducible. It captures
-spelling overlap, not real meaning. Swap in a real embedding model by passing
-your own `embed` function to `Index`; nothing else changes.
+spelling overlap, not real meaning. A real embedding model takes its place
+through embedders.py (`Index(embedders.get("ollama:nomic-embed-text"))`);
+nothing else here changes. If that model cannot be reached, the index falls
+back to the stand-in for the search and records why.
+
+A fourth step is optional: a RERANKER (rerank.py) re-reads the best few
+candidates together with the question and puts them in a better order.
 
 Everything here is plain Python over an in-memory list, which is honest up to
 a few thousand items. Past that you would move BM25 to SQLite FTS5 or
@@ -30,7 +35,6 @@ import math
 import re
 import zlib
 from collections import Counter
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -92,23 +96,30 @@ class Hit:
     cosine: float = 0.0
     coverage: float = 0.0         # share of the query's words that appear in this document
     meta: dict[str, Any] = field(default_factory=dict)
+    first_rank: int | None = None  # where the first stage put it, when a reranker moved it
 
     def to_json(self) -> dict[str, Any]:
         return {"id": self.id, "text": self.text, "score": round(self.score, 4),
                 "bm25_rank": self.bm25_rank, "dense_rank": self.dense_rank,
                 "bm25": round(self.bm25, 3), "cosine": round(self.cosine, 3),
-                "coverage": round(self.coverage, 2), **self.meta}
+                "coverage": round(self.coverage, 2), **self.meta,
+                **({"first_rank": self.first_rank} if self.first_rank is not None else {})}
 
 
 class Index:
     """A small searchable collection: add documents, then search three ways."""
 
-    def __init__(self, embedder: Callable[[str], list[float]] = embed):
-        self._embed = embedder
+    def __init__(self, embedder: Any = None):
+        """`embedder` is an object from embedders.py, or any `text -> vector` function. None is the hash stand-in."""
+        from loopwright.memory import embedders
+        self.embedder = (embedders.HASH if embedder is None else embedder if hasattr(embedder, "documents")
+                         else embedders.FunctionEmbedder(embedder))
         self.docs: list[tuple[str, str, dict[str, Any]]] = []   # (id, text, meta)
         self._tokens: list[list[str]] = []
-        self._vectors: list[list[float]] = []
+        self._parts: list[tuple[str, str]] = []                  # (boost, text): what each document is embedded from
+        self._vectors: list[list[float]] = []                    # filled on the first search, in one batch
         self._df: Counter[str] = Counter()
+        self.fallback = ""                                       # why the stand-in took over, when it did
 
     def add(self, doc_id: str, text: str, meta: dict[str, Any] | None = None,
             boost: str = "") -> None:
@@ -118,8 +129,33 @@ class Index:
         tokens = tokenize(indexed)
         self.docs.append((doc_id, text, meta or {}))
         self._tokens.append(tokens)
-        self._vectors.append(self._embed(f"{boost} {boost} {text}" if boost else text))
+        self._parts.append((boost, text))
         self._df.update(set(tokens))
+
+    def _to_embed(self, start: int = 0) -> list[str]:
+        """The text each document is embedded as. The stand-in counts words, so a
+        title is repeated to weigh more; a real model reads it once, as a title."""
+        if self.embedder.real:
+            return [f"{boost}. {text}" if boost else text for boost, text in self._parts[start:]]
+        return [f"{boost} {boost} {text}" if boost else text for boost, text in self._parts[start:]]
+
+    def _embedded(self) -> None:
+        """Make sure every document has a vector. One batch, on first use, so
+        adding a hundred documents is one request to the model and not a hundred."""
+        from loopwright.memory import embedders
+        if len(self._vectors) == len(self._parts):
+            return
+        try:
+            self._vectors += self.embedder.documents(self._to_embed(len(self._vectors)))
+        except embedders.EmbedError as exc:
+            self._fall_back(str(exc))
+
+    def _fall_back(self, why: str) -> None:
+        """The model is unreachable: use the stand-in for everything in this index.
+        Vectors from two embedders cannot be compared, so none of the old ones are kept."""
+        from loopwright.memory import embedders
+        self.fallback, self.embedder = why, embedders.HASH
+        self._vectors = self.embedder.documents(self._to_embed())
 
     def __len__(self) -> int:
         return len(self.docs)
@@ -145,21 +181,39 @@ class Index:
         return sorted(scored, key=lambda pair: -pair[1])[:k]
 
     # ---- ranker 2: dense (nearest vectors)
-    def dense(self, query: str, k: int = 10, floor: float = 0.0) -> list[tuple[int, float]]:
+    def dense(self, query: str, k: int = 10, floor: float | None = 0.0, strict: bool = False) -> list[tuple[int, float]]:
+        """`floor=None` asks the embedder for its own floor (see embedders.py)."""
+        from loopwright.memory import embedders
         if not self.docs:
             return []
-        q = self._embed(query)
+        self._embedded()
+        try:
+            q = self.embedder.query(query)
+            floor = self.embedder.floor(strict) if floor is None else floor
+        except embedders.EmbedError as exc:
+            self._fall_back(str(exc))
+            q, floor = self.embedder.query(query), self.embedder.floor(strict) if floor is None else floor
         scored = [(i, cosine(q, v)) for i, v in enumerate(self._vectors)]
         return sorted((p for p in scored if p[1] > floor), key=lambda pair: -pair[1])[:k]
 
     # ---- fusion
-    def search(self, query: str, k: int = 5, mode: str = "hybrid",
-               min_cosine: float = 0.18) -> list[Hit]:
+    def search(self, query: str, k: int = 5, mode: str = "hybrid", min_cosine: float | None = None,
+               strict: bool = False, report: dict[str, Any] | None = None, question: str = "") -> list[Hit]:
         """mode: 'bm25' | 'dense' | 'hybrid'. A hit must share a word with the
-        query or clear `min_cosine`; without that floor, dense search hands
-        back its nearest neighbours even when nothing is relevant."""
+        query or clear a similarity floor; without that floor, dense search
+        hands back its nearest neighbours even when nothing is relevant. The
+        floor is the embedder's own (`strict` asks for its higher one) unless
+        `min_cosine` sets it. `report`, when given, is filled with which
+        embedder answered and what it cost.
+
+        `question` is the sentence the user actually wrote, when `query` is a
+        shortened keyword version of it. Keywords suit BM25. A real embedding
+        model was trained on sentences, so it is given the sentence."""
         lexical = self.bm25(query, k=max(k * 3, 10)) if mode in ("bm25", "hybrid") else []
-        vectors = self.dense(query, k=max(k * 3, 10), floor=min_cosine) if mode in ("dense", "hybrid") else []
+        meaning = question if question and self.embedder.real else query
+        vectors = self.dense(meaning, k=max(k * 3, 10), floor=min_cosine, strict=strict) if mode in ("dense", "hybrid") else []
+        if report is not None:
+            report.update(embedder=self.embedder.name, fallback=self.fallback, **self.embedder.take_stats())
         hits: dict[int, Hit] = {}
         terms = set(tokenize(query))
 

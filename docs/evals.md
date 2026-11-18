@@ -5,6 +5,7 @@ loopwright eval              # run everything, print the tables, write results/e
 loopwright eval --gate       # the same, and exit 1 if the release gate fails (CI runs this)
 loopwright eval --judge      # also run the model-graded cases; needs a real model
 loopwright eval --mine       # only the cases you saved from your own runs
+loopwright eval --retrieval --embedder hash --embedder auto    # only retrieval: the stand-in next to a real embedding model
 loopwright compare --targets scripted local claude-code     # the same questions through several models
 ```
 
@@ -12,15 +13,15 @@ loopwright compare --targets scripted local claude-code     # the same questions
 
 | Part | What it is | Where |
 |---|---|---|
-| Suites | `core` (tool routing, skills, patterns), `memory`, `safety`, `reliability`, `context`, `automation` (workflows, scheduled tasks, the shell, the browser). 72 cases | [`evals/datasets/*.jsonl`](../loopwright/evals/datasets/) |
+| Suites | `core` (tool routing, skills, patterns), `memory`, `safety`, `reliability`, `context`, `automation` (workflows, scheduled tasks, the shell, the browser). 74 cases | [`evals/datasets/*.jsonl`](../loopwright/evals/datasets/) |
 | Trials | Reliability cases run three times with failures injected at different points. `pass_at_1` is the mean; `pass_all_trials` is the share that passed every time (pass^3) | `trials` in a case |
 | Ablations | Every suite again with one mechanism off: `no-memory`, `always-retrieve`, `no-guardrails`, `no-retries` | `VARIANTS` in [`runner.py`](../loopwright/evals/runner.py) |
-| Retrieval | 44 labelled questions against the handbook; recall@1 and @3 for BM25, dense and hybrid | `retrieval.jsonl` |
+| Retrieval | Two labelled question sets against the handbook: 44 in its own words, 60 held-out that paraphrase. Recall@1 and @3 for BM25, dense and hybrid, with any embedder and optionally a reranker ([retrieval.md](retrieval.md)) | `retrieval.jsonl`, `retrieval-heldout.jsonl` |
 | Gate | 30 labelled messages against the retrieval gate's rules; accuracy, false skips, false retrieves | `gate.jsonl` |
 | Judge | 5 rubric-graded cases. Skipped without a real model; there is deliberately no offline judge | [`judge.py`](../loopwright/evals/judge.py) |
 
 The five `automation` cases marked `"needs": "browser"` start a real headless browser. On a machine with no
-Chromium-family browser they are left out, so the totals there are 64 cases and four attacks. With a browser the
+Chromium-family browser they are left out, so the totals there are 69 cases and four attacks. With a browser the
 whole run takes about half a minute; without one, a few seconds.
 
 Each case gets a new state folder and a frozen clock (Thursday 2026-11-12), so cases cannot leak into each other

@@ -47,6 +47,7 @@ class ToolContext:
     origin: str = ""                                            # "telegram:12345": where a scheduled result should go
     worker: Callable[..., dict[str, Any]] | None = None         # run a sub-loop with its own tools (browser agent)
     workflow: Callable[[str, str], dict[str, Any]] | None = None  # run a named workflow inside this turn
+    small: Callable[[str], Any] | None = None                   # small(purpose) -> a callable for a narrow model job, or None
 
 
 @dataclass

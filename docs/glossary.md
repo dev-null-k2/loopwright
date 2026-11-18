@@ -549,16 +549,16 @@ Retrieval returns chunks, not documents, so the chunk boundary decides what the 
 
 **Text turned into vectors so that similar meaning lands close together.**
 
-An embedding model maps a passage to a list of numbers. To search, the query is embedded too and the nearest passages by cosine similarity are returned. Loopwright ships a hashed n-gram embedder so it runs offline and gives identical vectors everywhere; it captures spelling overlap, not real meaning, and is a seam you replace with a real model.
+An embedding model maps a passage to a list of numbers. To search, the query is embedded too and the nearest passages by cosine similarity are returned. Loopwright ships a hashed n-gram embedder so it runs offline and gives identical vectors everywhere; it captures spelling overlap, not real meaning. A real model takes its place with one option: `embedder=ollama:nomic-embed-text`, or any OpenAI-compatible embeddings API. Four things come with a real model and are handled in code: passages are embedded in batches and cached on disk, so each is embedded once; the question and the passages get the different instruction prefixes the model was trained with; the similarity floor is measured for that model instead of assumed; and if the model cannot be reached the search falls back to the stand-in.
 
 - **Why it exists.** Keyword search misses paraphrase: 'booking' does not match 'schedule'. Vector search finds passages that mean the same thing in different words.
-- **The tradeoff.** Dense search is weak on exact tokens such as error codes, ids and names, and it always returns its nearest neighbours even when nothing is relevant, so it needs a similarity floor.
-- **In this repo.** [`loopwright/memory/retrieval.py`](../loopwright/memory/retrieval.py)
+- **The tradeoff.** Dense search is weak on exact tokens such as error codes, ids and names, and it always returns its nearest neighbours even when nothing is relevant, so it needs a similarity floor. That floor does not carry between models: unrelated sentences score near 0 with one and near 0.5 with another. Change the model and every stored vector has to be made again.
+- **In this repo.** [`loopwright/memory/embedders.py`](../loopwright/memory/embedders.py)
 - **See it run.** `loopwright ask "What are embeddings?" --steps`
 
 > **Interview question.** When does vector search fail, and what do you do about it?
 >
-> On exact identifiers: product codes, error ids, rare names, where the embedding blurs what matters. And on empty results: it returns the closest thing even if it is unrelated. I pair it with BM25 in a hybrid search, apply a similarity threshold so nothing is returned when nothing fits, and add a reranker if precision at the top still falls short.
+> On exact identifiers: product codes, error ids, rare names, where the embedding blurs what matters. And on empty results: it returns the closest thing even if it is unrelated. I pair it with BM25 in a hybrid search, apply a similarity threshold calibrated for the model in use so nothing is returned when nothing fits, and add a reranker if precision at the top still falls short. I also check the model's instruction prefixes: leaving them out fails silently.
 
 ### <a id="bm25"></a>BM25
 
@@ -594,11 +594,11 @@ Both rankers return their top results. Reciprocal rank fusion gives each passage
 
 **A slower, more accurate model re-orders the top results from the first-pass search.**
 
-First-stage retrieval is built for speed over a whole corpus. A reranker reads the query and each candidate together and scores how well they match, which is more accurate but too slow to run on everything. So you retrieve fifty, rerank, and keep five. Loopwright does not ship one; the retrieval eval shows where it would go.
+First-stage retrieval is built for speed over a whole corpus. A reranker reads the query and each candidate together and scores how well they match, which is more accurate but too slow to run on everything. So you retrieve a dozen, rerank, and keep three. Loopwright has two, both off by default: `rerank=endpoint` sends the candidates to a cross-encoder behind the /v1/rerank API that Cohere, Jina and llama.cpp share, and `rerank=model` asks the chat model itself to put them in order. Either way a failure keeps the first-stage order.
 
 - **Why it exists.** It raises precision at the top of the list, which is the only part the model sees.
-- **The tradeoff.** Added latency and cost per query, and it cannot rescue a passage the first stage never retrieved.
-- **In this repo.** [`loopwright/memory/retrieval.py`](../loopwright/memory/retrieval.py)
+- **The tradeoff.** Added latency and cost per query, and it cannot rescue a passage the first stage never retrieved. Using the chat model as the reranker needs no extra service but spends a model call on every search.
+- **In this repo.** [`loopwright/memory/rerank.py`](../loopwright/memory/rerank.py)
 - **See it run.** `loopwright ask "What is reranking?" --steps`
 
 > **Interview question.** Retrieval recall at 20 is good but answers are poor. What do you add?

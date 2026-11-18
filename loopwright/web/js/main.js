@@ -36,6 +36,8 @@ const LAB = [
   ["pattern", "Orchestration", "react: decide step by step. plan: write the steps first. reflect: a critic reviews the draft.", ["react", "plan", "reflect"]],
   ["memory", "Long-term memory", "Off removes the gate, retrieval, the memory tools and consolidation.", "bool"],
   ["gate", "Retrieval gate", "rules or model decide per turn. always searches every turn. never forces the model to pull.", ["rules", "model", "always", "never"]],
+  ["embedder", "Embedding model", "hash is the built-in stand-in: it matches spelling, not meaning. auto uses an embedding model from your local model server when one is running. Name one with LOOPWRIGHT_EMBEDDER.", ["hash", "auto"]],
+  ["rerank", "Reranker", "A second, slower look at what the handbook search found. model: the chat model orders the candidates. endpoint: a cross-encoder at LOOPWRIGHT_RERANK_URL.", ["off", "model", "endpoint"]],
   ["guardrails", "Guardrails", "Off removes the fence on outside content. Try it with the poisoned page.", "bool"],
   ["approvals", "Outside effects", "ask: you approve each one. approve or deny: a fixed policy.", ["ask", "approve", "deny"]],
   ["search", "Web search backend", "auto picks the first one set up. demo is an offline corpus.", ["auto", "demo", "duckduckgo", "tavily", "brave", "claude-code"]],
@@ -274,7 +276,8 @@ function drawLab() {
       input = h("input", { type: "number", min: 0, value: lab[key] });
       input.addEventListener("change", () => { lab[key] = Number(input.value); drawLab(); });
     } else {
-      input = h("select", {}, kind.map((v) => h("option", { value: v }, v)));
+      const choices = kind.includes(lab[key]) ? kind : [...kind, lab[key]];       // a value set outside the Lab (an environment variable) stays selectable
+      input = h("select", {}, choices.map((v) => h("option", { value: v }, v)));
       input.value = lab[key];
       input.addEventListener("change", () => { lab[key] = input.value; drawLab(); });
     }

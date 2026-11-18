@@ -59,6 +59,12 @@ track on multi-step requests and takes seconds to minutes per step. That is a go
 exactly where it goes wrong, and the tool gate, budgets and repeat detection are what keep those mistakes harmless.
 `loopwright selftest --provider local` tells you which of the eight behaviours your model manages.
 
+### Embedding models
+
+Retrieval uses a built-in stand-in for embeddings by default. If your local server also has an embedding model
+(`ollama pull nomic-embed-text`), `--set embedder=auto`, or Embedding model in the Lab, uses it for memory and
+handbook search, still with no network. `loopwright doctor` lists what it found. See [retrieval.md](retrieval.md).
+
 ## What needs a network, and what happens without one
 
 | Feature | Offline behaviour |

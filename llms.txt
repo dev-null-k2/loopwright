@@ -23,6 +23,7 @@
 - [Claude Code](docs/claude-code.md)
 - [Offline and local models](docs/offline.md)
 - [Replay](docs/replay.md)
+- [Retrieval: the stand-in embedder, real embedding models, reranking](docs/retrieval.md)
 - [Evals](docs/evals.md)
 - [Security](docs/security.md)
 

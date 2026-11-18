@@ -46,6 +46,7 @@ from loopwright import workflows as wf
 from loopwright.config import Options, home_dir
 from loopwright.events import Event, Live, Recorder, Sink, new_id, write_trace
 from loopwright.loop import LoopResult, run_loop
+from loopwright.memory import embedders
 from loopwright.memory import gate as gate_mod
 from loopwright.memory.consolidation import consolidate
 from loopwright.memory.retrieval import Hit
@@ -193,6 +194,7 @@ class Agent:
         registry = self.registry.without(off)
         gate = ToolGate(registry, tools, options, rec, state, approver)
         t = _Turn(message, session, options, rec, gateway, state, tools, registry, gate, time.perf_counter())
+        tools.small = gateway.small
         tools.spawn = lambda task, n: self._spawn(t, task, n)
         tools.worker = lambda **kw: self._work(t, **kw)
         tools.workflow = lambda name, text: self._workflow(t, name, text)
@@ -292,14 +294,16 @@ class Agent:
                  data={"retrieve": decision.retrieve, "query": decision.query, "reason": decision.reason, "mode": decision.mode})
         if not decision.retrieve:
             return []
-        facts = self.store.search_facts(decision.query, k=5)
+        report: dict[str, Any] = {}
+        facts = self.store.search_facts(decision.query, k=5, embedder=opts.embedder, report=report, question=t.message)
+        embedders.emit(rec, report, "semantic", src="gate")
         rec.emit("memory.search", "semantic", f"Semantic memory: {len(facts)} fact(s) found",
                  "Facts are searched two ways at once: BM25 for exact words and vectors for similarity, merged by "
                  "reciprocal rank fusion. A hit must share a word with the query or clear a similarity floor, "
                  "so an unrelated store returns nothing.",
                  src="gate", status="ok" if facts else "skip",
                  data={"query": decision.query, "hits": [h.to_json() for h in facts], "stored": len(self.store.facts())})
-        episodes = self.store.search_episodes(decision.query, k=2)
+        episodes = self.store.search_episodes(decision.query, k=2, embedder=opts.embedder, question=t.message)
         rec.emit("memory.episodes", "episodic", f"Episodic memory: {len(episodes)} episode(s) found",
                  "Episodes are dated summaries of past sessions: what happened and when, as opposed to timeless "
                  "facts. They answer 'what did we do last week?'.",

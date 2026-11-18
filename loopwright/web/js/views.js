@@ -286,9 +286,13 @@ export function createEvals(actions) {
 
       h("div", { class: "two" },
         h("div", {}, h("h2", {}, "Handbook retrieval"),
-          h("table", { class: "grid" }, h("thead", {}, h("tr", {}, h("th", {}, "Ranker"), h("th", { class: "n" }, "recall@1"), h("th", { class: "n" }, "recall@3"))),
-            h("tbody", {}, ["bm25", "dense", "hybrid"].map((m) => h("tr", {}, h("td", {}, m), h("td", { class: "n" }, pct(r.retrieval[m].recall_at_1)), h("td", { class: "n" }, pct(r.retrieval[m].recall_at_3)))))),
-          h("p", { class: "note" }, `${r.retrieval.questions} labelled questions. The dense ranker here is an offline hashed embedder, not a real embedding model.`)),
+          h("table", { class: "grid" }, h("thead", {}, h("tr", {}, h("th", {}, "Ranker"), h("th", { class: "n" }, "recall@1"), h("th", { class: "n" }, "recall@3"),
+              r.retrieval.heldout ? [h("th", { class: "n" }, "held-out @1"), h("th", { class: "n" }, "held-out @3")] : null)),
+            h("tbody", {}, ["bm25", "dense", "hybrid"].map((m) => h("tr", {}, h("td", {}, m), h("td", { class: "n" }, pct(r.retrieval[m].recall_at_1)), h("td", { class: "n" }, pct(r.retrieval[m].recall_at_3)),
+              r.retrieval.heldout ? [h("td", { class: "n" }, pct(r.retrieval.heldout[m].recall_at_1)), h("td", { class: "n" }, pct(r.retrieval.heldout[m].recall_at_3))] : null)))),
+          h("p", { class: "note" }, `${r.retrieval.questions} questions written in the handbook's own words`
+            + (r.retrieval.heldout ? `, and ${r.retrieval.heldout.questions} held-out ones that ask for the same cards in other words. The gap between the two is what vocabulary costs` : "")
+            + ". The dense ranker here is the offline hashed embedder, which matches spelling and not meaning. Score a real embedding model on the same questions with: loopwright eval --retrieval --embedder ollama:nomic-embed-text")),
         h("div", {}, h("h2", {}, "Retrieval gate (rules)"),
           h("table", { class: "grid" }, h("tbody", {},
             h("tr", {}, h("td", {}, "Accuracy"), h("td", { class: "n" }, `${pct(r.gate.accuracy)} of ${r.gate.messages}`)),

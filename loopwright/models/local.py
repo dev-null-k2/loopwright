@@ -103,6 +103,14 @@ def rank(base: str, models: list[str]) -> tuple[str, str]:
     return best, why
 
 
+EMBEDDING_FAMILIES = ("embed", "bge-", "all-minilm", "e5-", "gte-", "arctic", "paraphrase-")
+
+
+def is_embedder(model: str) -> bool:
+    """An embedding model turns text into a vector and cannot chat. Runners list both kinds together."""
+    return any(marker in model.lower() for marker in EMBEDDING_FAMILIES)
+
+
 def detect(refresh: bool = False) -> dict[str, Any] | None:
     """-> {"name", "url", "models", "preferred", "why"} for the first local server that
     answers, or None. Cached for 20 seconds so the cockpit can ask often."""
@@ -116,9 +124,10 @@ def detect(refresh: bool = False) -> dict[str, Any] | None:
             models = [m.get("id", "") for m in _get(f"{base}/v1/models").get("data", [])]
         except (urllib.error.URLError, TimeoutError, OSError, ValueError):
             continue
-        models = [m for m in models if m and "embed" not in m.lower()]
+        embedders = [m for m in models if m and is_embedder(m)]          # not chat models: retrieval uses these
+        models = [m for m in models if m and not is_embedder(m)]
         preferred, why = rank(base, models)
-        value = {"name": name, "url": base, "models": models, "preferred": preferred, "why": why}
+        value = {"name": name, "url": base, "models": models, "preferred": preferred, "why": why, "embedders": embedders}
         break
     _found.update(at=time.time(), value=value)
     return value

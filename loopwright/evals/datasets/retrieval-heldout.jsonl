@@ -1,0 +1,60 @@
+{"q": "why do answers get worse when I put more and more text into the prompt", "expect": "context-rot"}
+{"q": "how do I stop a retried request from charging the customer twice", "expect": "idempotency"}
+{"q": "the same question gives a different answer every run, why", "expect": "determinism"}
+{"q": "stop hammering a service that keeps failing", "expect": "circuit-breaker"}
+{"q": "switch to a backup model when the main one is unavailable", "expect": "fallback"}
+{"q": "wait longer between each attempt after a rate limit error", "expect": "retry-backoff"}
+{"q": "who signs off before the assistant sends an email", "expect": "human-in-the-loop"}
+{"q": "a web page told my assistant to forward my inbox to a stranger", "expect": "prompt-injection"}
+{"q": "why is private data plus outside text plus outbound access dangerous together", "expect": "lethal-trifecta"}
+{"q": "summarise older messages when the conversation gets too long", "expect": "compaction"}
+{"q": "pay less for the repeated beginning of every request", "expect": "prompt-caching"}
+{"q": "how much can the model read at once", "expect": "context-window"}
+{"q": "remember what the user likes between conversations", "expect": "semantic-memory"}
+{"q": "what did we talk about last Tuesday", "expect": "episodic-memory"}
+{"q": "teach the assistant a procedure it can reuse later", "expect": "procedural-memory"}
+{"q": "decide whether to look anything up before answering", "expect": "retrieval-gate"}
+{"q": "turn chat history into stored facts in the background", "expect": "consolidation"}
+{"q": "delete something the assistant learned about me", "expect": "forgetting"}
+{"q": "split a long document into pieces for search", "expect": "chunking"}
+{"q": "find passages that mean the same thing in different words", "expect": "embeddings"}
+{"q": "match an exact error code in the documents", "expect": "bm25"}
+{"q": "combine keyword results and vector results into one list", "expect": "hybrid-search"}
+{"q": "re-order the top results with a slower, more accurate model", "expect": "reranking"}
+{"q": "the model made up a source that does not exist", "expect": "hallucination"}
+{"q": "should I retrain the model or just give it my documents", "expect": "customisation-options"}
+{"q": "get data back in a fixed shape my code can parse", "expect": "structured-output"}
+{"q": "how does the model ask my code to run a function", "expect": "tool-calling"}
+{"q": "write a description so the model picks the right function", "expect": "tool-schema"}
+{"q": "what is checked before a function the model asked for is run", "expect": "tool-gate"}
+{"q": "limit how many steps and how much money one request can use", "expect": "budgets"}
+{"q": "when does the loop end", "expect": "stop-conditions"}
+{"q": "write the list of steps before doing any of them", "expect": "plan-and-execute"}
+{"q": "a second pass grades the draft and sends it back for a revision", "expect": "evaluator-optimizer"}
+{"q": "hand part of the job to a helper that starts with a clean slate", "expect": "subagents"}
+{"q": "send billing questions one way and technical questions another", "expect": "routing"}
+{"q": "do three independent lookups at the same time", "expect": "parallelization"}
+{"q": "pick up where it left off after a crash", "expect": "checkpointing"}
+{"q": "a complete ordered record of one request, for debugging", "expect": "tracing"}
+{"q": "watch a past run again at a slower speed", "expect": "replay"}
+{"q": "how much did that request cost in tokens and money", "expect": "cost-accounting"}
+{"q": "tests that block a release when quality drops", "expect": "release-gate"}
+{"q": "use one model to grade another model's answers", "expect": "llm-as-judge"}
+{"q": "grade the path the agent took and not only its answer", "expect": "trajectory-evals"}
+{"q": "run each test several times and require every run to pass", "expect": "pass-k"}
+{"q": "turn one feature off to prove that it matters", "expect": "ablations"}
+{"q": "attack your own system on purpose to find weaknesses", "expect": "red-teaming"}
+{"q": "run the assistant every morning without anyone asking", "expect": "scheduled-agents"}
+{"q": "let the assistant run commands it wrote without risking my machine", "expect": "code-sandbox"}
+{"q": "run an open-weights model on my laptop with no internet", "expect": "local-models"}
+{"q": "show the words while they are still being generated", "expect": "streaming"}
+{"q": "reach the assistant from WhatsApp or Slack", "expect": "messaging-gateways"}
+{"q": "keep one customer's documents invisible to another customer", "expect": "multi-tenancy"}
+{"q": "where is personal data processed and how long is it kept", "expect": "data-boundaries"}
+{"q": "find the nearest neighbours among millions of items quickly", "expect": "vector-index"}
+{"q": "ship a change to five percent of traffic first", "expect": "rollout"}
+{"q": "reuse an earlier answer for a very similar question", "expect": "semantic-cache"}
+{"q": "improve what the user typed before searching with it", "expect": "query-rewriting"}
+{"q": "let the model work through the problem before it answers", "expect": "reasoning"}
+{"q": "one interface in front of several model vendors", "expect": "model-gateway"}
+{"q": "whose permissions does the assistant act with", "expect": "agent-auth"}

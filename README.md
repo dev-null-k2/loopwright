@@ -14,7 +14,8 @@ and any run can be replayed, paused and stepped through afterwards.
 [Workflows, schedules, browser, chat apps](#beyond-the-chat-box) ·
 [Add your own tools](#make-it-yours) ·
 [Claude Code](#runs-on-your-claude-code-subscription) ·
-[Offline and local models](docs/offline.md)
+[Offline and local models](docs/offline.md) ·
+[Retrieval: embeddings and reranking](docs/retrieval.md)
 
 [![CI](https://github.com/dev-null-k2/loopwright/actions/workflows/ci.yml/badge.svg)](https://github.com/dev-null-k2/loopwright/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2456d6)](LICENSE)
@@ -56,13 +57,14 @@ that says which part of the system it happened in and why. That one decision giv
 |---|---|
 | **Replay is the interface** | Play, pause, step forward and back, scrub a strip coloured by subsystem, 0.4x to 4x. Live turns and old traces use the same player. |
 | **The reply arrives as it is written** | Every provider streams, the scripted model included. The words appear when the board says they do, the output guard masks secrets inside the stream, and the receipt shows the time to the first words next to the total. |
+| **Retrieval you can swap and measure** | BM25 plus vectors, fused. The vectors come from a built-in stand-in or, with one option, a real embedding model on Ollama or any OpenAI-compatible API, with a reranker on top. Two labelled question sets score whichever you choose. |
 | **Every reply shows its work** | Under each answer: what it looked up in memory, which skill loaded, every tool call with its arguments and raw output, retries, refusals. Click a row and the board jumps to that step. |
 | **It teaches while it runs** | Each step is explained in plain words, linked to a 95-card handbook and to the file that implements it. Twenty-five guided lessons run real turns and tell you where to look. |
 | **Switch any mechanism off** | The Lab turns off memory, the retrieval gate or guardrails, injects model and tool failures, and changes the orchestration pattern, per message. |
 | **Runs with no key, and with no internet** | A built-in scripted model makes everything work the moment you clone. Or use an open-source model on your own machine (Ollama, LM Studio, llama.cpp), your Claude Code subscription, or any Anthropic or OpenAI-compatible key. |
 | **Not only a chat box** | The same agent runs fixed **workflows**, **scheduled tasks** with nobody watching, a **browser agent** that clicks through real pages, an opt-in sandboxed **shell**, and answers on **Telegram, Discord, Slack and WhatsApp**. Each is a few hundred readable lines, and each is watched and replayed like everything else. |
 | **Compare models on your own machine** | The same eight behaviour cases through any mix of local models, Claude Code and API models, side by side, with a replayable trace behind every cell. |
-| **Measured, with teeth** | 72 eval cases, four ablations, a release gate, and gate rules that fail if the *evals themselves* stop being able to fail. |
+| **Measured, with teeth** | 74 eval cases, four ablations, a release gate, and gate rules that fail if the *evals themselves* stop being able to fail. |
 | **Zero dependencies** | Python standard library only. No framework, no SDK, no build step for the UI. |
 
 ## See it work
@@ -104,7 +106,7 @@ request with guardrails off, and the message goes out. That pair is the whole ar
 
 ### Evals with ablations
 
-<picture><img alt="The Evals tab: release gate Pass, 72 of 72 cases, 0% of injection attacks worked. An ablation table shows the safety suite falling to 25% and attacks rising to 100% with guardrails off, and the memory suite falling to 18% with memory off." src="docs/media/evals.png" width="100%"></picture>
+<picture><img alt="The Evals tab: release gate Pass, 74 of 74 cases, 0% of injection attacks worked. An ablation table shows the safety suite falling to 25% and attacks rising to 100% with guardrails off, and the memory suite falling to 18% with memory off." src="docs/media/evals.png" width="100%"></picture>
 
 ### A browser agent you can watch
 
@@ -241,23 +243,24 @@ More in [docs/architecture.md](docs/architecture.md).
 for five cases (a few seconds on a machine without one). Raw numbers:
 [`results/eval-report.json`](results/eval-report.json).
 
-**72 cases** across six suites, each with a fresh agent and a frozen clock, graded on the trace as well as the
+**74 cases** across six suites, each with a fresh agent and a frozen clock, graded on the trace as well as the
 answer. Reliability cases run three trials with failures injected at different points.
 
 | Variant | core | memory | safety | reliability | context | automation | Injection attacks that worked | Memory searches |
 |---|---|---|---|---|---|---|---|---|
-| **full** | **100%** | **100%** | **100%** | **100%** | **100%** | **100%** | **0 of 5** | 29 in 93 turns |
+| **full** | **100%** | **100%** | **100%** | **100%** | **100%** | **100%** | **0 of 5** | 29 in 95 turns |
 | no-memory | 100% | 18% | 100% | 100% | 80% | 100% | 0 of 5 | 0 |
-| always-retrieve (no gate) | 100% | 82% | 100% | 100% | 100% | 100% | 0 of 5 | 88 in 93 turns |
+| always-retrieve (no gate) | 100% | 82% | 100% | 100% | 100% | 100% | 0 of 5 | 90 in 95 turns |
 | no-guardrails | 88% | 91% | 25% | 100% | 80% | 42% | **5 of 5** | 29 |
-| no-retries | 100% | 100% | 100% | 59% | 100% | 100% | 0 of 5 | 29 |
+| no-retries | 100% | 100% | 100% | 67% | 100% | 100% | 0 of 5 | 29 |
 
 | Other checks | Result |
 |---|---|
-| Handbook retrieval, 44 labelled questions, recall@1 / @3 | BM25 84% / 100% · dense 73% / 91% · hybrid 84% / 98% |
+| Handbook retrieval, 44 questions in the handbook's own words, recall@1 / @3 | BM25 84% / 100% · dense 73% / 91% · hybrid 84% / 98% |
+| The same, 60 held-out questions that paraphrase | BM25 60% / 75% · dense 50% / 62% · hybrid 60% / 73% |
 | Retrieval gate (rules), 30 labelled messages | 83% accurate; 2 false skips, 3 false retrieves |
 | Lessons | all 24 runnable lessons produce every step they promise (a test enforces it) |
-| Unit and end-to-end tests | 133 passing |
+| Unit and end-to-end tests | 145 passing |
 
 The `automation` suite covers workflows, scheduled tasks, the shell and the browser: a workflow's hard-coded send
 is refused after it read the web, a scheduled run cannot send or run commands, a turn that read a file cannot
@@ -275,16 +278,18 @@ and an injection on a page the browser read does not reach the outbox.
   That is what lets the evals show the attacks working (5 of 5 with guardrails off) and the defence holding
   (0 of 5 with them on). One case (`tests/test_harness.py`) goes further and drives the gate with a fully
   compromised model.
-- The "dense" ranker is an offline hashed embedder that captures spelling, not meaning. On this small corpus plain
-  BM25 does as well as hybrid or slightly better (100% against 98% at recall@3): fusing with a weak ranker can
-  push a good BM25 hit down. Hybrid is the default because that is what holds up on real corpora with a real
-  embedding model, and the embedder is one function you can replace.
+- The "dense" ranker in these numbers is an offline hashed embedder that captures spelling, not meaning. On this
+  small corpus plain BM25 does as well as hybrid or slightly better (100% against 98% at recall@3): fusing with a
+  weak ranker can push a good BM25 hit down. Asked in other words (the held-out set), every ranker here drops to
+  about three in four. A real embedding model and a reranker plug in with one option each
+  ([docs/retrieval.md](docs/retrieval.md)) and are tested against a stand-in server, but **none has been scored
+  yet**: `loopwright eval --retrieval --embedder auto` produces that row on a machine with Ollama.
 - The rule-based gate is wrong about one message in six. Its misses are listed in the report; the model-based
   gate (`gate=model`) exists for that reason and needs a real model.
 - The release gate also fails if guardrails-off stops letting attacks through, or memory-off stops failing memory
   cases. An eval that cannot fail is not measuring anything.
 - Five automation cases need a Chromium-family browser. On a machine without one they are left out, and the
-  totals are 64 cases and four attacks.
+  totals are 69 cases and four attacks.
 
 ## Make it yours
 
@@ -379,7 +384,7 @@ trifecta"*. More in [docs/claude-code.md](docs/claude-code.md).
 
 | Part | How it is verified |
 |---|---|
-| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 133 automated tests and the 72-case eval suite, on every push, on Python 3.11 and 3.13 |
+| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 145 automated tests and the 74-case eval suite, on every push, on Python 3.11 and 3.13 |
 | Browser agent | Against real headless Chrome on a bundled four-page site: reading, clicking, filling in and submitting a form, screenshots, and refusal of local and private addresses, including a page's own sub-requests. Not run against arbitrary live websites |
 | Shell tool | Real commands: the opt-in switch, approval, scrubbed environment, timeout, denial in tainted and unattended turns. The sandbox was `none` on the machine the evals ran on (no bubblewrap); the macOS `sandbox-exec` profile is probed at run time and has not been exercised in CI |
 | Chat gateways | Each protocol against a stand-in: a fake Bot API (Telegram), a local WebSocket server playing Discord's gateway and Slack's Socket Mode, real signed and forged HTTP deliveries (WhatsApp). **Not run against the live services** |
@@ -427,7 +432,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              133 tests
+tests/              145 tests
 docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports

@@ -5,7 +5,8 @@ Roughly in order.
 **Next**
 - Scores for real models: three trials per model through the local, Claude Code and API providers, published
   from `loopwright compare`.
-- A real embedding model behind the existing `embed` seam, with the retrieval eval re-run against it.
+- A real embedding model and a reranker scored on the two retrieval sets, and the row published. The code and
+  the command exist (`loopwright eval --retrieval --embedder auto`); no real model has been run through it yet.
 - The chat gateways run against the live services, with the results written up.
 
 **Then**
@@ -14,7 +15,6 @@ Roughly in order.
 - HTTP transport for the MCP client (stdio only today).
 - Triggers other than time for scheduled work: a webhook, a new file in the workspace.
 - A container or micro-VM runner for `run_command`, for machines where the OS sandbox is not available.
-- A reranker stage, measured.
 
 **What comparable projects have that this one does not**
 

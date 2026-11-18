@@ -10,6 +10,15 @@ loopwright compare --targets scripted local claude-code     # the same questions
 loopwright compare --targets local claude-code --trials 3 --publish     # three trials each, written to results/models.md
 ```
 
+## Real models, without your own hardware
+
+The numbers on this page come from the scripted stand-in. To put real open-source models next to them, the
+repository has a workflow that a person starts by hand: on GitHub, **Actions, Model scores, Run workflow**. It
+installs Ollama on the runner, downloads the models you name, and then runs the retrieval eval with real
+embedding models, a streaming check, and `loopwright compare` with several trials. The results are attached to
+the run as an artifact called `model-scores`; nothing is committed and it never starts by itself. The same three
+commands work on any machine with Ollama (see [retrieval.md](retrieval.md) and the README).
+
 ## What runs
 
 | Part | What it is | Where |

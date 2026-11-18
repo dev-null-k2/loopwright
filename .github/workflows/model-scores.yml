@@ -1,0 +1,99 @@
+name: Model scores
+
+# Real open-source models, on a GitHub runner, with the numbers kept:
+#   - the retrieval eval with real embedding models, next to the built-in stand-in
+#   - the eight behaviour questions through small chat models, several trials each
+#   - a check that a real model's reply arrives as a stream
+#
+# It never starts by itself. A person starts it: Actions tab, "Model scores", "Run workflow".
+# The results are attached to the run as the "model-scores" artifact; nothing is committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      chat_models:
+        description: "Chat models, Ollama names, space separated"
+        default: "qwen2.5:3b llama3.2:3b"
+      embedders:
+        description: "Embedding models, Ollama names, space separated"
+        default: "nomic-embed-text mxbai-embed-large all-minilm"
+      trials:
+        description: "Trials per question"
+        default: "3"
+      rerank:
+        description: "Also score retrieval with the first chat model as reranker (slow)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-scores
+  cancel-in-progress: true
+
+jobs:
+  scores:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      OLLAMA_CONTEXT_LENGTH: "16384"      # Ollama's default window is 4,096 tokens; the agent's prompt outgrows that in a few steps
+      OLLAMA_KEEP_ALIVE: "60m"
+      LOOPWRIGHT_HOME: ${{ runner.temp }}/loopwright
+      CHAT_MODELS: ${{ inputs.chat_models }}
+      EMBEDDERS: ${{ inputs.embedders }}
+      TRIALS: ${{ inputs.trials }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e .
+
+      - name: Install and start Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl stop ollama 2>/dev/null || true      # run it ourselves, so the settings above apply
+          nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 1; done
+          echo; ollama --version; nproc; free -g
+          echo "FIRST_CHAT=${CHAT_MODELS%% *}" >> "$GITHUB_ENV"
+          echo "FIRST_EMBEDDER=${EMBEDDERS%% *}" >> "$GITHUB_ENV"
+
+      - name: Download the models
+        run: |
+          for model in $EMBEDDERS $CHAT_MODELS; do ollama pull "$model"; done
+          ollama list
+          loopwright doctor
+
+      - name: Retrieval with real embedding models
+        run: |
+          loopwright eval --retrieval --embedder hash $(for m in $EMBEDDERS; do echo "--embedder ollama:$m"; done) --out results
+
+      - name: Does a real model's reply arrive as a stream?
+        continue-on-error: true
+        run: python scripts/check_streaming.py --provider local --model "$FIRST_CHAT" --out results/streaming.json
+
+      - name: The eight behaviour questions through each chat model
+        run: |
+          loopwright compare --targets scripted $(for m in $CHAT_MODELS; do echo "local:$m"; done) --trials "$TRIALS" --publish results --out "$RUNNER_TEMP/compare"
+
+      - name: Retrieval again, with the chat model reranking the candidates
+        if: inputs.rerank
+        continue-on-error: true
+        timeout-minutes: 120
+        run: |
+          loopwright eval --retrieval --embedder "ollama:$FIRST_EMBEDDER" --rerank model --provider local --model "$FIRST_CHAT" --out results/rerank
+
+      - name: Keep the results
+        if: always()
+        run: |
+          mkdir -p artifact
+          cp -r results artifact/results
+          cp -r "$RUNNER_TEMP/compare" artifact/compare 2>/dev/null || true
+          tail -n 400 "$RUNNER_TEMP/ollama.log" > artifact/ollama.log 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-scores
+          path: artifact

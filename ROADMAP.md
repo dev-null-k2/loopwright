@@ -4,8 +4,8 @@ Roughly in order.
 
 **Next**
 - Scores for real models. The machinery is in (`loopwright compare --trials 3 --publish` writes
-  `results/models.md`), and the published table holds only the scripted stand-in until someone runs it with a
-  local model, Claude Code or an API key.
+  `results/models.md`, and the hand-started "Model scores" workflow runs it on a GitHub runner), and the
+  published table holds only the scripted stand-in until someone runs it with a real model.
 - A real embedding model and a reranker scored on the two retrieval sets, and the row published. The code and
   the command exist (`loopwright eval --retrieval --embedder auto`); no real model has been run through it yet.
 - The chat gateways run against the live services, with the results written up.

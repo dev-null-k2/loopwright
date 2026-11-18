@@ -32,6 +32,7 @@ An event is a JSON object: `seq`, `t_ms`, `kind`, `stage` (the box), `src` (the 
 | `kb.search` | Knowledge base (RAG) | [RAG](glossary.md#rag) |
 | `loop.observe` | Model gateway | [Agent loop (ReAct)](glossary.md#react-loop) |
 | `loop.stop` | Model gateway | [Stop conditions](glossary.md#stop-conditions) |
+| `mcp.call` | Tools | [MCP client](glossary.md#mcp-client) |
 | `memory.episodes` | Episodic memory | [Episodic memory](glossary.md#episodic-memory) |
 | `memory.forget` | Semantic memory | [Forgetting](glossary.md#forgetting) |
 | `memory.gate` | Retrieval gate | [Retrieval gate](glossary.md#retrieval-gate) |

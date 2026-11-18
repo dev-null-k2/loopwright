@@ -686,7 +686,7 @@ The description is the only information the model has for choosing a tool, so it
 
 **An open protocol for connecting models to tools and data, so an integration is written once.**
 
-The Model Context Protocol standardises how a client (an agent or app) discovers and calls tools offered by a server, over JSON-RPC on stdio or HTTP. Write a server for your system once and any MCP client can use it. Loopwright is an MCP server: Claude Code or any other client can ask it questions, search its memory and read its traces.
+The Model Context Protocol standardises how a client (an agent or app) discovers and calls tools offered by a server, over JSON-RPC on stdio or HTTP. Write a server for your system once and any MCP client can use it. Loopwright is an MCP server on both transports: Claude Code or any other client can ask it questions, search its memory and read its traces, by starting it as a child process or by POSTing to it as a local web service. It answers the stateless 2026 revision and the older handshake.
 
 - **Why it exists.** Without a standard, every agent needs a custom adapter for every tool. With one, tools and agents are interchangeable.
 - **The tradeoff.** A connected server's tool descriptions go into your context and its results are untrusted input, so each server widens both the token bill and the attack surface. Connect what you need and gate what it can do.
@@ -729,9 +729,9 @@ A model knows nothing after its training cutoff. A search tool returns titles, U
 
 ### <a id="mcp-client"></a>MCP client
 
-**The agent side of MCP: start a server, list its tools, and add them to your own registry.**
+**The agent side of MCP: connect to a server, list its tools, and add them to your own registry.**
 
-Loopwright reads ~/.loopwright/mcp.json, starts each listed server, asks for its tools and exposes them to the model as server__tool. It is the mirror image of the MCP server in this repo, and the test suite connects the two to each other.
+Loopwright reads ~/.loopwright/mcp.json, connects to each listed server, asks for its tools and exposes them to the model as server__tool. A server is either a command to start (stdio: one JSON message per line) or an address (Streamable HTTP: one POST per message). The protocol changed shape in 2026: the newest revision is stateless, with no handshake and the version on every request, while older servers open with `initialize` and, over HTTP, hand out a session. The client works out which kind it has and speaks that. It is the mirror image of the MCP server in this repo, and the test suite connects the two to each other over both transports.
 
 - **Why it exists.** It is how an agent gains capabilities nobody on your team wrote: file systems, issue trackers, databases.
 - **The tradeoff.** You did not write that server. Its tool descriptions go into your prompt and its results into your context, so both are untrusted. Here borrowed tools need approval by default and their output is fenced. Every extra tool also costs tokens on every call.

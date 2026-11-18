@@ -417,7 +417,7 @@ export function createTools() {
   const root = document.getElementById("tools-body");
   async function show() {
     const t = await api.tools();
-    const name = h("input", { placeholder: "name, e.g. files" }), command = h("input", { placeholder: "command and arguments, e.g. npx -y @modelcontextprotocol/server-filesystem /tmp" });
+    const name = h("input", { placeholder: "name, e.g. files" }), command = h("input", { placeholder: "a command, e.g. npx -y @modelcontextprotocol/server-filesystem /tmp, or an address, e.g. https://example.com/mcp" });
     const trust = h("select", {}, h("option", { value: "ask" }, "ask before each call"), h("option", { value: "read" }, "read-only: no approval"));
     const msg = h("span", { class: "hint" });
     const effect = { read: "reads", write: "changes local state", external: "outside effects: needs approval" };
@@ -435,18 +435,20 @@ export function createTools() {
           h("td", {}, api.static ? null : h("button", { class: "linkish", onclick: async () => { await api.toggleTool(x.name, !x.enabled); show(); } }, x.enabled ? "Switch off" : "Switch on")))))),
 
       h("h2", {}, "MCP servers"),
-      h("p", { class: "note", style: "margin-bottom:10px" }, "Borrow tools from any Model Context Protocol server. You did not write that server, so its results are fenced as untrusted and its tools need approval unless you mark it read-only."),
+      h("p", { class: "note", style: "margin-bottom:10px" }, "Borrow tools from any Model Context Protocol server: a program started on this computer, or one already running at an https address. You did not write that server, so its results are fenced as untrusted and its tools need approval unless you mark it read-only."),
       Object.keys(t.mcp_config).length ? h("table", { class: "grid" }, h("tbody", {}, Object.entries(t.mcp_config).map(([n, spec]) => {
         const status = t.mcp.find((m) => m.server === n);
-        return h("tr", {}, h("td", {}, h("b", {}, n)), h("td", { class: "hint" }, `${spec.command} ${(spec.args || []).join(" ")}`),
-          h("td", { class: status?.ok ? "pass" : "fail" }, status?.ok ? `${status.tools.length} tool(s)` : (status?.error || "not started")),
+        return h("tr", {}, h("td", {}, h("b", {}, n)), h("td", { class: "hint" }, spec.url || `${spec.command} ${(spec.args || []).join(" ")}`),
+          h("td", { class: status?.ok ? "pass" : "fail" }, status?.ok ? `${status.tools.length} tool(s)` : (status?.error || "not started"),
+            status?.ok && status.transport ? h("div", { class: "hint" }, `${status.transport}, ${status.era === "modern" ? "stateless protocol" : "handshake protocol"} ${status.protocol_version}`) : null,
+            status?.skipped?.length ? h("div", { class: "hint" }, `${status.skipped.length} tool(s) left out: ${status.skipped[0].why}`) : null),
           h("td", {}, api.static ? null : h("button", { class: "linkish", onclick: async () => { await api.removeMcp(n); show(); } }, "Remove")));
       }))) : null,
       api.static ? null : h("div", { class: "editor", style: "margin-top:10px" }, h("h3", {}, "Connect a server"), name, command, h("div", { class: "row" }, trust,
         h("button", { class: "primary", onclick: async () => {
           const parts = command.value.trim().split(/\s+/);
           const r = await api.addMcp({ name: name.value, command: parts[0] || "", args: parts.slice(1), trust: trust.value }).catch((e) => ({ error: e.message }));
-          if (r.error) msg.textContent = "Give it a name and a command."; else show();
+          if (r.error) msg.textContent = "Give it a name, and a command to start or an https address."; else show();
         } }, "Connect"), msg)),
 
       h("h2", {}, "Your own tools"),

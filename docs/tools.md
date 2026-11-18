@@ -25,17 +25,36 @@ bundled one replaces it.
 ```bash
 # ~/.loopwright/mcp.json
 {"servers": {
-  "files": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]},
-  "docs":  {"command": "python", "args": ["my_server.py"], "trust": "read"}
+  "files":  {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]},
+  "docs":   {"command": "python", "args": ["my_server.py"], "trust": "read"},
+  "remote": {"url": "https://example.com/mcp", "headers": {"Authorization": "Bearer ${EXAMPLE_TOKEN}"}}
 }}
 ```
+
+A server is either a `command` to start on this computer (stdio) or a `url` that is already running (Streamable
+HTTP). `${NAME}` in a header is read from the environment when the server is connected, so a token is never
+written in the file. Plain `http://` is accepted only for this machine.
 
 Or use Tools, Connect a server. Or ask in chat; that calls `connect_mcp_server`, which the tool gate treats as an
 outside effect, so you are asked to approve it. Each borrowed tool appears as `server__tool`.
 
 Two defaults follow from the fact that you did not write the server: its **results are fenced as untrusted**
-(and taint the turn), and its **tools need approval** unless you set `"trust": "read"`. Only stdio servers are
-supported.
+(and taint the turn), and its **tools need approval** unless you set `"trust": "read"`.
+
+**Which version of the protocol.** MCP changed shape in its 2026-07-28 revision: no `initialize` handshake and no
+session; every request carries its version, and over HTTP the method and tool name are copied into headers
+(`Mcp-Method`, `Mcp-Name`). Older servers still open with the handshake. The client tries the new way first and
+falls back, on both transports, and the Tools page shows which one each server turned out to speak. A tool
+parameter a server marks `x-mcp-header` is mirrored into an `Mcp-Param-…` header as that revision requires; a tool
+whose marking breaks the rules is left out and listed as such.
+
+Not supported: signing in to a server with OAuth (pass a token in `headers` instead), the HTTP+SSE transport that
+was retired in 2025, and servers that ask the client a question or for a model call before finishing; such a
+result is reported to the model as an error.
+
+**What was run.** The client is tested over real HTTP and real pipes against Loopwright's own server and against
+stand-ins for a modern server (strict headers, a streamed answer, a version it has to renegotiate) and an older
+one (handshake, session id, an expired session). It has not been run against a third-party hosted MCP server.
 
 ## 3. Write a tool in Python
 

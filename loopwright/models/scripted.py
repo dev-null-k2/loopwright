@@ -75,6 +75,7 @@ class Env:
     today: dt.date
     tools: set[str]
     critic: str = ""
+    schemas: dict[str, dict[str, Any]] = field(default_factory=dict)      # tool name -> its parameters, as offered this call
 
 
 @dataclass
@@ -140,8 +141,15 @@ def parse_intents(user: str) -> list[Intent]:
     return [_classify(c.strip()) for c in clauses] or [Intent("smalltalk", text)]
 
 
+BORROWED = re.compile(r"^(?:please\s+)?(?:use|call|ask|run)\s+(?:the\s+)?([A-Za-z0-9_-]+__[A-Za-z0-9_-]+)(?:\s+tool)?"
+                      r"(?:\s*(?:for|with|about|on|to explain|to look up|:)\s*(.+?))?[.?!]*$", re.I | re.S)
+
+
 def _classify(c: str) -> Intent:
     low = c.lower()
+    m = BORROWED.match(c)
+    if m:           # a tool named server__tool came from an MCP server: the user is asking for it by name
+        return Intent("borrowed", c, {"tool": m.group(1), "text": (m.group(2) or "").strip().strip('"\'')})
     m = re.match(r"^(?:please\s+)?(?:remember|note|keep in mind|don'?t forget)(?:\s+that)?[:,]?\s+(.+)$", c, re.I | re.S)
     if m and not re.match(r"^(save|take|add|write)\b", low):
         return Intent("remember", c, {"text": m.group(1).strip().rstrip(".")})
@@ -306,6 +314,18 @@ def _handle(intent: Intent, env: Env, results: list[Result], prev: str) -> Step:
                 else "You're welcome.", 0, "")
     if kind == "capabilities":
         return ("done", "I'm Loopwright, an agent built so you can watch every step it takes. " + CAPABILITIES, 0, "")
+
+    if kind == "borrowed":
+        tool = next((name for name in env.tools if name.lower() == s["tool"].lower()), "")
+        if not tool:
+            return ("done", f"I have no tool named `{s['tool']}`. A tool borrowed from an MCP server shows up on the "
+                            "Tools page as server__tool once its server is connected.", 0, "")
+        schema = env.schemas.get(tool, {})
+        strings = [k for k in [*schema.get("required", []), *schema.get("properties", {})]
+                   if schema.get("properties", {}).get(k, {}).get("type") == "string"]
+        arguments = {strings[0]: s["text"]} if strings and s["text"] else {}       # the text goes in its first text parameter
+        return _single(results, ("call", [(tool, arguments)]),
+                       lambda d: f"The `{tool}` tool answered: {_safe_sentences(_untrusted_body(d)) or 'nothing I can repeat.'}")
 
     if kind == "remember":
         return _single(results, _call("remember", text=s["text"]),
@@ -738,6 +758,7 @@ class ScriptedProvider:
         names = {t["name"] for t in tools}
         user, results, critic = _turn(messages)
         env = _env(system, names, critic)
+        env.schemas = {t["name"]: t.get("parameters") or {} for t in tools}
         if purpose == "plan":
             text, calls, thought = self._plan(user), [], "listing the steps before taking any"
         elif purpose == "subagent":

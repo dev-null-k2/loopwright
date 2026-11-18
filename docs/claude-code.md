@@ -51,7 +51,10 @@ rejects a flag, the error says which.
 ## Loopwright as a tool server for Claude Code (MCP)
 
 ```bash
-claude mcp add loopwright -- loopwright mcp
+claude mcp add loopwright -- loopwright mcp                                  # Claude Code starts it (stdio)
+
+loopwright mcp --http                                                        # or run it as a local web service
+claude mcp add --transport http loopwright http://127.0.0.1:8766/mcp
 ```
 
 This repository also ships a [`.mcp.json`](../.mcp.json), so opening it in Claude Code offers the server
@@ -69,6 +72,13 @@ Turns started over MCP use the scripted model by default, because the caller is 
 `LOOPWRIGHT_PROVIDER` to change that. Tools with outside effects are denied on this channel: there is no human on
 it to approve them.
 
-The server is about 150 lines of hand-written JSON-RPC over stdio
-([`mcp_server.py`](../loopwright/mcp_server.py)), there to be read. The test suite connects Loopwright's MCP
-client to Loopwright's MCP server.
+The server is hand-written JSON-RPC ([`mcp_server.py`](../loopwright/mcp_server.py)), there to be read: one
+function that is the protocol, and two small transports around it, stdio and Streamable HTTP. It answers the
+stateless 2026-07-28 revision (no handshake, the version on every request) and the older `initialize` handshake.
+Over HTTP it listens on 127.0.0.1 only, checks the `Origin` header so a web page cannot drive it, rejects a
+request whose headers disagree with its body, and requires a bearer token if `LOOPWRIGHT_MCP_TOKEN` is set.
+
+**Status.** The test suite connects Loopwright's MCP client to Loopwright's MCP server over both transports.
+The HTTP server was also checked with Claude Code 2.1.326's own client: `claude mcp add --transport http` and
+`claude mcp list` reported it connected, having sent `server/discover` and `tools/list` in the stateless
+2026-07-28 form. A tool call made by a signed-in Claude Code through it has not been run.

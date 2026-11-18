@@ -17,7 +17,7 @@
 - [Forward-deployed interview preparation](docs/fde-interviews.md): the loop round by round, mapped to this repository
 
 ## Use and extend
-- [Tools, skills and MCP](docs/tools.md)
+- [Tools, skills and MCP (stdio and HTTP, both protocol eras)](docs/tools.md)
 - [Workflows and scheduled tasks](docs/automations.md)
 - [Chat gateways: Telegram, Discord, Slack, WhatsApp](docs/gateways.md)
 - [Claude Code](docs/claude-code.md)

@@ -64,7 +64,7 @@ that says which part of the system it happened in and why. That one decision giv
 | **Runs with no key, and with no internet** | A built-in scripted model makes everything work the moment you clone. Or use an open-source model on your own machine (Ollama, LM Studio, llama.cpp), your Claude Code subscription, or any Anthropic or OpenAI-compatible key. |
 | **Not only a chat box** | The same agent runs fixed **workflows**, **scheduled tasks** with nobody watching, a **browser agent** that clicks through real pages, an opt-in sandboxed **shell**, and answers on **Telegram, Discord, Slack and WhatsApp**. Each is a few hundred readable lines, and each is watched and replayed like everything else. |
 | **Compare models on your own machine** | The same eight behaviour cases through any mix of local models, Claude Code and API models, side by side, with a replayable trace behind every cell. |
-| **Measured, with teeth** | 74 eval cases, four ablations, a release gate, and gate rules that fail if the *evals themselves* stop being able to fail. |
+| **Measured, with teeth** | 76 eval cases, four ablations, a release gate, and gate rules that fail if the *evals themselves* stop being able to fail. |
 | **Zero dependencies** | Python standard library only. No framework, no SDK, no build step for the UI. |
 
 ## See it work
@@ -106,7 +106,7 @@ request with guardrails off, and the message goes out. That pair is the whole ar
 
 ### Evals with ablations
 
-<picture><img alt="The Evals tab: release gate Pass, 74 of 74 cases, 0% of injection attacks worked. An ablation table shows the safety suite falling to 25% and attacks rising to 100% with guardrails off, and the memory suite falling to 18% with memory off." src="docs/media/evals.png" width="100%"></picture>
+<picture><img alt="The Evals tab: release gate Pass, 76 of 76 cases, 0% of injection attacks worked. An ablation table shows the safety suite falling to 23% and attacks rising to 100% with guardrails off, and the memory suite falling to 18% with memory off." src="docs/media/evals.png" width="100%"></picture>
 
 ### A browser agent you can watch
 
@@ -225,7 +225,7 @@ eighteen boxes; the detailed one shows them all.
 | **The loop** | Model, tools, results, repeat. Three stop conditions. About 100 lines | [`loop.py`](loopwright/loop.py) |
 | Model gateway | Five providers behind one interface; retries with backoff and jitter, fallback chain, circuit breaker, accounting. Replies are streamed, with secrets masked inside the stream | [`models/gateway.py`](loopwright/models/gateway.py), [`models/streaming.py`](loopwright/models/streaming.py) |
 | Tool gate | Six checks before any tool runs: exists, valid arguments, budget, not a repeat, permitted, not already done. Outside effects need approval; after untrusted content they are denied | [`toolgate.py`](loopwright/toolgate.py) |
-| Tools | 23 built in, plus yours, plus any MCP server's | [`tools/`](loopwright/tools/) |
+| Tools | 23 built in, plus yours, plus any MCP server's, started here or reached over HTTP | [`tools/`](loopwright/tools/) |
 | Subagents | Parallel workers with a fresh context and read-only tools that return a summary. The browser agent is one, with browser tools | [`tools/delegate.py`](loopwright/tools/delegate.py), [`tools/browser.py`](loopwright/tools/browser.py) |
 | Workflow | The other way to orchestrate: a fixed graph of tool, model, agent and route steps, where the code decides the path | [`workflows.py`](loopwright/workflows.py) |
 | Planner, critic | Optional patterns: plan-and-execute, evaluator-optimizer | [`patterns.py`](loopwright/patterns.py) |
@@ -243,15 +243,15 @@ More in [docs/architecture.md](docs/architecture.md).
 for five cases (a few seconds on a machine without one). Raw numbers:
 [`results/eval-report.json`](results/eval-report.json).
 
-**74 cases** across six suites, each with a fresh agent and a frozen clock, graded on the trace as well as the
+**76 cases** across six suites, each with a fresh agent and a frozen clock, graded on the trace as well as the
 answer. Reliability cases run three trials with failures injected at different points.
 
 | Variant | core | memory | safety | reliability | context | automation | Injection attacks that worked | Memory searches |
 |---|---|---|---|---|---|---|---|---|
-| **full** | **100%** | **100%** | **100%** | **100%** | **100%** | **100%** | **0 of 5** | 29 in 95 turns |
+| **full** | **100%** | **100%** | **100%** | **100%** | **100%** | **100%** | **0 of 5** | 29 in 97 turns |
 | no-memory | 100% | 18% | 100% | 100% | 80% | 100% | 0 of 5 | 0 |
-| always-retrieve (no gate) | 100% | 82% | 100% | 100% | 100% | 100% | 0 of 5 | 90 in 95 turns |
-| no-guardrails | 88% | 91% | 25% | 100% | 80% | 42% | **5 of 5** | 29 |
+| always-retrieve (no gate) | 100% | 82% | 100% | 100% | 100% | 100% | 0 of 5 | 92 in 97 turns |
+| no-guardrails | 82% | 91% | 23% | 100% | 80% | 42% | **5 of 5** | 29 |
 | no-retries | 100% | 100% | 100% | 67% | 100% | 100% | 0 of 5 | 29 |
 
 | Other checks | Result |
@@ -260,7 +260,7 @@ answer. Reliability cases run three trials with failures injected at different p
 | The same, 60 held-out questions that paraphrase | BM25 60% / 75% · dense 50% / 62% · hybrid 60% / 73% |
 | Retrieval gate (rules), 30 labelled messages | 83% accurate; 2 false skips, 3 false retrieves |
 | Lessons | all 24 runnable lessons produce every step they promise (a test enforces it) |
-| Unit and end-to-end tests | 145 passing |
+| Unit and end-to-end tests | 156 passing |
 
 The `automation` suite covers workflows, scheduled tasks, the shell and the browser: a workflow's hard-coded send
 is refused after it read the web, a scheduled run cannot send or run commands, a turn that read a file cannot
@@ -289,7 +289,7 @@ and an injection on a page the browser read does not reach the outbox.
 - The release gate also fails if guardrails-off stops letting attacks through, or memory-off stops failing memory
   cases. An eval that cannot fail is not measuring anything.
 - Five automation cases need a Chromium-family browser. On a machine without one they are left out, and the
-  totals are 69 cases and four attacks.
+  totals are 71 cases and four attacks.
 
 ## Make it yours
 
@@ -384,7 +384,7 @@ trifecta"*. More in [docs/claude-code.md](docs/claude-code.md).
 
 | Part | How it is verified |
 |---|---|
-| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 145 automated tests and the 74-case eval suite, on every push, on Python 3.11 and 3.13 |
+| Harness, loop, tool gate, memory, guardrails, workflows, scheduler, evals, CLI, web server, MCP server and client | 156 automated tests and the 76-case eval suite, on every push, on Python 3.11 and 3.13 |
 | Browser agent | Against real headless Chrome on a bundled four-page site: reading, clicking, filling in and submitting a form, screenshots, and refusal of local and private addresses, including a page's own sub-requests. Not run against arbitrary live websites |
 | Shell tool | Real commands: the opt-in switch, approval, scrubbed environment, timeout, denial in tainted and unattended turns. The sandbox was `none` on the machine the evals ran on (no bubblewrap); the macOS `sandbox-exec` profile is probed at run time and has not been exercised in CI |
 | Chat gateways | Each protocol against a stand-in: a fake Bot API (Telegram), a local WebSocket server playing Discord's gateway and Slack's Socket Mode, real signed and forged HTTP deliveries (WhatsApp). **Not run against the live services** |
@@ -432,7 +432,7 @@ loopwright/
   otel.py  ws.py    OpenTelemetry export; a WebSocket client
   server.py  cli.py  mcp_server.py
   web/              the cockpit: plain HTML, CSS and ES modules
-tests/              145 tests
+tests/              156 tests
 docs/               architecture, automations, gateways, mobile, replay, evals, tools, offline, claude-code, security,
                     glossary, lessons, interview prep, events + the static demo served by GitHub Pages
 results/            the committed eval and comparison reports

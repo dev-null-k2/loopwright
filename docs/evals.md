@@ -13,7 +13,7 @@ loopwright compare --targets scripted local claude-code     # the same questions
 
 | Part | What it is | Where |
 |---|---|---|
-| Suites | `core` (tool routing, skills, patterns), `memory`, `safety`, `reliability`, `context`, `automation` (workflows, scheduled tasks, the shell, the browser). 74 cases | [`evals/datasets/*.jsonl`](../loopwright/evals/datasets/) |
+| Suites | `core` (tool routing, skills, patterns), `memory`, `safety`, `reliability`, `context`, `automation` (workflows, scheduled tasks, the shell, the browser). 76 cases | [`evals/datasets/*.jsonl`](../loopwright/evals/datasets/) |
 | Trials | Reliability cases run three times with failures injected at different points. `pass_at_1` is the mean; `pass_all_trials` is the share that passed every time (pass^3) | `trials` in a case |
 | Ablations | Every suite again with one mechanism off: `no-memory`, `always-retrieve`, `no-guardrails`, `no-retries` | `VARIANTS` in [`runner.py`](../loopwright/evals/runner.py) |
 | Retrieval | Two labelled question sets against the handbook: 44 in its own words, 60 held-out that paraphrase. Recall@1 and @3 for BM25, dense and hybrid, with any embedder and optionally a reranker ([retrieval.md](retrieval.md)) | `retrieval.jsonl`, `retrieval-heldout.jsonl` |
@@ -21,7 +21,7 @@ loopwright compare --targets scripted local claude-code     # the same questions
 | Judge | 5 rubric-graded cases. Skipped without a real model; there is deliberately no offline judge | [`judge.py`](../loopwright/evals/judge.py) |
 
 The five `automation` cases marked `"needs": "browser"` start a real headless browser. On a machine with no
-Chromium-family browser they are left out, so the totals there are 69 cases and four attacks. With a browser the
+Chromium-family browser they are left out, so the totals there are 71 cases and four attacks. With a browser the
 whole run takes about half a minute; without one, a few seconds.
 
 Each case gets a new state folder and a frozen clock (Thursday 2026-11-12), so cases cannot leak into each other

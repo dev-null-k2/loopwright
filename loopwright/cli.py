@@ -17,7 +17,7 @@
     loopwright tasks           scheduled tasks: list, add, run, pause, resume, rm
     loopwright telegram | discord | slack | whatsapp     talk to the agent from a chat app
     loopwright export [id]     write a turn as OpenTelemetry (OTLP) JSON, or send it to a collector
-    loopwright mcp             serve over MCP on stdio (for Claude Code and other clients)
+    loopwright mcp [--http]    serve over MCP on stdio or HTTP (for Claude Code and other clients)
 """
 
 from __future__ import annotations
@@ -673,7 +673,8 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 def cmd_mcp(args: argparse.Namespace) -> int:
     from loopwright.mcp_server import main as mcp_main
-    return mcp_main()
+    from loopwright.mcp_server import main_http
+    return main_http(args.port, args.host) if args.http else mcp_main()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -805,7 +806,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--model")
     p.set_defaults(fn=cmd_selftest)
 
-    p = sub.add_parser("mcp", help="serve over MCP on stdio")
+    p = sub.add_parser("mcp", help="serve over MCP: on stdio, or with --http as a local web service")
+    p.add_argument("--http", action="store_true", help="serve Streamable HTTP on http://127.0.0.1:8766/mcp instead of stdio")
+    p.add_argument("--port", type=int, default=8766)
+    p.add_argument("--host", default="127.0.0.1", help="the address to listen on (keep it local unless a token is set)")
     p.set_defaults(fn=cmd_mcp)
 
     args = parser.parse_args(argv)

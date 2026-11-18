@@ -78,6 +78,18 @@ def _setup(agent: Agent, setup: dict[str, Any]) -> None:
         agent.store.add_message("default", "user" if i % 2 == 0 else "assistant", f"({i + 1}) {FILLER}")
     for note in setup.get("notes", []):
         agent.store.add_note(note)
+    if setup.get("mcp"):
+        # Borrow tools from an MCP server over HTTP. The server is Loopwright's own, started here on a free port,
+        # so the case exercises the real client against a real server with nothing to install.
+        import threading
+
+        from loopwright.mcp_server import serve_http
+        httpd = serve_http(port=0)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        agent._eval_servers = [httpd]
+        entry = {"url": f"http://127.0.0.1:{httpd.server_address[1]}/mcp", **({"trust": "read"} if setup["mcp"] == "read" else {})}
+        (agent.home / "mcp.json").write_text(json.dumps({"servers": {"handbook": entry}}), encoding="utf-8")
+        agent.load_extensions()
     for event in setup.get("events", []):
         agent.store.add_event(event["title"], event["date"], event["time"], event.get("attendees", []))
     for task in setup.get("tasks", []):
@@ -140,6 +152,9 @@ def run_case(case: dict[str, Any], overrides: dict[str, Any] | None = None,
                 shutil.copyfile(results[-1].trace_path, traces_dir / f"{case['id']}.jsonl")
             agent.store.close()
         finally:
+            for httpd in getattr(agent, "_eval_servers", []):
+                httpd.shutdown()
+                httpd.server_close()
             shutil.rmtree(home, ignore_errors=True)
     return {"id": case["id"], "suite": case["suite"], "title": case["title"], "concept": case.get("concept", ""),
             "prompt": case["turns"][-1] if isinstance(case["turns"][-1], str) else case["turns"][-1]["say"],

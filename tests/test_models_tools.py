@@ -222,7 +222,7 @@ def test_mcp_server_speaks_the_protocol_over_stdio():
                          capture_output=True, text=True, timeout=60).stdout
     replies = {r["id"]: r for r in map(json.loads, out.strip().splitlines())}
     assert len(replies) == 6                                                    # the notification got no reply; the bad line got an error
-    assert replies[1]["result"]["protocolVersion"] == "2025-06-18" and replies[1]["result"]["serverInfo"]["name"] == "loopwright"
+    assert replies[1]["result"]["protocolVersion"] == "2025-11-25" and replies[1]["result"]["serverInfo"]["name"] == "loopwright"
     assert {t["name"] for t in replies[2]["result"]["tools"]} >= {"loopwright_ask", "loopwright_explain", "loopwright_trace"}
     assert "2 + 2 = **4**" in replies[3]["result"]["content"][0]["text"] and "[tools] Ran calculator" in replies[3]["result"]["content"][0]["text"]
     assert replies[4]["error"]["code"] == -32602 and replies[5]["error"]["code"] == -32601 and replies[None]["error"]["code"] == -32700

@@ -107,12 +107,14 @@ def read_mcp_config(home: Path) -> dict[str, Any]:
 
 
 def add_mcp_server(home: Path, name: str, command: str, args: list[str], trust: str = "ask") -> None:
+    """`command` is a program to start, or the http(s) address of a server that is already running."""
     slug = "".join(ch for ch in name.lower() if ch.isalnum() or ch in "-_")[:30]
     if not slug or not command.strip():
-        raise ValueError("an MCP server needs a name and a command")
+        raise ValueError("an MCP server needs a name and a command or an address")
     config = read_mcp_config(home)
-    config.setdefault("servers", {})[slug] = {"command": command.strip(), "args": [str(a) for a in args],
-                                              **({"trust": "read"} if trust == "read" else {})}
+    remote = command.strip().lower().startswith(("http://", "https://"))
+    entry: dict[str, Any] = {"url": command.strip()} if remote else {"command": command.strip(), "args": [str(a) for a in args]}
+    config.setdefault("servers", {})[slug] = {**entry, **({"trust": "read"} if trust == "read" else {})}
     (Path(home) / "mcp.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
 

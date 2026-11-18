@@ -12,7 +12,7 @@ Roughly in order.
 **Then**
 - Held-out eval cases written by someone other than the author.
 - A model-based gate eval, to put a number next to the rule-based gate's 83%.
-- HTTP transport for the MCP client (stdio only today).
+- OAuth sign-in for remote MCP servers (a token in a header works today).
 - Triggers other than time for scheduled work: a webhook, a new file in the workspace.
 - A container or micro-VM runner for `run_command`, for machines where the OS sandbox is not available.
 

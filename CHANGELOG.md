@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.10.0
+
+MCP over HTTP, and the protocol's 2026 revision.
+
+- **Borrow tools from a remote MCP server.** An entry in `mcp.json` can be a `url` instead of a `command`. Each
+  message is one POST; the answer is read from a JSON body or from a short event stream. Header values can name
+  an environment variable (`${TOKEN}`), so a secret is never written in the file, and plain http is refused for
+  anything but this machine.
+- **Both eras of the protocol, on both transports.** The 2026-07-28 revision is stateless: no `initialize`, no
+  session, the version on every request and, over HTTP, the method and tool name mirrored into headers. Older
+  servers still open with the handshake. The client tries the new way first (`server/discover`) and falls back
+  when the answer is not a modern one; over stdio that includes a server that simply stays silent. An expired
+  session is reopened, a version the server stops speaking is renegotiated, and tool parameters marked
+  `x-mcp-header` are mirrored and encoded as the revision requires.
+- **Loopwright's own server speaks HTTP too.** `loopwright mcp --http` serves the same six tools on
+  `http://127.0.0.1:8766/mcp`, to modern and older clients, with `Origin` checking, header validation and an
+  optional bearer token. Claude Code 2.1.326 connects to it.
+- An `mcp.call` step shows each borrowed call with its transport and protocol version; the Tools page shows the
+  same per server. The scripted model can now call a borrowed tool when asked for it by name
+  ("Use handbook__loopwright_explain for idempotency"), which is what lets two new eval cases run offline against
+  a real server over real HTTP (76 cases). 156 tests.
+- Not supported, and said so in `docs/tools.md`: OAuth sign-in, the retired HTTP+SSE transport, and servers that
+  ask the client for input. Not yet run: a third-party hosted MCP server.
+
 ## 0.9.0
 
 A real embedding model and a reranker, behind one option each.

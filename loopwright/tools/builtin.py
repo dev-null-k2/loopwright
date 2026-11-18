@@ -283,8 +283,8 @@ def read_file(args: dict[str, Any], ctx: ToolContext) -> str:
 
 def connect_mcp_server(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     """Add an MCP server to mcp.json and load its tools. Starting a program on
-    the user's machine is as outside-effect as a tool gets, so the gate asks
-    a human first."""
+    the user's machine, or sending requests to an address, is as outside-effect
+    as a tool gets, so the gate asks a human first."""
     from loopwright.tools.plugins import add_mcp_server
     try:
         add_mcp_server(ctx.home, args["name"], args["command"], args.get("args", []))
@@ -375,7 +375,7 @@ def default_registry() -> Registry:
              read_file, untrusted=True),
         Tool("connect_mcp_server", "Connect an MCP server so its tools become available, when the user asks for a "
              "capability you lack and names a server or command. The user must approve it.",
-             _obj({"name": _S, "command": {**_S, "description": "the program to start, e.g. npx"},
+             _obj({"name": _S, "command": {**_S, "description": "the program to start, e.g. npx; or the https address of a server that is already running"},
                    "args": {"type": "array", "items": _S}}, ["name", "command"]),
              connect_mcp_server, effect="external"),
         delegate_tool(),

@@ -33,6 +33,19 @@ loopwright selftest --provider local
 
 `LOOPWRIGHT_MODEL` (or `--model`, or the Model list in the cockpit) picks the model. Otherwise Loopwright picks one that can call tools: it asks the server what each model can do (Ollama reports this), falls back to the model's family name, and never prefers a vision or embedding model. `loopwright doctor` shows the pick.
 
+**Give the model room.** Ollama loads every model with a 4,096-token context window unless told otherwise, and
+cuts a longer prompt without an error. This agent's prompt starts near 2,500 tokens (most of it the tool
+definitions) and grows with each tool result, so a turn of a few steps runs past that and the model answers from
+what is left. Start the server with more:
+
+```bash
+OLLAMA_CONTEXT_LENGTH=16384 ollama serve
+```
+
+It has to be set on the server: the OpenAI-style endpoint ignores a per-request size. Loopwright asks Ollama how
+large the loaded model's window is, and a turn whose prompt does not fit shows a warning step
+(`model.window`) saying so. `loopwright doctor` prints the same advice when it finds Ollama.
+
 **It is also the automatic fallback.** If your normal provider is Claude Code or an API and the network drops,
 the model gateway retries, then falls back to a local model if one is running, then to the scripted model. You see
 each of those steps on the board.
@@ -78,5 +91,7 @@ handbook search, still with no network. `loopwright doctor` lists what it found.
 ## Status
 
 The local provider is tested over real HTTP against a stub server that behaves like each of the three kinds of
-model above, including full turns through the harness, streamed replies and the offline fallback. It has not been run against every
+model above, including full turns through the harness, streamed replies, the window warning and the offline
+fallback. `python scripts/check_streaming.py --provider local` runs one watched turn against your own server and
+prints how long the first words took and whether the reply arrived in pieces. It has not been run against every
 runner and model; if yours misbehaves, `loopwright ask "..." --provider local --steps` shows the exchange.

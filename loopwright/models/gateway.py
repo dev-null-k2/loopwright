@@ -21,6 +21,7 @@ the same way every time, so retrying it just burns time and money.
 
 from __future__ import annotations
 
+import json
 import os
 import random
 import time
@@ -31,7 +32,16 @@ from loopwright.events import Recorder
 from loopwright.models import local as local_models
 from loopwright.models import pricing
 from loopwright.models.anthropic_api import AnthropicProvider
-from loopwright.models.base import FatalModelError, Message, ModelError, ModelResponse, Provider, TransientModelError
+from loopwright.models.base import (
+    FatalModelError,
+    Message,
+    ModelError,
+    ModelResponse,
+    Provider,
+    TransientModelError,
+    estimate_tokens,
+    messages_text,
+)
 from loopwright.models.claude_code import ClaudeCodeProvider, find_cli
 from loopwright.models.local import LocalProvider
 from loopwright.models.openai_compat import OpenAICompatProvider
@@ -109,6 +119,7 @@ class ModelGateway:
     def __init__(self, options: Options, rec: Recorder, home=None, providers: list[Provider] | None = None):
         self.options, self.rec = options, rec
         self.calls: list[dict[str, Any]] = []           # every model call, for the receipt
+        self._window_warned = False
         if providers is not None:
             self.chain = providers
         else:
@@ -230,6 +241,7 @@ class ModelGateway:
         if stream:
             row["first_token_ms"] = stream["first_token_ms"]
         self.calls.append(row)
+        self._check_window(response, system, messages, tools, rec)
         wants = ", ".join(c.name for c in response.tool_calls)
         title = (f"Model asks for: {wants}" if wants else "Model answers") if purpose in ("loop", "subagent") \
             else f"Small model call: {purpose}"
@@ -248,6 +260,25 @@ class ModelGateway:
                        "message_count": len(messages)},
         })
         return response
+
+    def _check_window(self, response: ModelResponse, system: str, messages: list[Message], tools: list[dict[str, Any]],
+                      rec: Recorder) -> None:
+        """Warn, once a turn, when the prompt is larger than the window the model was loaded with.
+        A local runner cuts such a prompt silently, and the model then answers from part of it."""
+        if not response.window or self._window_warned:
+            return
+        prompt = max(response.usage.tokens_in, estimate_tokens(system + messages_text(messages) + json.dumps(tools)))
+        if prompt + 256 <= response.window:          # leave room for at least a short reply
+            return
+        self._window_warned = True
+        rec.emit("model.window", "model", f"The prompt (about {prompt:,} tokens) does not fit the model's {response.window:,}-token window",
+                 "A local runner loads a model with a context window of its own choosing: Ollama's default is 4,096 "
+                 "tokens, whatever the model supports. A longer prompt is cut without an error, so the model may never "
+                 "see the tool definitions, the memory or the start of the conversation, and it answers anyway. Start "
+                 "the server with a larger window (OLLAMA_CONTEXT_LENGTH=16384 ollama serve); it cannot be set per "
+                 "request on the OpenAI-style endpoint.",
+                 src="context", status="warn", data={"prompt_tokens": prompt, "window": response.window,
+                                                      "provider": response.provider, "model": response.model})
 
     @staticmethod
     def _breaker_fail(provider: Provider) -> None:

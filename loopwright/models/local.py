@@ -23,6 +23,16 @@ So this provider degrades in three steps and remembers which one worked:
                and ask for one JSON object back (the same protocol the Claude
                Code adapter uses)
 
+THE WINDOW. A runner loads a model with a context window it chooses, not the
+one the model was trained for. Ollama's default is 4,096 tokens, and a prompt
+longer than that is cut without any error: the model answers from what was
+left. This agent's prompt starts at about 2,500 tokens (most of it the tool
+definitions) and grows with every tool result, so it passes 4,096 within a
+few steps. So after each call the provider asks the server how large the loaded model's
+window is (Ollama says at /api/ps) and reports it, and the gateway warns when
+the prompt does not fit. The fix is on the server, before it starts:
+OLLAMA_CONTEXT_LENGTH=16384 ollama serve.
+
 Expect a small model to be a weaker agent than a hosted one: it will pick the
 wrong tool more often and lose the thread on long tasks. The harness around it
 (budgets, the tool gate, repeat detection) is what keeps that safe, and the
@@ -109,6 +119,26 @@ EMBEDDING_FAMILIES = ("embed", "bge-", "all-minilm", "e5-", "gte-", "arctic", "p
 def is_embedder(model: str) -> bool:
     """An embedding model turns text into a vector and cannot chat. Runners list both kinds together."""
     return any(marker in model.lower() for marker in EMBEDDING_FAMILIES)
+
+
+_windows: dict[str, tuple[float, int]] = {}      # model -> (when asked, tokens)
+
+
+def context_window(base: str, model: str) -> int:
+    """Tokens in the loaded model's context window, or 0 when the server does not
+    say. Ollama reports it per running model at /api/ps. Asked at most once a minute."""
+    asked, known = _windows.get(model, (0.0, 0))
+    if time.time() - asked < 60:
+        return known
+    window = 0
+    try:
+        for row in _get(f"{base}/api/ps", timeout=1.0).get("models", []):
+            if model in (row.get("name"), row.get("model")) or f"{model}:latest" in (row.get("name"), row.get("model")):
+                window = int(row.get("context_length") or 0)
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, AttributeError, TypeError):
+        window = 0
+    _windows[model] = (time.time(), window)
+    return window
 
 
 def detect(refresh: bool = False) -> dict[str, Any] | None:
@@ -207,4 +237,6 @@ class LocalProvider:
 
     def _label(self, response: ModelResponse) -> ModelResponse:
         response.provider, response.cost_usd = self.name, 0.0       # your own hardware: no per-token bill
+        server = detect()
+        response.window = context_window(server["url"], self.model) if server else 0
         return response

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.1
+
+- **A local model's window is checked.** Ollama loads a model with a 4,096-token context window by default and
+  silently cuts a longer prompt; this agent's prompt passes that within a few steps. The local provider now asks
+  the server how large the loaded model's window is, and a turn whose prompt does not fit shows a `model.window`
+  warning with the fix (`OLLAMA_CONTEXT_LENGTH=16384 ollama serve`). `loopwright doctor` says the same when it
+  finds Ollama, and `docs/offline.md` explains it. Tested against the stand-in server.
+- `scripts/check_streaming.py`: one watched turn against a real model, with the time to first words, the number
+  of pieces and whether the screen ended on the reply.
+- 158 tests.
+
 ## 0.11.0
 
 Model scores that survive a second run.

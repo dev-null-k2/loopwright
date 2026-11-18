@@ -43,6 +43,7 @@ class ModelResponse:
     model: str = ""
     stop_reason: str = "end_turn"
     thought: str = ""            # a short visible rationale, when the provider gives one
+    window: int = 0              # the model's context window in tokens, when the provider could find out
     cost_usd: float | None = None
 
 

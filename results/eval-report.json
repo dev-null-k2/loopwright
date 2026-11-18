@@ -1,6 +1,6 @@
 {
-  "generated": "2026-11-17T18:44:29",
-  "version": "0.11.0",
+  "generated": "2026-11-17T19:11:04",
+  "version": "0.11.1",
   "model": "scripted-v1 (rule-based; these are evals of the harness, not of an LLM)",
   "suites": {
     "core": {
@@ -80,7 +80,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 11,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -132,7 +132,7 @@
           "tokens_in": 7178,
           "turns": 1,
           "tokens_out": 36,
-          "duration_ms": 10,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -175,7 +175,7 @@
           "tokens_in": 4754,
           "turns": 1,
           "tokens_out": 14,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "clock"
@@ -222,7 +222,7 @@
           "tokens_in": 2363,
           "turns": 1,
           "tokens_out": 104,
-          "duration_ms": 5,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -267,7 +267,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 81,
+          "duration_ms": 68,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -309,7 +309,7 @@
           "tokens_in": 5188,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 8,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -351,7 +351,7 @@
           "tokens_in": 5188,
           "turns": 1,
           "tokens_out": 42,
-          "duration_ms": 10,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -398,7 +398,7 @@
           "tokens_in": 4749,
           "turns": 1,
           "tokens_out": 15,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -447,10 +447,10 @@
           "trial": {},
           "reply": "Here is how they compare.\n\n**BM25**: Keyword ranking that scores a passage by how often it has the query's words, weighted by how rare they are. It exists because: It is exact. If the user typed 'BILL-4004', BM25 finds the passage with that string, which an embedding may not. Tradeoff: It only matches words. Synonyms, paraphrases and typos score zero. [handbook: BM25]\n\n**embeddings**: Text turned into vectors so that similar meaning lands close together. It exists because: Keyword search misses paraphrase: 'booking' does not match 'schedule'. Vector search finds passages that mean the same thing in different words. Tradeoff: Dense search is weak on exact tokens such as error codes, ids and names, and it always returns its nearest neighbours even when nothing is relevant, so it needs a similarity floor. That floor does not carry between models: unrelated sentences score near 0 with one and near 0.5 with another. Change the model and every stored vector has to be made again. [handbook: Embeddings]",
           "steps": 38,
-          "tokens_in": 7243,
+          "tokens_in": 7244,
           "turns": 1,
           "tokens_out": 563,
-          "duration_ms": 16,
+          "duration_ms": 13,
           "cost_usd": 0.0,
           "tools": [
             "delegate"
@@ -497,7 +497,7 @@
           "tokens_in": 5824,
           "turns": 1,
           "tokens_out": 71,
-          "duration_ms": 9,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -536,10 +536,10 @@
           "trial": {},
           "reply": "Here is how they compare.\n\n**retrieval gate**: A cheap check, before any search, of whether this turn needs memory at all. It exists because: Retrieving on every turn is slower, and loosely related memories in the prompt bias the answer. 'What is 2+2' does not need your address. Tradeoff: a gate that wrongly skips loses a memory the turn needed. So it needs its own eval, and the model keeps a recall tool to pull memory mid-turn when the gate was wrong. [handbook: Retrieval gate]\n\n**compaction**: Replacing older conversation with a summary when history outgrows its share of the window. It exists because: Without it a long session either overflows the window or spends most of every call re-reading old small talk. Tradeoff: It is lossy and irreversible in the model's view: whatever the summary omits is gone. That is why durable facts are also written to long-term memory, and why the recent messages stay verbatim. [handbook: Compaction]\n\nIn short: A cheap check, before any search, of whether this turn needs memory at all. Replacing older conversation with a summary when history outgrows its share of the window.",
           "steps": 40,
-          "tokens_in": 11001,
+          "tokens_in": 11006,
           "turns": 1,
           "tokens_out": 816,
-          "duration_ms": 13,
+          "duration_ms": 11,
           "cost_usd": 0.0,
           "tools": [
             "delegate"
@@ -581,7 +581,7 @@
           "tokens_in": 5000,
           "turns": 1,
           "tokens_out": 180,
-          "duration_ms": 8,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -633,7 +633,7 @@
           "tokens_in": 5600,
           "turns": 1,
           "tokens_out": 274,
-          "duration_ms": 10,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "web_search"
@@ -680,7 +680,7 @@
           "tokens_in": 10436,
           "turns": 2,
           "tokens_out": 158,
-          "duration_ms": 14,
+          "duration_ms": 12,
           "cost_usd": 0.0,
           "tools": [
             "create_skill",
@@ -728,7 +728,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 15,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -775,7 +775,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 10,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -832,7 +832,7 @@
           "tokens_in": 6388,
           "turns": 1,
           "tokens_out": 83,
-          "duration_ms": 7,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "handbook__loopwright_explain"
@@ -979,7 +979,7 @@
           "tokens_in": 5230,
           "turns": 1,
           "tokens_out": 58,
-          "duration_ms": 8,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -1031,7 +1031,7 @@
           "tokens_in": 15012,
           "turns": 3,
           "tokens_out": 133,
-          "duration_ms": 26,
+          "duration_ms": 21,
           "cost_usd": 0.0,
           "tools": [
             "remember",
@@ -1118,7 +1118,7 @@
           "tokens_in": 4798,
           "turns": 1,
           "tokens_out": 35,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "remember"
@@ -1170,7 +1170,7 @@
           "tokens_in": 10651,
           "turns": 3,
           "tokens_out": 294,
-          "duration_ms": 16,
+          "duration_ms": 14,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -1217,7 +1217,7 @@
           "tokens_in": 7831,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 10,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "recall",
@@ -1260,7 +1260,7 @@
           "tokens_in": 2389,
           "turns": 1,
           "tokens_out": 14,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -1297,10 +1297,10 @@
           "trial": {},
           "reply": "I searched the handbook and found nothing relevant. I'm running on Loopwright's built-in scripted model, which only understands a fixed set of request shapes. I can remember things across sessions, book and list calendar events, save and search notes, do exact arithmetic, answer questions about how AI agents are built (with citations from the handbook), compare two concepts using parallel subagents, search the web, fetch a page, work a real browser, run workflows, schedule tasks to run on their own, and draft a message that you approve before it goes anywhere. For open-ended questions, connect Claude Code or an API key (run `loopwright doctor`).",
           "steps": 25,
-          "tokens_in": 11218,
+          "tokens_in": 11217,
           "turns": 2,
           "tokens_out": 385,
-          "duration_ms": 20,
+          "duration_ms": 17,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge",
@@ -1401,7 +1401,7 @@
           "tokens_in": 4966,
           "turns": 1,
           "tokens_out": 91,
-          "duration_ms": 6,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "fetch_url"
@@ -1594,7 +1594,7 @@
           "tokens_in": 4790,
           "turns": 1,
           "tokens_out": 34,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -1641,7 +1641,7 @@
           "tokens_in": 4764,
           "turns": 1,
           "tokens_out": 29,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "read_file"
@@ -1772,7 +1772,7 @@
           "tokens_in": 4777,
           "turns": 1,
           "tokens_out": 28,
-          "duration_ms": 5,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "save_note"
@@ -1871,7 +1871,7 @@
           "tokens_in": 5345,
           "turns": 1,
           "tokens_out": 112,
-          "duration_ms": 8,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "web_search"
@@ -2015,7 +2015,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 8,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2052,7 +2052,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2090,7 +2090,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2144,7 +2144,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2228,7 +2228,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2446,7 +2446,7 @@
           "tokens_in": 7188,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2484,7 +2484,7 @@
           "tokens_in": 7188,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2534,7 +2534,7 @@
           "tokens_in": 7855,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 9,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2573,7 +2573,7 @@
           "tokens_in": 7855,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 7,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2612,7 +2612,7 @@
           "tokens_in": 7855,
           "turns": 1,
           "tokens_out": 72,
-          "duration_ms": 8,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [
             "create_event",
@@ -2707,7 +2707,7 @@
           "tokens_in": 7190,
           "turns": 1,
           "tokens_out": 50,
-          "duration_ms": 6,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "calculator",
@@ -2861,7 +2861,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2908,7 +2908,7 @@
           "tokens_in": 4756,
           "turns": 1,
           "tokens_out": 18,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "calculator"
@@ -2960,7 +2960,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 79,
+          "duration_ms": 55,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -3007,7 +3007,7 @@
           "tokens_in": 5668,
           "turns": 1,
           "tokens_out": 235,
-          "duration_ms": 11,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "search_knowledge"
@@ -3049,7 +3049,7 @@
           "tokens_in": 2935,
           "turns": 1,
           "tokens_out": 104,
-          "duration_ms": 7,
+          "duration_ms": 6,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -3089,7 +3089,7 @@
           "tokens_in": 6371,
           "turns": 1,
           "tokens_out": 59,
-          "duration_ms": 11,
+          "duration_ms": 10,
           "cost_usd": 0.0,
           "tools": [
             "create_event"
@@ -3131,7 +3131,7 @@
           "tokens_in": 2612,
           "turns": 1,
           "tokens_out": 104,
-          "duration_ms": 4,
+          "duration_ms": 3,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -3171,7 +3171,7 @@
           "tokens_in": 8105,
           "turns": 1,
           "tokens_out": 177,
-          "duration_ms": 8,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -3262,12 +3262,12 @@
             {
               "check": "tool_called: list_events",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
+              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
             },
             {
               "check": "tool_called: search_notes",
               "pass": true,
-              "note": "tools that ran: ['list_events', 'search_notes', 'search_knowledge']"
+              "note": "tools that ran: ['list_events', 'search_knowledge', 'search_notes']"
             },
             {
               "check": "reply_contains: Design review",
@@ -3291,12 +3291,12 @@
           "tokens_in": 377,
           "turns": 1,
           "tokens_out": 62,
-          "duration_ms": 8,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "list_events",
-            "search_notes",
-            "search_knowledge"
+            "search_knowledge",
+            "search_notes"
           ],
           "model": "scripted-v1",
           "provider": "scripted",
@@ -3548,7 +3548,7 @@
           "tokens_in": 4789,
           "turns": 1,
           "tokens_out": 38,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3600,7 +3600,7 @@
           "tokens_in": 4839,
           "turns": 1,
           "tokens_out": 85,
-          "duration_ms": 10,
+          "duration_ms": 8,
           "cost_usd": 0.0,
           "tools": [
             "schedule_task"
@@ -3694,7 +3694,7 @@
           "tokens_in": 4776,
           "turns": 1,
           "tokens_out": 41,
-          "duration_ms": 4,
+          "duration_ms": 5,
           "cost_usd": 0.0,
           "tools": [
             "send_message"
@@ -3741,7 +3741,7 @@
           "tokens_in": 7365,
           "turns": 1,
           "tokens_out": 80,
-          "duration_ms": 6,
+          "duration_ms": 7,
           "cost_usd": 0.0,
           "tools": [
             "read_file",
@@ -3789,7 +3789,7 @@
           "tokens_in": 2365,
           "turns": 1,
           "tokens_out": 40,
-          "duration_ms": 3,
+          "duration_ms": 2,
           "cost_usd": 0.0,
           "tools": [],
           "model": "scripted-v1",
@@ -3849,7 +3849,7 @@
           "tokens_in": 5096,
           "turns": 1,
           "tokens_out": 66,
-          "duration_ms": 12,
+          "duration_ms": 13,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3939,7 +3939,7 @@
           "tokens_in": 4972,
           "turns": 1,
           "tokens_out": 30,
-          "duration_ms": 5,
+          "duration_ms": 4,
           "cost_usd": 0.0,
           "tools": [
             "run_command"
@@ -3996,7 +3996,7 @@
           "tokens_in": 6931,
           "turns": 1,
           "tokens_out": 155,
-          "duration_ms": 1773,
+          "duration_ms": 1686,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4038,7 +4038,7 @@
           "tokens_in": 7240,
           "turns": 1,
           "tokens_out": 164,
-          "duration_ms": 1723,
+          "duration_ms": 1622,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4132,7 +4132,7 @@
           "tokens_in": 6036,
           "turns": 1,
           "tokens_out": 167,
-          "duration_ms": 767,
+          "duration_ms": 731,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4174,7 +4174,7 @@
           "tokens_in": 5843,
           "turns": 1,
           "tokens_out": 106,
-          "duration_ms": 394,
+          "duration_ms": 401,
           "cost_usd": 0.0,
           "tools": [
             "browse_web"
@@ -4482,8 +4482,8 @@
           "expected": "routing",
           "got": [
             "concept:context-window",
-            "concept:trajectory-evals",
-            "concept:a2a"
+            "concept:a2a",
+            "concept:trajectory-evals"
           ]
         },
         {
@@ -4662,5 +4662,5 @@
       "gate_false_skip_rate_max": 0.2
     }
   },
-  "seconds": 39.43
+  "seconds": 37.84
 }

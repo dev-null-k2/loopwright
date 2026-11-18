@@ -405,6 +405,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     chosen = pick_provider("auto")
     for name, info in status.items():
         print(f"  {'ready ' if info['ok'] else 'no    '} {name:<12} {info['note']}{'   <- auto picks this' if name == chosen else ''}")
+    from loopwright.models import local as local_models
+    running = local_models.detect()
+    if running and running["name"] == "Ollama":
+        print("\n  Ollama loads a model with a 4,096-token window unless told otherwise. This agent's prompt starts near 2,500 tokens "
+              "and grows\n  with every tool result, so longer turns get cut without an error. Give it room:  "
+              "OLLAMA_CONTEXT_LENGTH=16384 ollama serve")
     from loopwright.memory import embedders
     found = embedders.local_embedding_models()
     print("\nRetrieval")

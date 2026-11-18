@@ -23,6 +23,7 @@ class Stub(BaseHTTPRequestHandler):
     requests: list = []
     listed: list = ["native-model", "nomic-embed-text", "chatty-model", "plain-model"]
     caps: dict | None = None        # model -> capabilities, as Ollama's /api/show reports them; None = not an Ollama server
+    window: int = 0                 # the context window /api/ps reports for a loaded model; 0 = the server does not say
 
     def log_message(self, *args):
         pass
@@ -36,6 +37,10 @@ class Stub(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_GET(self):
+        if self.path == "/api/ps":
+            if not Stub.window:
+                return self._send(404, {"error": "not found"})
+            return self._send(200, {"models": [{"name": name, "model": name, "context_length": Stub.window} for name in Stub.listed]})
         self._send(200, {"data": [{"id": name} for name in Stub.listed]})
 
     def do_POST(self):
@@ -89,7 +94,8 @@ def server(monkeypatch):
     monkeypatch.setenv("LOOPWRIGHT_LOCAL_URL", f"http://127.0.0.1:{httpd.server_address[1]}/v1")
     local._found.update(at=0.0, value=None)
     local._caps.clear()
-    Stub.requests, Stub.caps = [], None
+    Stub.requests, Stub.caps, Stub.window = [], None, 0
+    local._windows.clear()
     Stub.listed = ["native-model", "nomic-embed-text", "chatty-model", "plain-model"]
     yield httpd
     httpd.shutdown()
@@ -168,3 +174,24 @@ def test_the_model_picked_is_one_that_can_call_tools_not_the_first_one_listed(se
     Stub.listed = ["llava:13b", "some-unknown-model"]
     local._caps.clear()
     assert local.detect(refresh=True)["preferred"] == "some-unknown-model"            # anything before a vision model
+
+
+def test_a_window_smaller_than_the_prompt_is_noticed_and_said_once(server, tmp_path):
+    """Ollama loads a model with 4,096 tokens of context by default and cuts a longer prompt silently.
+    The provider asks the server what the window is, and the turn warns when the prompt does not fit."""
+    agent = Agent(home=tmp_path)
+    options = Options(provider="local", model="native-model", fast=True, fallback=False)
+    quiet = agent.run_turn("What's 18% of 2450?", options=options)
+    assert "model.window" not in quiet.kinds()                                     # a server that does not say: no guess, no warning
+    Stub.window = 2048
+    local._windows.clear()
+    result = agent.run_turn("What's 18% of 2450?", session="b", options=options)
+    warnings = [e for e in result.events if e.kind == "model.window"]
+    assert len(warnings) == 1 and warnings[0].status == "warn" and result.ok        # said once, and the turn goes on
+    assert warnings[0].data["window"] == 2048 and warnings[0].data["prompt_tokens"] > 2048 - 256
+    assert "OLLAMA_CONTEXT_LENGTH" in warnings[0].detail
+    Stub.window = 16384
+    local._windows.clear()
+    roomy = agent.run_turn("What's 18% of 2450?", session="c", options=options)
+    assert "model.window" not in roomy.kinds()
+    assert local.context_window(f"http://127.0.0.1:{server.server_address[1]}", "native-model") == 16384

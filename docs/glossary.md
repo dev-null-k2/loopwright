@@ -293,7 +293,7 @@ Both use models and tools. The difference is who holds the control flow. A workf
 The window holds the system prompt, tool definitions, conversation and tool results. It is the model's entire knowledge of the current situation: anything not in it does not exist for the model. It is finite, and it is billed on every call.
 
 - **Why it exists.** Every design question about memory, retrieval and compaction is really a question about what to put in this limited space.
-- **The tradeoff.** A larger window lets you include more, but models attend less reliably as it fills, and cost and latency scale with its size. Capacity is not a reason to use it.
+- **The tradeoff.** A larger window lets you include more, but models attend less reliably as it fills, and cost and latency scale with its size. Capacity is not a reason to use it. The window you get is also not always the one the model supports: a local runner loads a model with a window of its own choosing (Ollama's default is 4,096 tokens) and silently cuts a prompt that is longer. Loopwright asks the runner how large the window is and warns when the prompt does not fit.
 - **In this repo.** [`loopwright/context.py`](../loopwright/context.py)
 - **See it run.** `loopwright ask "What is a context window?" --steps`
 

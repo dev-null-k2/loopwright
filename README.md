@@ -256,8 +256,10 @@ answer. Reliability cases run three trials with failures injected at different p
 
 | Other checks | Result |
 |---|---|
-| Handbook retrieval, 44 questions in the handbook's own words, recall@1 / @3 | BM25 84% / 100% · dense 73% / 91% · hybrid 84% / 98% |
+| Handbook retrieval, 44 questions in the handbook's own words, recall@1 / @3 | BM25 84% / 100% · dense 73% / 93% · hybrid 84% / 98% |
 | The same, 60 held-out questions that paraphrase | BM25 60% / 75% · dense 50% / 62% · hybrid 60% / 73% |
+| Held-out again, hybrid with a real embedding model in place of the stand-in | all-minilm 65% / 82% · nomic-embed-text 68% / 83% · mxbai-embed-large 75% / 88% |
+| Eight behaviour questions, three trials, right on every trial ([results/models.md](results/models.md)) | scripted stand-in 8/8 · qwen2.5:3b 5/8 · llama3.2:3b 3/8 |
 | Retrieval gate (rules), 30 labelled messages | 83% accurate; 2 false skips, 3 false retrieves |
 | Lessons | all 24 runnable lessons produce every step they promise (a test enforces it) |
 | Unit and end-to-end tests | 158 passing |
@@ -278,12 +280,17 @@ and an injection on a page the browser read does not reach the outbox.
   That is what lets the evals show the attacks working (5 of 5 with guardrails off) and the defence holding
   (0 of 5 with them on). One case (`tests/test_harness.py`) goes further and drives the gate with a fully
   compromised model.
-- The "dense" ranker in these numbers is an offline hashed embedder that captures spelling, not meaning. On this
-  small corpus plain BM25 does as well as hybrid or slightly better (100% against 98% at recall@3): fusing with a
-  weak ranker can push a good BM25 hit down. Asked in other words (the held-out set), every ranker here drops to
-  about three in four. A real embedding model and a reranker plug in with one option each
-  ([docs/retrieval.md](docs/retrieval.md)) and are tested against a stand-in server, but **none has been scored
-  yet**: `loopwright eval --retrieval --embedder auto` produces that row on a machine with Ollama.
+- The "dense" ranker in the first two retrieval rows is an offline hashed embedder that captures spelling, not
+  meaning. On this small corpus plain BM25 does as well as hybrid or slightly better (100% against 98% at
+  recall@3): fusing with a weak ranker can push a good BM25 hit down. Asked in other words (the held-out set),
+  every stand-in ranker drops to about three in four.
+- The real-model rows come from one run of the "Model scores" workflow on a GitHub-hosted runner (4 cores, no
+  GPU, models in Ollama). Three real embedding models were scored and each beat the stand-in on the held-out
+  questions, the largest by 15 points at recall@3. A 3B chat model used as reranker made the held-out set better
+  (93% at recall@3) and the easy set worse; [docs/retrieval.md](docs/retrieval.md) has the table. It is one run:
+  the embedding numbers are deterministic, the chat-model numbers are three trials and would move on a fourth.
+- In that run a small model **obeyed a prompt injection** and tried to send a message; the tool gate refused the
+  call. That is the claim this project makes about limits in code, observed on a real model.
 - The rule-based gate is wrong about one message in six. Its misses are listed in the report; the model-based
   gate (`gate=model`) exists for that reason and needs a real model.
 - The release gate also fails if guardrails-off stops letting attacks through, or memory-off stops failing memory
@@ -350,12 +357,15 @@ asked. Setup for each: [docs/gateways.md](docs/gateways.md).
 behaviour cases through each and prints pass, time, tokens and cost; the cockpit shows the table and replays any
 cell. Add `--trials 3` and each question is asked three times in fresh state, so the table can tell "right every
 time" from "right at least once"; add `--publish` and it is written to [`results/models.md`](results/models.md)
-with the date, the version and the machine. That file currently holds **only the scripted stand-in**: no real
-model has been run through it yet. On a machine with Ollama or a signed-in Claude Code:
+with the date, the version and the machine. The published file has two small open-source models next to the
+scripted stand-in, with what each got wrong and why. No hosted model (Claude, GPT) is in it yet. On a machine
+with Ollama or a signed-in Claude Code:
 
 ```bash
 loopwright compare --targets local claude-code --trials 3 --publish
 ```
+
+The same run is a button on GitHub: Actions, Model scores, Run workflow.
 
 **Your own evals, and your own observability stack.** Under every reply: Good, Bad, and Save as eval case, which
 turns that run into a regression test (`loopwright eval --mine`). `loopwright export last --otlp

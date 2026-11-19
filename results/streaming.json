@@ -1,0 +1,14 @@
+{
+  "provider": "local",
+  "model": "qwen2.5:3b",
+  "ok": true,
+  "streamed_calls": 1,
+  "pieces": 35,
+  "first_token_ms": 68063,
+  "last_call_ms": 73714,
+  "turn_ms": 73720,
+  "pieces_spread_ms": 5136,
+  "screen_ends_on_reply": true,
+  "reply": "An agent harness is a framework or toolset that manages an AI's training and deployment, including controlling its learning process and performance, ensuring it operates safely and effectively within the system it's integrated into. It serves as the central control for the AI's lifecycle management.",
+  "run": "https://github.com/dev-null-k2/loopwright/actions/runs/44399395974"
+}

@@ -1,0 +1,52 @@
+{
+ "generated": "2026-11-18T22:52:41",
+ "version": "0.11.1",
+ "rows": [
+  {
+   "embedder": "ollama:nomic-embed-text",
+   "rerank": "model",
+   "questions": 44,
+   "bm25": {
+    "recall_at_1": 0.841,
+    "recall_at_3": 1.0
+   },
+   "dense": {
+    "recall_at_1": 0.864,
+    "recall_at_3": 0.932
+   },
+   "hybrid": {
+    "recall_at_1": 0.886,
+    "recall_at_3": 0.977
+   },
+   "reranked": {
+    "recall_at_1": 0.568,
+    "recall_at_3": 0.909,
+    "failed": 0
+   },
+   "fallback": "",
+   "embedder_used": "ollama:nomic-embed-text",
+   "heldout": {
+    "questions": 60,
+    "bm25": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.75
+    },
+    "dense": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.767
+    },
+    "hybrid": {
+     "recall_at_1": 0.683,
+     "recall_at_3": 0.833
+    },
+    "reranked": {
+     "recall_at_1": 0.717,
+     "recall_at_3": 0.933,
+     "failed": 0
+    }
+   }
+  }
+ ],
+ "run": "https://github.com/dev-null-k2/loopwright/actions/runs/44399395974",
+ "machine": "GitHub-hosted runner: Linux x86_64, 4 cores, no GPU"
+}

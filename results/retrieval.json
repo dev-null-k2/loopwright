@@ -1,0 +1,144 @@
+{
+ "generated": "2026-11-18T21:18:11",
+ "version": "0.11.1",
+ "rows": [
+  {
+   "embedder": "hash",
+   "rerank": "off",
+   "questions": 44,
+   "bm25": {
+    "recall_at_1": 0.841,
+    "recall_at_3": 1.0
+   },
+   "dense": {
+    "recall_at_1": 0.727,
+    "recall_at_3": 0.932
+   },
+   "hybrid": {
+    "recall_at_1": 0.841,
+    "recall_at_3": 0.977
+   },
+   "fallback": "",
+   "embedder_used": "hash",
+   "heldout": {
+    "questions": 60,
+    "bm25": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.75
+    },
+    "dense": {
+     "recall_at_1": 0.5,
+     "recall_at_3": 0.617
+    },
+    "hybrid": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.733
+    }
+   }
+  },
+  {
+   "embedder": "ollama:nomic-embed-text",
+   "rerank": "off",
+   "questions": 44,
+   "bm25": {
+    "recall_at_1": 0.841,
+    "recall_at_3": 1.0
+   },
+   "dense": {
+    "recall_at_1": 0.864,
+    "recall_at_3": 0.932
+   },
+   "hybrid": {
+    "recall_at_1": 0.886,
+    "recall_at_3": 0.977
+   },
+   "fallback": "",
+   "embedder_used": "ollama:nomic-embed-text",
+   "heldout": {
+    "questions": 60,
+    "bm25": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.75
+    },
+    "dense": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.767
+    },
+    "hybrid": {
+     "recall_at_1": 0.683,
+     "recall_at_3": 0.833
+    }
+   }
+  },
+  {
+   "embedder": "ollama:mxbai-embed-large",
+   "rerank": "off",
+   "questions": 44,
+   "bm25": {
+    "recall_at_1": 0.841,
+    "recall_at_3": 1.0
+   },
+   "dense": {
+    "recall_at_1": 0.864,
+    "recall_at_3": 0.932
+   },
+   "hybrid": {
+    "recall_at_1": 0.909,
+    "recall_at_3": 1.0
+   },
+   "fallback": "",
+   "embedder_used": "ollama:mxbai-embed-large",
+   "heldout": {
+    "questions": 60,
+    "bm25": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.75
+    },
+    "dense": {
+     "recall_at_1": 0.683,
+     "recall_at_3": 0.917
+    },
+    "hybrid": {
+     "recall_at_1": 0.75,
+     "recall_at_3": 0.883
+    }
+   }
+  },
+  {
+   "embedder": "ollama:all-minilm",
+   "rerank": "off",
+   "questions": 44,
+   "bm25": {
+    "recall_at_1": 0.841,
+    "recall_at_3": 1.0
+   },
+   "dense": {
+    "recall_at_1": 0.75,
+    "recall_at_3": 0.955
+   },
+   "hybrid": {
+    "recall_at_1": 0.864,
+    "recall_at_3": 1.0
+   },
+   "fallback": "",
+   "embedder_used": "ollama:all-minilm",
+   "heldout": {
+    "questions": 60,
+    "bm25": {
+     "recall_at_1": 0.6,
+     "recall_at_3": 0.75
+    },
+    "dense": {
+     "recall_at_1": 0.517,
+     "recall_at_3": 0.717
+    },
+    "hybrid": {
+     "recall_at_1": 0.65,
+     "recall_at_3": 0.817
+    }
+   }
+  }
+ ],
+ "run": "https://github.com/dev-null-k2/loopwright/actions/runs/44399395974",
+ "machine": "GitHub-hosted runner: Linux x86_64, 4 cores, no GPU"
+}

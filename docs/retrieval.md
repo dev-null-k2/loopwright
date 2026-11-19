@@ -104,26 +104,48 @@ Two question sets are scored, and the difference between them matters more than 
   other words: "decide whether to look anything up before answering". It was written in one sitting before any
   result on it had been seen, and nothing has been tuned against it since.
 
-With the stand-in embedder:
+| Embedder | Ranker | First set, recall@1 / @3 | Held-out, recall@1 / @3 |
+|---|---|---|---|
+| none | BM25 | 84% / 100% | 60% / 75% |
+| hash (the stand-in) | dense | 73% / 93% | 50% / 62% |
+| | hybrid | 84% / 98% | 60% / 73% |
+| `all-minilm` (23M parameters) | dense | 75% / 95% | 52% / 72% |
+| | hybrid | 86% / 100% | 65% / 82% |
+| `nomic-embed-text` | dense | 86% / 93% | 60% / 77% |
+| | hybrid | 89% / 98% | 68% / 83% |
+| `mxbai-embed-large` | dense | 86% / 93% | 68% / 92% |
+| | hybrid | 91% / 100% | 75% / 88% |
+| `nomic-embed-text` | hybrid, then `qwen2.5:3b` reranks twelve candidates | 57% / 91% | 72% / 93% |
 
-| Ranker | First set, recall@1 / @3 | Held-out, recall@1 / @3 |
-|---|---|---|
-| BM25 | 84% / 100% | 60% / 75% |
-| dense (hash) | 73% / 91% | 50% / 62% |
-| hybrid | 84% / 98% | 60% / 73% |
+What the numbers say:
 
-Read that as: on questions in the handbook's vocabulary the right card is nearly always in the top three; asked
-in other words, one question in four misses. That gap is what a real embedding model is for.
+- **The stand-in is what it claims to be.** On questions in the handbook's vocabulary it finds the right card in
+  the top three almost every time; asked in other words, one question in four misses.
+- **A real embedding model closes part of that gap, and how much depends on the model.** On the held-out set
+  hybrid recall@3 goes from 73% to 82%, 83% and 88%. The smallest model is barely better than the stand-in on its
+  own (dense 72% against 62%) and still lifts the hybrid by nine points.
+- **Hybrid is not always the best of both.** With `mxbai-embed-large`, dense search alone finds 92% of held-out
+  answers in the top three, and fusing it with BM25 brings that down to 88%: on paraphrases the keyword ranker is
+  the weak partner, and equal-weight fusion lets it pull good results down. On the first set the same fusion helps.
+  Which ranker to trust depends on how your users phrase things, which is a reason to measure on your own questions.
+- **A small chat model is an erratic reranker.** It lifted the held-out set to 93% at recall@3, which it can do
+  because it chooses from twelve candidates where the first stage keeps three, and it made the top result *worse* on the easy set
+  (57% from 89%): it re-orders lists that were already right. A cross-encoder built for the job, or a larger
+  model, is the usual answer; neither has been run here.
 
 ## What has and has not been run
 
-- The stand-in numbers above are from `loopwright eval`, on every push.
-- The embedders and both rerankers are tested over real HTTP against a stand-in server that speaks Ollama's
-  `/api/embed`, the OpenAI-style `/v1/embeddings` and `/v1/rerank`: batching, prefixes, the cache, the measured
-  floor, the fallback, a full turn, and the eval. The stand-in's "model" is the hash embedder plus a few
-  synonyms, enough to tell a search that used it from one that did not.
-- **No real embedding model and no real reranker has been scored yet.** The table has no row for one because none
-  has been run. The command above produces that row on any machine with Ollama, and writes it to
-  `results/retrieval.json`.
-- The floor's "mean plus two standard deviations" is a reasoned default, not a tuned one. Check it against your
-  model with `loopwright eval --retrieval` and set `LOOPWRIGHT_EMBED_FLOOR` if dense recall looks cut off.
+- The stand-in rows are from `loopwright eval`, on every push.
+- The real-model rows are from one run of the "Model scores" workflow on a GitHub-hosted runner (4 cores, no GPU,
+  Ollama, Loopwright 0.11.1): [`results/retrieval.json`](../results/retrieval.json) and
+  [`results/retrieval-rerank.json`](../results/retrieval-rerank.json). Embedding is deterministic, so those rows
+  should reproduce; the reranked row depends on a chat model and will move from run to run. No search fell back
+  to the stand-in during the run.
+- The embedders and both rerankers are also tested on every push, over real HTTP against a stand-in server that
+  speaks Ollama's `/api/embed`, the OpenAI-style `/v1/embeddings` and `/v1/rerank`: batching, prefixes, the cache,
+  the measured floor, the fallback, a full turn, and the eval.
+- Not run: the OpenAI-style embeddings path against a real service, the `endpoint` reranker against a real
+  cross-encoder, and any embedding model larger than these three.
+- The floor's "mean plus two standard deviations" is a reasoned default, not a tuned one. Dense recall with the
+  three models above does not look cut off by it, which is some evidence and not a calibration. Set
+  `LOOPWRIGHT_EMBED_FLOOR` if it does with yours.

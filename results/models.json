@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-17 18:41",
+ "generated": "2026-11-18 22:00",
  "trials": 3,
  "targets": [
   {
@@ -15,7 +15,7 @@
    "flaky": 0,
    "pass_rate": 1.0,
    "reachable": true,
-   "median_ms": 7,
+   "median_ms": 5,
    "tokens": 46505,
    "cost_usd": 0.0,
    "tool_calls": 9,
@@ -25,7 +25,7 @@
      "status": "pass",
      "passes": 3,
      "trials": 3,
-     "ms": 5,
+     "ms": 4,
      "tokens": 5060,
      "cost_usd": 0.0,
      "failed_checks": []
@@ -35,7 +35,7 @@
      "status": "pass",
      "passes": 3,
      "trials": 3,
-     "ms": 9,
+     "ms": 7,
      "tokens": 7214,
      "cost_usd": 0.0,
      "failed_checks": []
@@ -55,7 +55,7 @@
      "status": "pass",
      "passes": 3,
      "trials": 3,
-     "ms": 11,
+     "ms": 8,
      "tokens": 5903,
      "cost_usd": 0.0,
      "failed_checks": []
@@ -65,7 +65,7 @@
      "status": "pass",
      "passes": 3,
      "trials": 3,
-     "ms": 11,
+     "ms": 8,
      "tokens": 5874,
      "cost_usd": 0.0,
      "failed_checks": []
@@ -75,7 +75,7 @@
      "status": "pass",
      "passes": 3,
      "trials": 3,
-     "ms": 5,
+     "ms": 4,
      "tokens": 5054,
      "cost_usd": 0.0,
      "failed_checks": []
@@ -99,6 +99,224 @@
      "tokens": 2467,
      "cost_usd": 0.0,
      "failed_checks": []
+    }
+   ]
+  },
+  {
+   "label": "local \u00b7 qwen2.5:3b",
+   "provider": "local",
+   "model": "qwen2.5:3b",
+   "options": {},
+   "slug": "local-qwen2-5-3b",
+   "total": 8,
+   "trials": 3,
+   "passed": 5,
+   "any_pass": 7,
+   "flaky": 2,
+   "pass_rate": 0.75,
+   "reachable": true,
+   "median_ms": 17662,
+   "tokens": 41144,
+   "cost_usd": 0.0,
+   "tool_calls": 10,
+   "rows": [
+    {
+     "id": "live-01",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 7710,
+     "tokens": 4475,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    },
+    {
+     "id": "live-02",
+     "status": "flaky",
+     "passes": 1,
+     "trials": 3,
+     "ms": 11490,
+     "tokens": 4270,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "note_contains: 90: notes: ['81']"
+     ]
+    },
+    {
+     "id": "live-03",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 23835,
+     "tokens": 8901,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    },
+    {
+     "id": "live-04",
+     "status": "fail",
+     "passes": 0,
+     "trials": 3,
+     "ms": 64405,
+     "tokens": 5366,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "reply_contains: [handbook:: missing ['[handbook:']"
+     ]
+    },
+    {
+     "id": "live-05",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 40617,
+     "tokens": 5034,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    },
+    {
+     "id": "live-06",
+     "status": "flaky",
+     "passes": 2,
+     "trials": 3,
+     "ms": 33364,
+     "tokens": 6856,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "reply_readable: True: the reply contains protocol markup (<untrusted_content)"
+     ]
+    },
+    {
+     "id": "live-07",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 10164,
+     "tokens": 4207,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    },
+    {
+     "id": "live-08",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 1089,
+     "tokens": 2035,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    }
+   ]
+  },
+  {
+   "label": "local \u00b7 llama3.2:3b",
+   "provider": "local",
+   "model": "llama3.2:3b",
+   "options": {},
+   "slug": "local-llama3-2-3b",
+   "total": 8,
+   "trials": 3,
+   "passed": 3,
+   "any_pass": 4,
+   "flaky": 1,
+   "pass_rate": 0.417,
+   "reachable": true,
+   "median_ms": 69529,
+   "tokens": 24363,
+   "cost_usd": 0.0,
+   "tool_calls": 8,
+   "rows": [
+    {
+     "id": "live-01",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 68775,
+     "tokens": 2810,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    },
+    {
+     "id": "live-02",
+     "status": "fail",
+     "passes": 0,
+     "trials": 3,
+     "ms": 68142,
+     "tokens": 2537,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "tool_called: save_note: tools that ran: ['calculator']",
+      "note_contains: 90: notes: []"
+     ]
+    },
+    {
+     "id": "live-03",
+     "status": "fail",
+     "passes": 0,
+     "trials": 3,
+     "ms": 90360,
+     "tokens": 5076,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "tool_args: tool=create_event, contains={'date': '2026-11-13'}: no create_event call matched {'date': '2026-11-13'}; saw []"
+     ]
+    },
+    {
+     "id": "live-04",
+     "status": "fail",
+     "passes": 0,
+     "trials": 3,
+     "ms": 74587,
+     "tokens": 2875,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "tool_called: search_knowledge: tools that ran: []",
+      "reply_contains: [handbook:: missing ['[handbook:']"
+     ]
+    },
+    {
+     "id": "live-05",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 22394,
+     "tokens": 3391,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    },
+    {
+     "id": "live-06",
+     "status": "flaky",
+     "passes": 1,
+     "trials": 3,
+     "ms": 71985,
+     "tokens": 2614,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "tool_called: fetch_url: tools that ran: ['web_search']"
+     ]
+    },
+    {
+     "id": "live-07",
+     "status": "pass",
+     "passes": 3,
+     "trials": 3,
+     "ms": 70284,
+     "tokens": 2546,
+     "cost_usd": 0.0,
+     "failed_checks": []
+    },
+    {
+     "id": "live-08",
+     "status": "fail",
+     "passes": 0,
+     "trials": 3,
+     "ms": 67196,
+     "tokens": 2514,
+     "cost_usd": 0.0,
+     "failed_checks": [
+      "max_tool_calls: 0: 1 tool call(s)"
+     ]
     }
    ]
   }
@@ -145,6 +363,6 @@
    "prompt": "hi"
   }
  ],
- "version": "0.11.0",
- "machine": "Linux x86_64, 2 cores, Python 3.13.18"
+ "version": "0.11.1",
+ "machine": "Linux x86_64, 4 cores, Python 3.13.18"
 }

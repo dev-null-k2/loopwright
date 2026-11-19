@@ -72,6 +72,12 @@ track on multi-step requests and takes seconds to minutes per step. That is a go
 exactly where it goes wrong, and the tool gate, budgets and repeat detection are what keep those mistakes harmless.
 `loopwright selftest --provider local` tells you which of the eight behaviours your model manages.
 
+Measured, not guessed: on a 4-core machine with no GPU, `qwen2.5:3b` got five of the eight behaviours right on
+all three trials and `llama3.2:3b` three, at a median of 18 and 70 seconds per question
+([results/models.md](../results/models.md)). In one trial a model obeyed an injected
+instruction to send a message, and the tool gate refused the call. A reply streamed as it should: 35 pieces
+over five seconds, after a 68-second wait for the first one while the model loaded and read the prompt.
+
 ### Embedding models
 
 Retrieval uses a built-in stand-in for embeddings by default. If your local server also has an embedding model

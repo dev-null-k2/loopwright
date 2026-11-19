@@ -3,11 +3,12 @@
 Roughly in order.
 
 **Next**
-- Scores for real models. The machinery is in (`loopwright compare --trials 3 --publish` writes
-  `results/models.md`, and the hand-started "Model scores" workflow runs it on a GitHub runner), and the
-  published table holds only the scripted stand-in until someone runs it with a real model.
-- A real embedding model and a reranker scored on the two retrieval sets, and the row published. The code and
-  the command exist (`loopwright eval --retrieval --embedder auto`); no real model has been run through it yet.
+- Scores for hosted models (Claude through Claude Code, an API model) next to the two small local ones that are
+  published in `results/models.md`, and a second run of those to see how far three trials move.
+- What that first run showed the harness should forgive: a small model passed a number as text (`"3"` for `3`)
+  and the tool gate refused the call. Coerce unambiguous values, say so in an event, and measure the difference.
+- A cross-encoder behind the `endpoint` reranker, scored. A 3B chat model as reranker helped the paraphrased
+  questions and hurt the easy ones.
 - The chat gateways run against the live services, with the results written up.
 
 **Then**

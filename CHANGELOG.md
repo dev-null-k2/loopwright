@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.2
+
+The first real-model numbers, from one run of the Model scores workflow (a GitHub-hosted runner: 4 cores, no GPU,
+Ollama, Loopwright 0.11.1). No code changed in this release.
+
+- **Embedding models, scored.** On the 60 held-out questions, hybrid recall@3 is 73% with the stand-in and 82%,
+  83% and 88% with `all-minilm`, `nomic-embed-text` and `mxbai-embed-large`. With the last one, dense search
+  alone (92%) beat the hybrid. `results/retrieval.json`; the table and what it means are in `docs/retrieval.md`.
+- **A chat model as reranker, scored.** `qwen2.5:3b` over twelve candidates took the held-out set to 93% at
+  recall@3 and made the easy set's top result worse (57% from 89%). `results/retrieval-rerank.json`.
+- **Two small chat models, three trials each.** Right on every trial: `qwen2.5:3b` 5 of 8, `llama3.2:3b` 3 of 8.
+  `results/models.md` lists what each got wrong. In one trial a model obeyed a prompt injection and called
+  `send_message`; the tool gate refused it.
+- **Streaming against a real server.** One watched turn: 35 pieces over 5.1 seconds, the screen ending on exactly
+  the reply. `results/streaming.json`.
+- The workflow's first version was rejected by GitHub (a context that is not available in job `env`); fixed.
+- Still not run: a hosted model, a cross-encoder reranker, a third-party hosted MCP server.
+
 ## 0.11.1
 
 - **A local model's window is checked.** Ollama loads a model with a 4,096-token context window by default and
